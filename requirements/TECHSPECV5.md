@@ -166,9 +166,10 @@ expr ::= ...
 ### 4.1 Primitive Types
 | Type | Notes |
 |------|-------|
-| `Int` | Signed 64-bit, checked overflow |
-| `Bool` | `true` / `false` only |
-| `String` | Immutable UTF-8 |
+| `number` | Signed 64-bit, checked overflow |
+| `boolean` | `true` / `false` only |
+| `string` | Immutable UTF-8 |
+| `Decimal` | Deterministic fixed-point |
 
 ### 4.2 Composite Types
 Records and algebraic data types (unchanged).
@@ -182,8 +183,8 @@ Use `Option<T>` and `Result<T, E>`.
 
 ```mtp
 type Decimal {
-  value: String   // canonical integer significand, **1–34 digits**, no leading zeros
-  scale: Int      // 0 ≤ scale ≤ 28 (IEEE-754-2008 decimal128)
+  value: string   // canonical integer significand, **1–34 digits**, no leading zeros
+  scale: number      // 0 ≤ scale ≤ 28 (IEEE-754-2008 decimal128)
 }
 ```
 
@@ -197,7 +198,7 @@ type Decimal {
 ## 5. Equality, Ordering & Hashing ➜
 
 * Equality: structural, total, no reference identity
-* Ordering: only `Int` and `String`
+* Ordering: only `number` and `string`
 * Hash: FNV-1a 64-bit of **deterministic CBOR (RFC 7049 §3.9)**
 * Map key order:
   1. Type tag
@@ -240,7 +241,7 @@ Host effects **must** be deterministic functions of their arguments + **request 
 
 ```mtp
 effect Async {
-  await<T>(promiseHash: String, contId: Int, effectArgs: Json): Result<T, Err>
+  await<T>(promiseHash: string, contId: number, effectArgs: Json): Result<T, Err>
 }
 ```
 
@@ -249,8 +250,8 @@ effect Async {
 ```mtp
 api POST /invoice
 uses { Async, DbWrite } {
-  let rate = await httpGet("https://fx.example.com/usd-eur")   // desugars to Async.await
-  let total = amount * rate
+  const rate = await httpGet("https://fx.example.com/usd-eur")   // desugars to Async.await
+  const total = amount * rate
   DbWrite.insert("invoice", total)
   respond json({ total })
 }
@@ -275,12 +276,12 @@ let x        = Async.await(ph, contId, e)
 
 ---
 
-## 8. API System (First-Class)
+## 8. API System (First-Class) ➜
 
 ```mtp
 api POST /users
 uses { db, log } {
-  let user = db.insert(...)
+  const user = db.insert(...)
   log.info("created user", user)
   respond json(user)
 }
@@ -296,12 +297,12 @@ uses { db, log } {
 ```mtp
 type Json {
   | JsonNull           // **inhabited only through parsing; no MTPScript literal produces JsonNull**
-  | JsonBool(Bool)
-  | JsonInt(Int)
+  | JsonBool(boolean)
+  | JsonInt(number)
   | JsonDecimal(Decimal)
-  | JsonString(String)
+  | JsonString(string)
   | JsonArray(List<Json>)
-  | JsonObject(Map<String, Json>)  // **duplicate keys rejected at parse time**
+  | JsonObject(Map<string, Json>)  // **duplicate keys rejected at parse time**
 }
 ```
 

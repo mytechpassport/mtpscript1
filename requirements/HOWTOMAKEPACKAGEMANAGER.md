@@ -207,7 +207,7 @@ api GET /hello {
 }
 
 // Define a function that uses an npm package
-function useExampleFunction(): String uses { unsafe } {
+function useExampleFunction(): string uses { unsafe } {
   return unsafe.callExampleFunction()
 }
 ```

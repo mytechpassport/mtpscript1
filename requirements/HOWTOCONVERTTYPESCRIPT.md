@@ -26,6 +26,8 @@ MTPScript has a simpler syntax compared to TypeScript. For example, it uses expl
 
 ### 2.1 Convert TypeScript Types to MTPScript Types
 
+MTPScript uses the same type names as TypeScript for primitives (except for high-precision decimals).
+
 #### TypeScript
 
 ```typescript
@@ -40,9 +42,9 @@ interface User {
 
 ```mtp
 type User {
-  id: Int
-  name: String
-  email: String
+  id: number
+  name: string
+  email: string
 }
 ```
 
@@ -60,12 +62,12 @@ class User {
 
 ```mtp
 type User {
-  id: Int
-  name: String
-  email: String
+  id: number
+  name: string
+  email: string
 }
 
-function createUser(id: Int, name: String, email: String): User {
+function createUser(id: number, name: string, email: string): User {
   return { id, name, email }
 }
 ```
@@ -91,8 +93,8 @@ type Result<T, E> {
   | err(error: E)
 }
 
-function divide(a: Int, b: Int): Result<Int, String> {
-  if b == 0 {
+function divide(a: number, b: number): Result<number, string> {
+  if (b == 0) {
     return err("Division by zero")
   }
   return ok(a / b)
@@ -115,8 +117,8 @@ async function fetchUser(id: number): Promise<User> {
 ```mtp
 effect http
 
-function fetchUser(id: Int): User uses { http } {
-  let response: String = http.get(`https://api.example.com/users/${id}`)
+function fetchUser(id: number): User uses { http } {
+  const response: string = http.get(`https://api.example.com/users/${id}`)
   return json.parse(response)
 }
 ```
@@ -136,8 +138,8 @@ interface Payment {
 
 ```mtp
 type Payment {
-  amount: Int
-  currency: String
+  amount: number
+  currency: string
 }
 ```
 
@@ -189,11 +191,11 @@ function convertType(node: ts.TypeNode): string {
   if (ts.isKeywordTypeNode(node)) {
     switch (node.kind) {
       case ts.SyntaxKind.NumberKeyword:
-        return 'Int';
+        return 'number';
       case ts.SyntaxKind.StringKeyword:
-        return 'String';
+        return 'string';
       case ts.SyntaxKind.BooleanKeyword:
-        return 'Bool';
+        return 'boolean';
       default:
         return 'Any';
     }
@@ -281,19 +283,19 @@ async function fetchUser(id: number): Promise<User> {
 ```mtp
 // output.mtp
 type User {
-  id: Int
-  name: String
-  email: String
+  id: number
+  name: string
+  email: string
 }
 
-function createUser(id: Int, name: String, email: String): User {
+function createUser(id: number, name: string, email: string): User {
   return { id, name, email }
 }
 
 effect http
 
-function fetchUser(id: Int): User uses { http } {
-  let response: String = http.get(`https://api.example.com/users/${id}`)
+function fetchUser(id: number): User uses { http } {
+  const response: string = http.get(`https://api.example.com/users/${id}`)
   return json.parse(response)
 }
 ```

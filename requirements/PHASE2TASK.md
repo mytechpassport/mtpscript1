@@ -34,7 +34,7 @@ This phase focuses on completing the MTPScript ecosystem for **production deploy
 ## 2. Full API Routing System (P0)
 
 ### 2.1 Request Handling (§8)
-- [x] **Path Parameter Extraction**: `/users/:id` → `{ id: String }`
+- [x] **Path Parameter Extraction**: `/users/:id` → `{ id: string }`
 - [x] **Query Parameter Parsing**: `?page=1&limit=10` → typed parameters
 - [x] **Request Body Parsing**: JSON body deserialization with validation
 - [x] **Header Access**: Typed header extraction with case normalization
@@ -60,7 +60,7 @@ This phase focuses on completing the MTPScript ecosystem for **production deploy
 - [x] `mtpsc migrate --check`: Dry-run with compatibility report
 
 ### 3.2 Mechanical Transforms (§17)
-- [x] **Type Mapping**: `number` → `Int`, `string` → `String`, `boolean` → `Bool`
+- [x] **Type Mapping**: `number` → `number`, `string` → `string`, `boolean` → `boolean`
 - [x] **Null Handling**: `null | T` → `Option<T>`, `throws` → `Result<T, E>`
 - [x] **Class Removal**: Convert classes to records and functions (basic implementation with manual intervention flags)
 - [x] **Loop Conversion**: `for`/`while` → recursive functions (basic implementation with manual intervention flags)
@@ -78,7 +78,7 @@ This phase focuses on completing the MTPScript ecosystem for **production deploy
 - [x] **TypeScript AST Parser**: Parse TypeScript files to AST for migration
 
 ### 3.2 Mechanical Transforms (§17)
-- [x] **Type Mapping**: `number` → `Int`, `string` → `String`, `boolean` → `Bool`
+- [x] **Type Mapping**: `number` → `number`, `string` → `string`, `boolean` → `boolean`
 - [x] **Null Handling**: `null | T` → `Option<T>`, `throws` → `Result<T, E>`
 - [x] **Class Removal**: Convert classes to records and functions
 - [x] **Loop Conversion**: `for`/`while` → recursive functions

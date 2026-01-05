@@ -27,7 +27,7 @@
 #include "../stdlib/runtime.h"
 #include "../host/npm_bridge.h"
 #include "../lsp/lsp.h"
-#include "../../mquickjs.h"
+#include "mquickjs.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

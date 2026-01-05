@@ -16,7 +16,7 @@
 #include <limits.h>
 #include <errno.h>
 #include "mtpscript.h"
-#include "../../cutils.h"
+#include "cutils.h"
 
 // Migration context for tracking issues and suggestions
 typedef struct {

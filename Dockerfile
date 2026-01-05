@@ -21,7 +21,7 @@ COPY . .
 RUN make clean && make all
 
 # Generate build info and sign it for reproducible builds
-RUN ./generate_build_info.sh
+RUN ./scripts/generate_build_info.sh
 
 # Verify build reproducibility by checking build-info.json exists
 RUN test -f build-info.json && echo "Reproducible build completed successfully"

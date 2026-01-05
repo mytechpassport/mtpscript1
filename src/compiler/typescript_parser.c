@@ -8,7 +8,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include "typescript_parser.h"
-#include "../../cutils.h"
+#include "cutils.h"
 
 // Forward declarations for free functions
 void mtpscript_ts_interface_decl_free(mtpscript_ts_interface_decl_t *interface);

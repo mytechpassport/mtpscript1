@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "../../cutils.h"
+#include "cutils.h"
 #include "../compiler/lexer.h"
 #include "../compiler/parser.h"
 #include "../compiler/typechecker.h"

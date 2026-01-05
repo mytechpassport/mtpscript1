@@ -1,1 +1,1 @@
-api GET "/test" func handler(): Int { return 200 }
+api GET "/test" function handler(): number { return 200 }

@@ -57,7 +57,7 @@ jobs:
 
     - name: Run acceptance tests
       run: |
-        ./phase2_acceptance_test
+        ./tests/executables/phase2_acceptance_test
 
     - name: Test determinism (SHA-256 verification)
       run: |

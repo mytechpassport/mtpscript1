@@ -9,7 +9,7 @@
 #ifndef MTPSCRIPT_MIGRATION_H
 #define MTPSCRIPT_MIGRATION_H
 
-#include "../../cutils.h"
+#include "cutils.h"
 #include "mtpscript.h"
 
 // Migration context for tracking issues and suggestions

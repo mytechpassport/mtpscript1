@@ -1,1 +1,1 @@
-func test(): Int { return 42 }
+function test(): number { return 42 }

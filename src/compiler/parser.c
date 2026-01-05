@@ -48,13 +48,12 @@ static bool match_token(mtpscript_parser_t *parser, mtpscript_token_type_t type)
 static mtpscript_type_t *parse_type(mtpscript_parser_t *parser) {
     mtpscript_token_t *token = advance_token(parser);
     mtpscript_type_t *type;
-    // printf("DEBUG: parse_type sees token: %s\n", mtpscript_string_cstr(token->lexeme));
 
-    if (strcmp(mtpscript_string_cstr(token->lexeme), "Int") == 0) {
+    if (token->type == MTPSCRIPT_TOKEN_TYPE_NUMBER || strcmp(mtpscript_string_cstr(token->lexeme), "Int") == 0) {
         type = mtpscript_type_new(MTPSCRIPT_TYPE_INT);
-    } else if (strcmp(mtpscript_string_cstr(token->lexeme), "String") == 0) {
+    } else if (token->type == MTPSCRIPT_TOKEN_TYPE_STRING || strcmp(mtpscript_string_cstr(token->lexeme), "String") == 0) {
         type = mtpscript_type_new(MTPSCRIPT_TYPE_STRING);
-    } else if (strcmp(mtpscript_string_cstr(token->lexeme), "Bool") == 0) {
+    } else if (token->type == MTPSCRIPT_TOKEN_TYPE_BOOLEAN || strcmp(mtpscript_string_cstr(token->lexeme), "Bool") == 0) {
         type = mtpscript_type_new(MTPSCRIPT_TYPE_BOOL);
     } else if (strcmp(mtpscript_string_cstr(token->lexeme), "Decimal") == 0) {
         type = mtpscript_type_new(MTPSCRIPT_TYPE_DECIMAL);
@@ -140,10 +139,18 @@ static mtpscript_statement_t *parse_statement(mtpscript_parser_t *parser) {
         mtpscript_statement_t *stmt = mtpscript_statement_new(MTPSCRIPT_STMT_RETURN_STMT);
         stmt->data.return_stmt.expression = parse_expression(parser);
         return stmt;
-    } else if (match_token(parser, MTPSCRIPT_TOKEN_LET)) {
+    } else if (match_token(parser, MTPSCRIPT_TOKEN_LET) || match_token(parser, MTPSCRIPT_TOKEN_CONST)) {
         mtpscript_statement_t *stmt = mtpscript_statement_new(MTPSCRIPT_STMT_VAR_DECL);
         mtpscript_token_t *name_token = advance_token(parser);
         stmt->data.var_decl.name = mtpscript_string_from_cstr(mtpscript_string_cstr(name_token->lexeme));
+
+        // Optional type annotation
+        if (match_token(parser, MTPSCRIPT_TOKEN_COLON)) {
+            stmt->data.var_decl.type = parse_type(parser);
+        } else {
+            stmt->data.var_decl.type = NULL;
+        }
+
         match_token(parser, MTPSCRIPT_TOKEN_EQUALS);
         stmt->data.var_decl.initializer = parse_expression(parser);
         return stmt;
@@ -247,7 +254,7 @@ static mtpscript_declaration_t *parse_declaration(mtpscript_parser_t *parser) {
         decl->data.api.path = mtpscript_string_from_cstr(mtpscript_string_cstr(path_token->lexeme));
 
         // Parse the function that follows
-        if (!match_token(parser, MTPSCRIPT_TOKEN_FUNC)) {
+        if (!match_token(parser, MTPSCRIPT_TOKEN_FUNCTION)) {
             // Error: expected 'func' after API path
             return NULL;
         }
@@ -314,7 +321,7 @@ static mtpscript_declaration_t *parse_declaration(mtpscript_parser_t *parser) {
         decl->data.api.handler = func;
 
         return decl;
-    } else if (match_token(parser, MTPSCRIPT_TOKEN_FUNC)) {
+    } else if (match_token(parser, MTPSCRIPT_TOKEN_FUNCTION)) {
         mtpscript_declaration_t *decl = mtpscript_declaration_new(MTPSCRIPT_DECL_FUNCTION);
         mtpscript_token_t *name = advance_token(parser);
         decl->data.function.name = mtpscript_string_from_cstr(mtpscript_string_cstr(name->lexeme));
@@ -342,34 +349,6 @@ static mtpscript_declaration_t *parse_declaration(mtpscript_parser_t *parser) {
         }
         match_token(parser, MTPSCRIPT_TOKEN_RBRACE);
         decl->data.function.effects = mtpscript_vector_new(); // Empty for now
-        return decl;
-    } else if (match_token(parser, MTPSCRIPT_TOKEN_FUNC)) {
-        mtpscript_declaration_t *decl = mtpscript_declaration_new(MTPSCRIPT_DECL_FUNCTION);
-        mtpscript_token_t *name = advance_token(parser);
-        decl->data.function.name = mtpscript_string_from_cstr(mtpscript_string_cstr(name->lexeme));
-
-        match_token(parser, MTPSCRIPT_TOKEN_LPAREN);
-        decl->data.function.params = mtpscript_vector_new();
-        while (!check_token(parser, MTPSCRIPT_TOKEN_RPAREN)) {
-            mtpscript_param_t *param = MTPSCRIPT_MALLOC(sizeof(mtpscript_param_t));
-            param->name = mtpscript_string_from_cstr(mtpscript_string_cstr(advance_token(parser)->lexeme));
-            match_token(parser, MTPSCRIPT_TOKEN_COLON);
-            param->type = parse_type(parser);
-            mtpscript_vector_push(decl->data.function.params, param);
-            if (!match_token(parser, MTPSCRIPT_TOKEN_COMMA)) break;
-        }
-        match_token(parser, MTPSCRIPT_TOKEN_RPAREN);
-
-        if (match_token(parser, MTPSCRIPT_TOKEN_COLON)) {
-            decl->data.function.return_type = parse_type(parser);
-        }
-
-        match_token(parser, MTPSCRIPT_TOKEN_LBRACE);
-        decl->data.function.body = mtpscript_vector_new();
-        while (!check_token(parser, MTPSCRIPT_TOKEN_RBRACE)) {
-            mtpscript_vector_push(decl->data.function.body, parse_statement(parser));
-        }
-        match_token(parser, MTPSCRIPT_TOKEN_RBRACE);
         return decl;
     } else if (match_token(parser, MTPSCRIPT_TOKEN_SERVE)) {
         mtpscript_declaration_t *decl = mtpscript_declaration_new(MTPSCRIPT_DECL_SERVE);

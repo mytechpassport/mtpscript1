@@ -378,43 +378,43 @@ MTPScript is a functional programming language with effect tracking. Here are al
 
 #### Function Definition
 ```mtp
-fn functionName(param: Type) -> ReturnType {
+function functionName(param: Type): ReturnType {
     // function body
     return value;
 }
 
 // Example
-fn add(x: Int, y: Int) -> Int {
+function add(x: number, y: number): number {
     return x + y;
 }
 ```
 
 #### Variable Declaration
 ```mtp
-let variableName = value;
-let typedVar: String = "hello";
+const variableName = value;
+const typedVar: string = "hello";
 ```
 
 #### Control Flow
 ```mtp
 // If expression (returns a value)
-let result = if condition {
+const result = if (condition) {
     "true branch"
 } else {
     "false branch"
 };
 
 // Await for async operations
-let data = await fetchData();
+const data = await fetchData();
 ```
 
 #### API Endpoints
 ```mtp
-api GET "/users" fn getUsers(): Json {
+api GET "/users" function getUsers(): Json {
     return { users: [] };
 }
 
-api POST "/users" fn createUser(name: String): Json {
+api POST "/users" function createUser(name: string): Json {
     return { id: 123, name: name };
 }
 ```
@@ -427,8 +427,8 @@ effect HttpOut;
 effect Log;
 
 // Usage in functions
-fn saveUser(user: User) -> Result<String, String> {
-    let result = DbWrite.execute("INSERT INTO users...", [user]);
+function saveUser(user: User): Result<string, string> {
+    const result = DbWrite.execute("INSERT INTO users...", [user]);
     return Ok("User saved");
 }
 ```
@@ -457,26 +457,26 @@ uses "http@2.0.0";
 
 ### HTTP Methods (for API definitions)
 ```mtp
-api GET "/path" fn handler(): Json { /* ... */ }
-api POST "/path" fn handler(): Json { /* ... */ }
-api PUT "/path" fn handler(): Json { /* ... */ }
-api DELETE "/path" fn handler(): Json { /* ... */ }
-api PATCH "/path" fn handler(): Json { /* ... */ }
+api GET "/path" function handler(): Json { /* ... */ }
+api POST "/path" function handler(): Json { /* ... */ }
+api PUT "/path" function handler(): Json { /* ... */ }
+api DELETE "/path" function handler(): Json { /* ... */ }
+api PATCH "/path" function handler(): Json { /* ... */ }
 ```
 
 ### Type Annotations
 ```mtp
 // Primitive types
-let num: Int = 42;
-let decimal: Decimal = 3.14159;
-let text: String = "hello";
-let flag: Bool = true;
+const num: number = 42;
+const decimal: Decimal = 3.14159;
+const text: string = "hello";
+const flag: boolean = true;
 
 // Complex types
-let user: { name: String, age: Int } = { name: "John", age: 30 };
-let users: [User] = [user1, user2];
-let result: Result<String, String> = Ok("success");
-let maybeUser: Option<User> = Some(user);
+const user: { name: string, age: number } = { name: "John", age: 30 };
+const users: [User] = [user1, user2];
+const result: Result<string, string> = Ok("success");
+const maybeUser: Option<User> = Some(user);
 ```
 
 ### Pipeline Operator
@@ -515,11 +515,11 @@ const multiply = (x, y) => x * y;
 
 **MTPScript:**
 ```
-fn add(x: Int, y: Int) -> Int {
+function add(x: number, y: number): number {
     return x + y;
 }
 
-fn multiply(x: Int, y: Int) -> Int {
+function multiply(x: number, y: number): number {
     return x * y;
 }
 ```
@@ -535,9 +535,9 @@ var flag = true;
 
 **MTPScript:**
 ```
-let x = 42;  // Inferred as Int
-let name: String = "John";
-let flag: Bool = true;
+const x = 42;  // Inferred as number
+const name: string = "John";
+const flag: boolean = true;
 ```
 
 ### Objects and Data Structures
@@ -557,12 +557,12 @@ const users = [
 
 **MTPScript:**
 ```
-let user = {
+const user = {
     name: "John",
     age: 30
 };
 
-let users: [{ name: String, age: Int }] = [
+const users: [{ name: string, age: number }] = [
     user1,
     user2
 ];
@@ -585,7 +585,7 @@ for (let i = 0; i < 10; i++) {
 
 **MTPScript:**
 ```
-let result = if condition {
+const result = if (condition) {
     doSomething()
 } else {
     doOther()
@@ -609,7 +609,7 @@ throw new Error("Failed");
 
 **MTPScript:**
 ```
-let result = match riskyOperation() {
+const result = match riskyOperation() {
     Ok(data) => process(data),
     Err(error) => handleError(error)
 };
@@ -630,8 +630,8 @@ async function fetchData() {
 
 **MTPScript:**
 ```
-fn fetchData() -> Result<Json, String> {
-    let response = await HttpOut.get(url);
+function fetchData(): Result<Json, string> {
+    const response = await HttpOut.get(url);
     return response.body;
 }
 ```
@@ -654,11 +654,11 @@ class User {
 **MTPScript:**
 ```
 // No classes - use functions and data structures
-fn createUser(name: String) -> User {
+function createUser(name: string): User {
     return { name: name };
 }
 
-fn greet(user: User) -> String {
+function greet(user: User): string {
     return "Hello, " + user.name;
 }
 ```
@@ -668,7 +668,7 @@ fn greet(user: User) -> String {
 **JavaScript:**
 ```javascript
 // ES6 modules
-import { func } from 'module';
+import { function } from 'module';
 export const value = 42;
 
 // CommonJS
@@ -678,7 +678,7 @@ const mod = require('module');
 **MTPScript:**
 ```
 // Git-hash pinned imports
-import { func } from "module@1.2.3";
+import { function } from "module@1.2.3";
 uses "module@1.2.3";
 
 // No runtime require()

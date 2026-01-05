@@ -33,9 +33,10 @@ MTPScript has a strong type system with primitive and composite types.
 
 ```mtp
 // Primitive types
-let intExample: Int = 42
-let boolExample: Bool = true
-let stringExample: String = "Hello, MTPScript!"
+const intExample: number = 42
+const boolExample: boolean = true
+const stringExample: string = "Hello, MTPScript!"
+const decimalExample: Decimal = 3.14
 ```
 
 ### 2.2 Composite Types
@@ -45,13 +46,13 @@ let stringExample: String = "Hello, MTPScript!"
 ```mtp
 // Define a record type
 type User {
-  id: Int
-  name: String
-  email: String
+  id: number
+  name: string
+  email: string
 }
 
 // Create an instance of User
-let user: User = {
+const user: User = {
   id: 1,
   name: "John Doe",
   email: "john.doe@example.com"
@@ -63,13 +64,13 @@ let user: User = {
 ```mtp
 // Define an algebraic data type
 type Payment {
-  | Card(number: String)
-  | Wire(ref: String)
+  | Card(number: string)
+  | Wire(ref: string)
 }
 
 // Create instances of Payment
-let cardPayment: Payment = Card("1234-5678-9101-1121")
-let wirePayment: Payment = Wire("ABC123")
+const cardPayment: Payment = Card("1234-5678-9101-1121")
+const wirePayment: Payment = Wire("ABC123")
 ```
 
 ---
@@ -80,20 +81,20 @@ let wirePayment: Payment = Wire("ABC123")
 
 ```mtp
 // Define a function
-function add(a: Int, b: Int): Int {
+function add(a: number, b: number): number {
   return a + b
 }
 
 // Call the function
-let result: Int = add(5, 3)
+const result: number = add(5, 3)
 ```
 
 ### 3.2 Conditionals
 
 ```mtp
 // Define a function with conditionals
-function isPositive(num: Int): Bool {
-  if num > 0 {
+function isPositive(num: number): boolean {
+  if (num > 0) {
     return true
   } else {
     return false
@@ -101,22 +102,22 @@ function isPositive(num: Int): Bool {
 }
 
 // Call the function
-let positive: Bool = isPositive(10)
+const positive: boolean = isPositive(10)
 ```
 
 ### 3.3 Pattern Matching
 
 ```mtp
 // Define a function with pattern matching
-function describePayment(payment: Payment): String {
+function describePayment(payment: Payment): string {
   match payment {
-    | Card(number) -> return "Card payment with number " + number
-    | Wire(ref) -> return "Wire payment with reference " + ref
+    | Card(number) => return "Card payment with number " + number
+    | Wire(ref) => return "Wire payment with reference " + ref
   }
 }
 
 // Call the function
-let paymentDescription: String = describePayment(cardPayment)
+const paymentDescription: string = describePayment(cardPayment)
 ```
 
 ### 3.4 Effects
@@ -126,7 +127,7 @@ let paymentDescription: String = describePayment(cardPayment)
 effect http
 
 // Define a function that uses the http effect
-function fetchUser(userId: Int): User uses { http } {
+function fetchUser(userId: number): User uses { http } {
   // Simulate fetching a user from an HTTP API
   return http.get("https://api.example.com/users/" + userId.toString())
 }
@@ -174,9 +175,9 @@ Let's create a simple CRUD (Create, Read, Update, Delete) example for managing u
 
 ```mtp
 type User {
-  id: Int
-  name: String
-  email: String
+  id: number
+  name: string
+  email: string
 }
 ```
 
@@ -184,8 +185,8 @@ type User {
 
 ```mtp
 // Define a function to create a user
-function createUser(name: String, email: String): User uses { db } {
-  let user: User = {
+function createUser(name: string, email: string): User uses { db } {
+  const user: User = {
     id: db.nextId(),
     name: name,
     email: email
@@ -199,7 +200,7 @@ function createUser(name: String, email: String): User uses { db } {
 
 ```mtp
 // Define a function to read a user
-function getUser(id: Int): Option<User> uses { db } {
+function getUser(id: number): Option<User> uses { db } {
   return db.find(id)
 }
 ```
@@ -208,10 +209,10 @@ function getUser(id: Int): Option<User> uses { db } {
 
 ```mtp
 // Define a function to update a user
-function updateUser(id: Int, name: String, email: String): Option<User> uses { db } {
+function updateUser(id: number, name: string, email: string): Option<User> uses { db } {
   match db.find(id) {
-    | some(user) -> {
-      let updatedUser: User = {
+    | some(user) => {
+      const updatedUser: User = {
         id: user.id,
         name: name,
         email: email
@@ -219,7 +220,7 @@ function updateUser(id: Int, name: String, email: String): Option<User> uses { d
       db.update(updatedUser)
       return some(updatedUser)
     }
-    | none -> return none
+    | none => return none
   }
 }
 ```
@@ -228,7 +229,7 @@ function updateUser(id: Int, name: String, email: String): Option<User> uses { d
 
 ```mtp
 // Define a function to delete a user
-function deleteUser(id: Int): Bool uses { db } {
+function deleteUser(id: number): boolean uses { db } {
   return db.delete(id)
 }
 ```
@@ -265,7 +266,7 @@ Then, inject the adapter as an effect in your MTPScript code.
 
 ```mtp
 // Define a function that uses the npm package
-function useExampleFunction(): String uses { unsafe } {
+function useExampleFunction(): string uses { unsafe } {
   return unsafe.callExampleFunction()
 }
 ```

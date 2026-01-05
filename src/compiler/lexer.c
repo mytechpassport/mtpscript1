@@ -85,10 +85,12 @@ mtpscript_error_t *mtpscript_lexer_tokenize(mtpscript_lexer_t *lexer, mtpscript_
             }
             const char *lexeme = mtpscript_string_cstr(buf);
             mtpscript_token_type_t type = MTPSCRIPT_TOKEN_IDENTIFIER;
-            if (strcmp(lexeme, "func") == 0) type = MTPSCRIPT_TOKEN_FUNC;
+            if (strcmp(lexeme, "function") == 0) type = MTPSCRIPT_TOKEN_FUNCTION;
+            else if (strcmp(lexeme, "fn") == 0) type = MTPSCRIPT_TOKEN_FUNCTION; // Support short form
             else if (strcmp(lexeme, "api") == 0) type = MTPSCRIPT_TOKEN_API;
             else if (strcmp(lexeme, "uses") == 0) type = MTPSCRIPT_TOKEN_USES;
             else if (strcmp(lexeme, "let") == 0) type = MTPSCRIPT_TOKEN_LET;
+            else if (strcmp(lexeme, "const") == 0) type = MTPSCRIPT_TOKEN_CONST;
             else if (strcmp(lexeme, "return") == 0) type = MTPSCRIPT_TOKEN_RETURN;
             else if (strcmp(lexeme, "if") == 0) type = MTPSCRIPT_TOKEN_IF;
             else if (strcmp(lexeme, "else") == 0) type = MTPSCRIPT_TOKEN_ELSE;
@@ -98,6 +100,9 @@ mtpscript_error_t *mtpscript_lexer_tokenize(mtpscript_lexer_t *lexer, mtpscript_
             else if (strcmp(lexeme, "serve") == 0) type = MTPSCRIPT_TOKEN_SERVE;
             else if (strcmp(lexeme, "true") == 0) type = MTPSCRIPT_TOKEN_BOOL;
             else if (strcmp(lexeme, "false") == 0) type = MTPSCRIPT_TOKEN_BOOL;
+            else if (strcmp(lexeme, "number") == 0) type = MTPSCRIPT_TOKEN_TYPE_NUMBER;
+            else if (strcmp(lexeme, "string") == 0) type = MTPSCRIPT_TOKEN_TYPE_STRING;
+            else if (strcmp(lexeme, "boolean") == 0) type = MTPSCRIPT_TOKEN_TYPE_BOOLEAN;
             else if (strcmp(lexeme, "GET") == 0) type = MTPSCRIPT_TOKEN_GET;
             else if (strcmp(lexeme, "await") == 0) type = MTPSCRIPT_TOKEN_AWAIT;
             else if (strcmp(lexeme, "POST") == 0) type = MTPSCRIPT_TOKEN_POST;
@@ -136,6 +141,8 @@ mtpscript_error_t *mtpscript_lexer_tokenize(mtpscript_lexer_t *lexer, mtpscript_
                 case ')': type = MTPSCRIPT_TOKEN_RPAREN; break;
                 case '{': type = MTPSCRIPT_TOKEN_LBRACE; break;
                 case '}': type = MTPSCRIPT_TOKEN_RBRACE; break;
+                case '[': type = MTPSCRIPT_TOKEN_LBRACKET; break;
+                case ']': type = MTPSCRIPT_TOKEN_RBRACKET; break;
                 case '+': type = MTPSCRIPT_TOKEN_PLUS; break;
                 case '-':
                     if (peek(lexer) == '>') {
@@ -159,9 +166,18 @@ mtpscript_error_t *mtpscript_lexer_tokenize(mtpscript_lexer_t *lexer, mtpscript_
                 case ',': type = MTPSCRIPT_TOKEN_COMMA; break;
                 case '<': type = MTPSCRIPT_TOKEN_LANGLE; break;
                 case '>': type = MTPSCRIPT_TOKEN_RANGLE; break;
+                case '.': type = MTPSCRIPT_TOKEN_DOT; break;
                 default:
-                    // Handle error
-                    return NULL;
+                    {
+                        mtpscript_error_t *error = MTPSCRIPT_MALLOC(sizeof(mtpscript_error_t));
+                        char msg[256];
+                        sprintf(msg, "Unexpected character: '%c'", c);
+                        error->message = mtpscript_string_from_cstr(msg);
+                        error->location.line = lexer->line;
+                        error->location.column = lexer->column;
+                        error->location.file = lexer->filename;
+                        return error;
+                    }
             }
             mtpscript_vector_push(tokens, create_token(lexer, type, lexeme));
         }

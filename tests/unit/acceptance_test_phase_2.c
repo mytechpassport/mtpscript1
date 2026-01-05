@@ -50,7 +50,7 @@ bool test_cursor_extension_files() {
 bool test_hot_reload_functionality() {
     // Test basic file I/O operations that hot reload would use
     const char *test_file = "hot_reload_test.mtp";
-    const char *content = "func main() { return \"test\" }";
+    const char *content = "function main(): string { return \"test\" }";
 
     // Write content
     FILE *f = fopen(test_file, "w");
@@ -146,8 +146,8 @@ bool test_union_exhaustiveness_checking() {
     // Test that union types are properly validated for exhaustiveness
     // This is a compile-time check, so we test via compilation
     const char *test_union_code =
-        "type Status = | Ok String | Error String\n"
-        "func check_status(s: Status) {\n"
+        "type Status = | Ok string | Error string\n"
+        "function check_status(s: Status) {\n"
         "    match s {\n"
         "        Ok msg -> \"Success: \" + msg\n"
         "        Error msg -> \"Error: \" + msg\n"
@@ -169,8 +169,8 @@ bool test_union_exhaustiveness_checking() {
 // Test non-exhaustive union match (should fail)
 bool test_union_exhaustiveness_failure() {
     const char *test_union_code =
-        "type Status = | Ok String | Error String\n"
-        "func check_status(s: Status) {\n"
+        "type Status = | Ok string | Error string\n"
+        "function check_status(s: Status) {\n"
         "    match s {\n"
         "        Ok msg -> \"Success: \" + msg\n"
         "        // Missing Error case - should fail exhaustiveness check\n"
@@ -192,10 +192,10 @@ bool test_union_exhaustiveness_failure() {
 // Test pipeline operator associativity
 bool test_pipeline_associativity() {
     const char *test_pipeline_code =
-        "func add1(x: Int) { x + 1 }\n"
-        "func mul2(x: Int) { x * 2 }\n"
-        "func sub3(x: Int) { x - 3 }\n"
-        "func main() {\n"
+        "function add1(x: number) { x + 1 }\n"
+        "function mul2(x: number) { x * 2 }\n"
+        "function sub3(x: number) { x - 3 }\n"
+        "function main() {\n"
         "    let result1 = 5 |> add1 |> mul2 |> sub3\n"
         "    let result2 = ((5 |> add1) |> mul2) |> sub3\n"
         "    assert(result1 == result2)\n"
@@ -225,7 +225,7 @@ bool test_pipeline_associativity() {
 bool test_determinism_verification() {
     const char *test_code =
         "uses { Log }\n"
-        "func deterministic(seed: String) {\n"
+        "function deterministic(seed: string) {\n"
         "    log(\"info\", \"Deterministic function called with seed: \" + seed)\n"
         "    { message: \"Hello from deterministic function\", seed: seed }\n"
         "}\n";
@@ -245,7 +245,7 @@ bool test_determinism_verification() {
 // Test SHA-256 response verification
 bool test_sha256_response_verification() {
     const char *test_code =
-        "func sha256_test(input: String) {\n"
+        "function sha256_test(input: string) {\n"
         "    // This function should produce deterministic SHA-256 output\n"
         "    { result: input + \"_processed\", timestamp: null }\n"
         "}\n";
@@ -265,7 +265,7 @@ bool test_sha256_response_verification() {
 // Test canonical JSON compliance
 bool test_canonical_json_compliance() {
     const char *test_code =
-        "func json_test() {\n"
+        "function json_test() {\n"
         "    // Test that output follows RFC 8785 canonical JSON\n"
         "    {\n"
         "        z_field: \"should be ordered\",\n"
@@ -300,11 +300,11 @@ bool test_http_server_syntax() {
         "    ]\n"
         "}\n"
         "\n"
-        "func health_check() {\n"
+        "function health_check() {\n"
         "    respond json { status: \"ok\" }\n"
         "}\n"
         "\n"
-        "func get_user(path: { id: String }) {\n"
+        "function get_user(path: { id: string }) {\n"
         "    respond json { user_id: path.id }\n"
         "}\n";
 
@@ -325,7 +325,7 @@ bool test_http_server_syntax() {
 // Test LSP diagnostics functionality
 bool test_lsp_diagnostics() {
     const char *test_code_with_error =
-        "func broken_function() {\n"
+        "function broken_function() {\n"
         "    undefined_variable + 1\n"
         "}\n";
 
@@ -345,7 +345,7 @@ bool test_lsp_diagnostics() {
 // Test LSP completion functionality (basic test)
 bool test_lsp_completion() {
     const char *test_code =
-        "func test_function(x: Int) {\n"
+        "function test_function(x: number) {\n"
         "    x +\n"
         "}\n";
 
@@ -365,7 +365,7 @@ bool test_lsp_completion() {
 bool test_dbread_effect() {
     const char *test_code =
         "uses { DbRead }\n"
-        "func get_user(user_id: Int) {\n"
+        "function get_user(user_id: number) {\n"
         "    let query = \"SELECT name, email FROM users WHERE id = ?\"\n"
         "    db_read(query, [user_id])\n"
         "}\n";
@@ -386,7 +386,7 @@ bool test_dbread_effect() {
 bool test_dbwrite_effect() {
     const char *test_code =
         "uses { DbWrite }\n"
-        "func create_user(name: String, email: String) {\n"
+        "function create_user(name: string, email: string) {\n"
         "    let query = \"INSERT INTO users (name, email) VALUES (?, ?)\"\n"
         "    db_write(query, [name, email])\n"
         "}\n";
@@ -407,7 +407,7 @@ bool test_dbwrite_effect() {
 bool test_httpout_effect() {
     const char *test_code =
         "uses { HttpOut }\n"
-        "func fetch_user(user_id: Int) {\n"
+        "function fetch_user(user_id: number) {\n"
         "    let url = \"https://api.example.com/users/\" + int_to_string(user_id)\n"
         "    http_out(\"GET\", url, \"\", {})\n"
         "}\n";
@@ -428,7 +428,7 @@ bool test_httpout_effect() {
 bool test_log_effect() {
     const char *test_code =
         "uses { Log }\n"
-        "func log_user_action(user_id: Int, action: String) {\n"
+        "function log_user_action(user_id: number, action: string) {\n"
         "    log(\"info\", \"User \" + int_to_string(user_id) + \" performed: \" + action)\n"
         "    { success: true }\n"
         "}\n";
@@ -449,7 +449,7 @@ bool test_log_effect() {
 bool test_combined_effects() {
     const char *test_code =
         "uses { DbRead, HttpOut, Log }\n"
-        "func complex_operation(user_id: Int) {\n"
+        "function complex_operation(user_id: number) {\n"
         "    log(\"info\", \"Starting complex operation for user: \" + int_to_string(user_id))\n"
         "    \n"
         "    let user_data = db_read(\"SELECT * FROM users WHERE id = ?\", [user_id])\n"
@@ -512,7 +512,7 @@ bool test_typescript_migration() {
 // Test cross-platform determinism (basic)
 bool test_cross_platform_determinism() {
     const char *test_code =
-        "func deterministic_calculation(seed: String, value: Int) {\n"
+        "function deterministic_calculation(seed: string, value: number) {\n"
         "    // Test that same inputs produce same outputs across platforms\n"
         "    let result = (value * 42) + length(seed)\n"
         "    {\n"
@@ -538,7 +538,7 @@ bool test_cross_platform_determinism() {
 // Test endianness independence (no floating point)
 bool test_endianness_independence() {
     const char *test_code =
-        "func endianness_test() {\n"
+        "function endianness_test() {\n"
         "    // Test that results are independent of endianness\n"
         "    // (MTPScript has no floating point, so integer operations are deterministic)\n"
         "    let a = 0x12345678\n"
@@ -562,7 +562,7 @@ bool test_endianness_independence() {
 // Test gas limit determinism
 bool test_gas_limit_determinism() {
     const char *test_code =
-        "func gas_limit_test(limit: Int) {\n"
+        "function gas_limit_test(limit: number) {\n"
         "    // Test that gas limit enforcement is deterministic\n"
         "    let counter = 0\n"
         "    while counter < 1000 {\n"
