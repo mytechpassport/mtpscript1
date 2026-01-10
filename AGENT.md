@@ -20,3 +20,4 @@
 3. **Implement feature** to satisfy the test
 4. **Run test** to validate implementation
 5. **Document changes** in appropriate files following folder structure rules
+6. **Do not mock or setup lazily** - always finish full implementation

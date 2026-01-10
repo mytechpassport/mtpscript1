@@ -1,0 +1,33 @@
+# Opencode workspace files
+.opencode
+
+# Build artifacts and intermediate files
+build/
+*.o
+*.so
+*.dylib
+*.a
+
+# Generated snapshots (keep examples, ignore temp builds)
+*.msqs
+!examples/*.msqs
+
+# Compiler and runtime binaries (keep final executables, ignore intermediate)
+mtpjs_*
+!mtpjs_repl
+!mtpsc
+
+# Temporary test files
+tmp/
+temp/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
