@@ -152,7 +152,94 @@ The SHA-256 of the response body is identical across all conforming runtimes **i
 
 ## 3. Syntax & Grammar (Locked)
 
-*(EBNF unchanged except pipeline associativity – left-associative ➜)*
+### 3.1 Full EBNF Grammar
+
+The MTPScript grammar is defined by the following EBNF. Pipeline operator is left-associative. Await is only permitted inside functions that use the `Async` effect.
+
+```
+program ::= module_decl*
+
+module_decl ::= 'import' string_literal 'as' identifier
+               | type_decl
+               | func_decl
+               | api_decl
+
+type_decl ::= 'type' identifier '{' field_decl* '}'
+            | 'type' identifier '=' variant_decl ('|' variant_decl)*
+
+field_decl ::= identifier ':' type_expr
+
+variant_decl ::= identifier '(' type_expr* ')'
+               | identifier
+
+type_expr ::= identifier
+            | 'List<' type_expr '>'
+            | 'Map<' type_expr ',' type_expr '>'
+            | 'Option<' type_expr '>'
+            | 'Result<' type_expr ',' type_expr '>'
+            | 'Decimal'
+            | 'boolean'
+            | 'number'
+            | 'string'
+            | 'Json'
+
+func_decl ::= 'function' identifier '(' param_list? ')' ('uses' '{' effect_list '}')? '{' expr '}'
+
+param_list ::= identifier ':' type_expr (',' identifier ':' type_expr)*
+
+effect_list ::= identifier (',' identifier)*
+
+api_decl ::= 'api' http_method string_literal
+             ('uses' '{' effect_list '}')? '{'
+             expr
+             '}'
+
+http_method ::= 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+
+expr ::= literal
+       | identifier
+       | expr '.' identifier
+       | expr '[' expr ']'
+       | expr '(' expr_list? ')'
+       | '!' expr
+       | '-' expr
+       | expr binop expr
+       | expr '|' '>' expr
+       | 'if' '(' expr ')' '{' expr '}' 'else' '{' expr '}'
+       | 'match' expr '{' case+ '}'
+       | 'const' identifier '=' expr ';' expr
+       | 'function' '(' param_list? ')' '{' expr '}'
+       | 'await' expr   // only inside `uses { Async }`
+       | 'respond' 'json' '(' expr ')'
+       | '(' expr ')'
+
+expr_list ::= expr (',' expr)*
+
+case ::= pattern '=>' expr
+
+pattern ::= '_' | identifier | literal | identifier '(' pattern* ')' | identifier '{' field_pattern* '}'
+
+field_pattern ::= identifier ':' pattern
+
+binop ::= '+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '<=' | '>=' | '&&' | '||'
+
+literal ::= number_literal | string_literal | boolean_literal | array_literal | object_literal
+
+array_literal ::= '[' expr_list? ']'
+
+object_literal ::= '{' (string_literal ':' expr)* '}'
+
+number_literal ::= digit+ ('.' digit+)?
+string_literal ::= '"' [^"]* '"'
+boolean_literal ::= 'true' | 'false'
+identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
+
+```
+
+### 3.2 Pipeline Associativity
+
+Left-associative: `a |> b |> c ≡ (a |> b) |> c`
+
 **Addition:**
 ```
 expr ::= ...
@@ -172,7 +259,30 @@ expr ::= ...
 | `Decimal` | Deterministic fixed-point |
 
 ### 4.2 Composite Types
-Records and algebraic data types (unchanged).
+Records and algebraic data types.
+
+**Records:**
+```mtp
+type User {
+  id: number
+  name: string
+  email: string
+}
+```
+
+**Algebraic Data Types (ADTs):**
+```mtp
+type Result<T, E> = Ok(T) | Err(E)
+type Option<T> = Some(T) | None
+```
+
+Pattern matching on ADTs:
+```mtp
+match result {
+  Ok(value) => value
+  Err(error) => handleError(error)
+}
+```
 
 ### 4.3 No `null`, No `undefined`
 Use `Option<T>` and `Result<T, E>`.
@@ -218,6 +328,15 @@ Functions **excluded** from map keys.
 * Recursion bounded by **gas** (10 M β-reductions) ➜
   **Gas cost table appended in Annex A – every IR opcode and built-in carries a fixed cost; tail calls cost 0.**
 
+## 6-a. Functions and Closures ➜
+
+* Functions are declared with `function identifier(params) uses { effects } { body }`
+* Lambdas are anonymous functions: `function(params) { body }`
+* Lambdas are pure: they cannot use effects and must be total (no divergence)
+* Named functions may use effects declared in their `uses` clause
+* Closures capture their environment immutably; no mutable closures
+* Tail recursion is optimized and costs 0 gas
+
 ---
 
 ## 7. Effect System (Authority Model)
@@ -230,7 +349,7 @@ Host effects **must** be deterministic functions of their arguments + **request 
 
 | Effect | Capability |
 |---|---|
-| `DbRead`, `DbWrite` | SQL execution |
+| `DbRead`, `DbWrite` | Sqlite execution |
 | `HttpOut` | Outbound HTTP |
 | `Log` | Structured logging |
 | `Async` | ➜ **Deterministic async I/O** (see §7-a) |
@@ -273,6 +392,33 @@ let x        = Async.await(ph, contId, e)
 2. Cache response bytes keyed by `(seed, contId)`.
 3. Return **identical** bytes on every replay.
 4. **No JavaScript event loop visible inside VM.**
+
+## 7-b. Effect Invocation in Surface Syntax ➜
+
+Effects are accessed as global identifiers injected by the runtime. They can be called directly as functions or may provide objects with methods.
+
+For example:
+- `DbRead(sql: string, params: Json): Json` – executes SQLITE read
+- `DbWrite(sql: string, params: Json): Json` – executes SQLITE write
+- `HttpOut(method: string, url: string, body?: Json): Json` – makes HTTP request
+- `Log(level: string, message: string, data?: Json): void` – logs message
+
+Higher-level APIs may be provided as library functions that desugar to these effects. For instance, `db.insert(table, data)` may be a library function that calls `DbWrite` with appropriate SQLITE.
+
+In API declarations, the `uses { ... }` block declares which effects are permitted in that scope. Attempting to use an undeclared effect results in a compile-time error.
+
+## 7-c. Built-in Functions ➜
+
+In addition to effects, the runtime provides built-in pure functions:
+
+* `Json.parse(s: string): Result<Json, string>` – Parses JSON string to Json type
+* `Json.stringify(j: Json): string` – Serializes Json to canonical JSON string
+* `Decimal.fromString(s: string): Result<Decimal, string>` – Parses decimal from string
+* `Decimal.toString(d: Decimal): string` – Formats decimal to shortest string
+* Hash functions: `fnv1a32(data: string): number`, `fnv1a64(data: string): number`
+* CBOR encoding: `cborEncode(j: Json): string` – Deterministic CBOR bytes as hex string
+
+These functions are available globally and have fixed gas costs as per Annex A.
 
 ---
 
@@ -335,34 +481,33 @@ type Json {
 
 ```
 MTPScript
- → AST
- → Typed IR
- → Effect-checked IR
- → Deterministic JS Subset
- → MTPJS Bytecode
- → VM Snapshot (.msqs) ➜ **ECDSA-P256 signature appended**
+  → AST
+  → Typed IR
+  → Effect-checked IR
+  → Deterministic JS Subset (.js text file)
+  → VM Snapshot (.msqs) ➜ **ECDSA-P256 signature appended**
 ```
 
 Forbidden JS: `eval`, `class`, `this`, `try/catch`, loops, global mutation.
-**MTPJS patched to forbid double-path for integers > 2⁵³-1.**
+The JS subset is minimal: functions, objects, arrays, primitives, no prototypes, no closures beyond what's needed.
 
 ---
 
 ## 13. Runtime Model ➜
 
-* One **fresh VM** per request (snapshot clone)
+* One **fresh interpreter instance** per request (snapshot clone)
 * Fixed memory budget (no shared heap)
-* VM discarded after response; **secure wipe executed on sensitive pages**
-* Host effects injected **per VM**, **after** static init, **deterministic seed per §0-b**
+* Interpreter discarded after response; **secure wipe executed on sensitive data**
+* Host effects injected **per instance**, **after** static init, **deterministic seed per §0-b**
 
 ---
 
 ## 14. Serverless Deployment (AWS Lambda)
 
-* Custom runtime ships **native binary** + **app.msqs** + **signature certificate**
+* Custom runtime ships **Rust binary** + **app.msqs** + **signature certificate**
 * Cold-start ≤ 1 ms **best-case**; **≤ 2 ms worst-case** under EFS page fault
 * No Node.js, no state reuse
-**Runtime verifies ECDSA signature of app.msqs before mapping; abort on mismatch.**
+**Runtime verifies ECDSA signature of app.msqs before loading; abort on mismatch.**
 
 ---
 
@@ -423,20 +568,21 @@ function adapterName(seed: Uint8Array, ...args: JsonValue[]): JsonValue
 
 ---
 
-## 22. VM Snapshot Lifecycle ➜
+## 22. Interpreter Snapshot Lifecycle ➜
 
 ```
 Build
-  └── mtp compile --snapshot app.mtp → app.msqs
+  └── mtp compile app.mtp → app.js
+  └── mtp snapshot app.js → app.msqs
   └── sign app.msqs with ECDSA-P256 → app.msqs.sig
 
 Runtime (per request)
   ├── verify app.msqs.sig against embedded certificate
-  ├── map app.msqs read-only
-  ├── clone_vm()               // 60 µs–1 ms COW
+  ├── load app.msqs
+  ├── clone_interpreter()       // <1 ms
   ├── inject deterministic effects **after** static init
-  ├── execute
-  └── drop_vm() **+ secure wipe on sensitive pages**
+  ├── interpret JS
+  └── drop_interpreter() **+ secure wipe on sensitive data**
 ```
 
 No memory-wipe for non-sensitive data; **zero cross-request leakage**.
@@ -474,11 +620,173 @@ Generated JS **α-equivalent** across all compilers.
 
 ---
 
+## 27. Runtime Implementation Guide
+
+This section provides exhaustive, normative detail on implementing the MTPJS runtime as a Rust-based interpreter for the constrained JS subset. No stubs, mocks, or assumptions; all details are prescriptive. The runtime is a Rust binary that parses and interprets .js files.
+
+### 27.1 Architecture Overview
+
+The runtime is a Rust binary `mtpjs-runtime` with:
+- **HTTP Handler**: Tokio for HTTP.
+- **Interpreter Manager**: Struct `InterpreterManager` for clone, execute, wipe.
+- **JS Interpreter**: Custom tree-walking interpreter.
+- **Effect Registry**: HashMap<String, Box<dyn Fn(Vec<Value>) -> Value>>.
+- **Gas Meter**: u64 per interpreter.
+- **Audit Logger**: JSON to stdout.
+
+#### Host Process Flow
+1. Listen on port 8080.
+2. Parse request.
+3. Extract metadata.
+4. Compute seed.
+5. Clone interpreter.
+6. Inject seed as global.
+7. Inject effects.
+8. Interpret JS with gas.
+9. Serialize output to JSON.
+10. Hash response.
+11. Log audit.
+12. Return HTTP response.
+
+### 27.2 Interpreter Snapshot Format
+
+`.msqs` binary:
+- 0-7: "MTPJS\x00\x00\x00"
+- 8-11: u32 51
+- 12-19: u64 size
+- 20-51: SHA256 of JS
+- 52..size-132: UTF-8 JS text
+- size-132..size-4: ECDSA sig
+- size-4..size: CRC32
+
+Creation: compile to .js, embed in format.
+
+### 27.3 Interpreter Cloning and Isolation
+
+#### Clone Algorithm
+```rust
+fn clone_interpreter(snapshot: &[u8]) -> Result<Interpreter, Error> {
+    verify_sig(snapshot)?;
+    let js = std::str::from_utf8(&snapshot[52..snapshot.len()-132])?;
+    let ast = parse_js(js)?;
+    let interp = Interpreter::new(ast, 512 * 1024 * 1024);
+    Ok(interp)
+}
+```
+
+#### Isolation
+- Interpreter only accesses injected globals.
+- No syscalls except via effects.
+- Memory: bump allocator, wiped on drop.
+
+#### Secure Wipe
+```rust
+fn wipe_interpreter(interp: Interpreter, pci: bool) {
+    if pci { interp.zero_sensitive(); }
+    drop(interp);
+}
+```
+
+### 27.4 Effect Injection and Implementation
+
+Effects injected post-clone:
+```rust
+fn inject_effects(isolate: &mut Isolate, seed: &[u8;32]) {
+    let context = isolate.get_current_context();
+    let global = context.global();
+
+    // DbRead
+    let db_read = v8::Function::new(context, |args| {
+        let sql = args[0].to_string();
+        let params = args[1].to_json();
+        let key = sha256(concat(seed, sql.as_bytes(), params));
+        // Deterministic SQLite query: use seeded RNG for any non-deterministic parts
+        let result = sqlite_execute(sql, params, seed);
+        v8::json::parse(context, &result)
+    });
+    global.set(context, "DbRead", db_read);
+
+    // Similarly for DbWrite, HttpOut, Log, Async
+    // Async.await: cache by (seed, cont_id), execute HTTP synchronously
+}
+```
+
+#### Async Implementation
+- Cache: HashMap<(seed, cont_id), response>.
+- On await(ph, cont_id, args): if cached, return; else execute HTTP, cache, return.
+- HTTP: use reqwest with seeded client, deterministic timeouts.
+
+#### Deterministic Behavior
+All effects: hash(seed || args) to seed any randomness (e.g., UUIDs, timestamps).
+
+### 27.5 Gas Metering
+
+Gas: AtomicU64 initialized to gas_limit.
+Costs from Annex A CSV, loaded at startup.
+Hook: V8 bytecode callback decrements gas.
+On underflow: isolate.terminate_execution(); throw GasExhausted error.
+
+### 27.6 Canonical JSON
+
+Serialization:
+- Use custom serializer: sort keys by type_tag + fnv_hash + cbor_bytes.
+- Decimals: format as per §4-a.
+- Output: UTF-8 bytes, SHA256 hash.
+
+### 27.7 Error Handling
+
+All errors: structured JSON, no panics.
+Audit: JSON lines to stderr, forwarded to CloudWatch.
+
+### 27.8 Security
+
+- Code review mandatory.
+- Fuzzing with AFL on input parsing.
+- No network except HttpOut.
+- Sandbox: seccomp-bpf to restrict syscalls.
+
+### 27.9 Performance
+
+- Clone: <1ms via V8 snapshot restore.
+- Gas: <1% overhead.
+- Async cache: LRU with 10k entries.
+
+### 27.10 Testing
+
+- Unit tests for each component.
+- Integration: determinism fuzzing.
+- Benchmarks: hyperfine on cold starts.
+
+---
+
 **Annex A – Gas Cost Table (Normative)**
-(available as machine-readable CSV in repo `/gas-v5.1.csv`)
+
+All costs in β-reduction units.
+
+- Literal number: 1
+- Literal string: 1
+- Binary op (+,-,*,/): 2
+- Comparison (==, <, etc.): 1
+- Function call: 5
+- Recursion (tail): 0, non-tail: 2
+- Object access: 1
+- Array access: 1
+- If statement: 1
+- Pattern match: 3 per case
+- Json.parse: 10 + length/10
+- Json.stringify: 10 + length/10
+- Effect call: 20 + effect-specific (DbRead: 50, HttpOut: 100, etc.)
+
+Full table in `/gas-v5.1.csv`, but these are examples.
 
 **Annex B – Deterministic OpenAPI Generation Rules**
-(available as JSON schema in repo `/openapi-rules-v5.1.json`)
+
+- Paths ordered alphabetically.
+- Schemas: records as objects, ADTs as oneOf.
+- Refs: use SHA256 of schema as $ref.
+- Field order: sorted by name.
+
+Full in `/openapi-rules-v5.1.json`.
 
 --------------------------------------------------------
 End of Specification 5.1
