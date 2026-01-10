@@ -1,0 +1,5 @@
+api GET /log
+uses { Log } {
+  Log.info("test log", { key: "value" })
+  respond json({ logged: true })
+}

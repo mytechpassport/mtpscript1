@@ -1,0 +1,25 @@
+// Test Effects system runtime functionality
+// Tests §7 Effect System (Authority Model)
+
+// Simple MTPScript that uses effects
+function test_effects() {
+    // Create effect arguments array
+    const db_args = ["SELECT id, name FROM users WHERE id = ?", 42]
+    const log_args = ["Testing Effects system"]
+    const http_args = ["https://api.example.com/test", "GET"]
+    
+    // These would be dispatched through mtp_dispatch_effect in runtime
+    const db_result = DbRead(db_args[0], db_args[1])
+    const log_result = Log(log_args[0])
+    const http_result = HttpOut(http_args[0], http_args[1])
+    
+    return {
+        db_result: db_result,
+        log_result: log_result,
+        http_result: http_result,
+        effects_used: ["DbRead", "Log", "HttpOut"]
+    }
+}
+
+const result = test_effects()
+respond json(result)

@@ -1,0 +1,37 @@
+api GET /test-json
+uses {} {
+  const input_obj = "{\"key\":\"value\",\"num\":42}"
+  const parsed_obj = Json.parse(input_obj)
+  const serialized_obj = match parsed_obj {
+    Ok(j) => Json.stringify(j)
+    Err(e) => "error"
+  }
+  const input_array = "[1,2,\"three\"]"
+  const parsed_array = Json.parse(input_array)
+  const serialized_array = match parsed_array {
+    Ok(j) => Json.stringify(j)
+    Err(e) => "error"
+  }
+  const input_nested = "{\"obj\":{\"inner\":true},\"arr\":[{\"a\":1}]}"
+  const parsed_nested = Json.parse(input_nested)
+  const serialized_nested = match parsed_nested {
+    Ok(j) => Json.stringify(j)
+    Err(e) => "error"
+  }
+  const input_invalid = "{\"key\":\"value\",\"key\":42}"
+  const parsed_invalid = Json.parse(input_invalid)
+  const serialized_invalid = match parsed_invalid {
+    Ok(j) => Json.stringify(j)
+    Err(e) => "error: duplicate key"
+  }
+  const input_bad = "{invalid}"
+  const parsed_bad = Json.parse(input_bad)
+  const serialized_bad = match parsed_bad {
+    Ok(j) => Json.stringify(j)
+    Err(e) => "parse error"
+  }
+  respond json({ 
+    serialized_obj, serialized_array, serialized_nested, 
+    serialized_invalid, serialized_bad 
+  })
+}

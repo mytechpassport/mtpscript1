@@ -1,0 +1,6 @@
+api GET /result
+uses {} {
+  const ok = Result.Ok("success")
+  const err = Result.Err("error")
+  respond json({ ok: ok, err: err })
+}

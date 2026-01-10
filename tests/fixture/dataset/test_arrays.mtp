@@ -1,0 +1,8 @@
+api GET /test-arrays
+uses {} {
+  const arr = [1, 2, 3, 4, 5]
+  const empty_arr: List<number> = []
+  const str_arr = ["a", "b", "c"]
+  const nested_arr = [[1, 2], [3, 4]]
+  respond json({ arr, empty_arr, str_arr, nested_arr })
+}

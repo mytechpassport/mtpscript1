@@ -1,0 +1,7 @@
+api GET /test-effects
+uses { Log } {
+  Log.info("Test log string", "simple message")
+  Log.info("Test log object", { key: "value", num: 42 })
+  Log.info("Test log array", [1, 2, 3])
+  respond json({ logged: true })
+}

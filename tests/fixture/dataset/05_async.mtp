@@ -1,0 +1,27 @@
+// Test Async effects runtime functionality
+// Tests §7-a Async Effect (Deterministic Await)
+
+function test_async_operations() {
+    // Create a promise
+    const promise = Async.create("http_request")
+    
+    // Await the promise (desugars to Async.await)
+    const result = await Async.wait(promise, "response_data")
+    
+    // Test sequential async operations
+    const promise2 = Async.create("database_query") 
+    const result2 = await Async.wait(promise2, "db_result")
+    
+    return {
+        async_result: result,
+        db_result: result2,
+        promises_created: [promise, promise2],
+        async_operations: ["create", "wait"]
+    }
+}
+
+const async_result = test_async_operations()
+respond json({
+    async_test: "completed",
+    result: async_result
+})

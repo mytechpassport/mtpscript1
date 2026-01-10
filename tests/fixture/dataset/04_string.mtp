@@ -1,0 +1,5 @@
+api GET /string
+uses {} {
+  const s = "world"
+  respond json({ hello: s })
+}

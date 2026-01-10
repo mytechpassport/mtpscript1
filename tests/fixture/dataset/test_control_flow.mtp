@@ -1,0 +1,16 @@
+api GET /test-control-flow
+uses {} {
+  const if_positive = if 5 > 0 { "positive" } else { "non-positive" }
+  const if_negative = if -1 > 0 { "positive" } else { "non-positive" }
+  const match_ok: Result<number, string> = Ok(10)
+  const match_ok_result = match match_ok {
+    Ok(n) => n * 2
+    Err(e) => 0
+  }
+  const match_err: Result<number, string> = Err("fail")
+  const match_err_result = match match_err {
+    Ok(n) => n * 2
+    Err(e) => 0
+  }
+  respond json({ if_positive, if_negative, match_ok_result, match_err_result })
+}

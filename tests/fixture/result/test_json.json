@@ -1,0 +1,1 @@
+{"serialized_array":"[1,2,\"three\"]","serialized_bad":"parse error","serialized_invalid":"error: duplicate key","serialized_nested":"{\"arr\":[{\"a\":1}],\"obj\":{\"inner\":true}}","serialized_obj":"{\"key\":\"value\",\"num\":42}"}

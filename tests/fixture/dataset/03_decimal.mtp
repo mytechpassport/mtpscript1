@@ -1,0 +1,5 @@
+api GET /decimal
+uses {} {
+  const d = Decimal { value: "123", scale: 2 }
+  respond json({ decimal: d })
+}

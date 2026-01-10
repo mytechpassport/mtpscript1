@@ -1,0 +1,1 @@
+{"async_test":"completed","result":{"async_operations":["create","wait"],"async_result":"response_data","db_result":"db_result","promises_created":["http_request","database_query"]}}

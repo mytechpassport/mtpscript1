@@ -1,0 +1,1 @@
+{"empty_nested":{"inner":{"age":0,"name":""},"list":[]},"empty_person":{"age":0,"name":""},"has_none":false,"has_some":true,"is_err":"fail","is_ok":"success","nested":{"inner":{"age":30,"name":"Alice"},"list":[1,2,3]},"person":{"age":30,"name":"Alice"}}

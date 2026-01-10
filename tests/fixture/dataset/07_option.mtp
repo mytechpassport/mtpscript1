@@ -1,0 +1,6 @@
+api GET /option
+uses {} {
+  const some = Option.Some(42)
+  const none = Option.None
+  respond json({ some: some, none: none })
+}

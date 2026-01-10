@@ -1,0 +1,1 @@
+{"boolean_false":false,"boolean_true":true,"decimal":"1.23","decimal_large":"1234567890.1234567890123456789012","decimal_max_scale":"0.0000000000000000000000000001","decimal_zero_scale":"123","empty_string":"","max_number":9223372036854775807,"min_number":-9223372036854775808,"neg_number":-42,"number":42,"string":"hello","unicode_string":"héllo"}

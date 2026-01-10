@@ -2,6 +2,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -O2 -g
 LDFLAGS = -lm
+INCLUDES = -Icore/include -Icore/utils -Icore/regex -Icore/stdlib -Icore/atom -Icore/opcode
 
 # Directories
 BUILD_DIR = build
@@ -20,12 +21,15 @@ MAIN_SOURCES = $(SRC_DIR)/main/mtpjs_repl.c
 CLI_SOURCES = $(SRC_DIR)/cli/mtpsc.c
 
 # Objects - Hardcoded paths for now
-CORE_OBJECTS = $(BUILD_DIR)/objects/core/runtime/mtpjs_simple.o
+CORE_OBJECTS = $(BUILD_DIR)/objects/core/runtime/mtpjs.o \
+               $(BUILD_DIR)/objects/core/utils/mtp_cutils.o \
+               $(BUILD_DIR)/objects/core/utils/mtp_dtoa.o \
+               $(BUILD_DIR)/objects/core/regex/mtp_libregexp.o \
+               $(BUILD_DIR)/objects/core/regex/mtp_libunicode.o \
+               $(BUILD_DIR)/objects/core/stdlib/mtpjs_libc.o
 RUNTIME_OBJECTS = $(BUILD_DIR)/objects/runtime/snapshot.o $(BUILD_DIR)/objects/runtime/gas_injection.o
 MAIN_OBJECTS = $(BUILD_DIR)/objects/main/mtpjs_repl.o
 CLI_OBJECTS = $(BUILD_DIR)/objects/cli/mtpsc.o
-
-ALL_OBJECTS = $(CORE_OBJECTS) $(RUNTIME_OBJECTS)
 
 ALL_OBJECTS = $(CORE_OBJECTS) $(RUNTIME_OBJECTS)
 
@@ -62,33 +66,53 @@ test: compile
 # REPL executable
 $(BUILD_DIR)/mtpjs_repl: $(MAIN_OBJECTS) $(ALL_OBJECTS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
 # Compiler executable  
 $(BUILD_DIR)/mtpsc: $(CLI_OBJECTS) $(ALL_OBJECTS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
 # Object file compilation - Explicit rules for each target
-$(BUILD_DIR)/objects/core/runtime/mtpjs_simple.o: $(CORE_DIR)/runtime/mtpjs_simple.c
+$(BUILD_DIR)/objects/core/runtime/mtpjs.o: $(CORE_DIR)/runtime/mtpjs.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(BUILD_DIR)/objects/core/utils/mtp_cutils.o: $(CORE_DIR)/utils/mtp_cutils.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(BUILD_DIR)/objects/core/utils/mtp_dtoa.o: $(CORE_DIR)/utils/mtp_dtoa.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(BUILD_DIR)/objects/core/regex/mtp_libregexp.o: $(CORE_DIR)/regex/mtp_libregexp.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(BUILD_DIR)/objects/core/regex/mtp_libunicode.o: $(CORE_DIR)/regex/mtp_libunicode.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(BUILD_DIR)/objects/core/stdlib/mtpjs_libc.o: $(CORE_DIR)/stdlib/mtpjs_libc.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(BUILD_DIR)/objects/runtime/snapshot.o: $(RUNTIME_DIR)/snapshot/snapshot.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(BUILD_DIR)/objects/runtime/gas_injection.o: $(RUNTIME_DIR)/gas/gas_injection.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(BUILD_DIR)/objects/main/mtpjs_repl.o: $(SRC_DIR)/main/mtpjs_repl.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(BUILD_DIR)/objects/cli/mtpsc.o: $(SRC_DIR)/cli/mtpsc.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(CORE_DIR)/include -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 # Clean
 clean:

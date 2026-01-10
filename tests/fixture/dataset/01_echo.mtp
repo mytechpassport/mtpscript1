@@ -1,0 +1,4 @@
+api GET /echo
+uses {} {
+  respond json({ message: "hello" })
+}

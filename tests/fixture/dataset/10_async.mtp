@@ -1,0 +1,5 @@
+api GET /async
+uses { Async } {
+  const res = await Async.await("testhash", 1, { input: "test" })
+  respond json(res)
+}
