@@ -1,0 +1,18 @@
+api GET "/decimal-edge" uses {} {
+  const valid_dec = Decimal.fromString("123.45");
+  const invalid_dec = Decimal.fromString("invalid");
+  const zero_dec = Decimal.fromString("0.000");
+  const large_dec = Decimal.fromString("12345678901234567890123456789012.123456789");
+
+  const str1 = match valid_dec { Ok(d) => Decimal.toString(d) Err(e) => "error" };
+  const str2 = match invalid_dec { Ok(d) => Decimal.toString(d) Err(e) => e };
+  const str3 = match zero_dec { Ok(d) => Decimal.toString(d) Err(e) => "error" };
+  const str4 = match large_dec { Ok(d) => Decimal.toString(d) Err(e) => e };
+
+  respond json({
+    "valid": str1,
+    "invalid": str2,
+    "zero": str3,
+    "large": str4
+  })
+}

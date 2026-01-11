@@ -1,0 +1,4 @@
+api GET "/http-out" uses { HttpOut } {
+  const response = HttpOut("GET", "https://httpbin.org/json", {});
+  respond json({ "response": response })
+}

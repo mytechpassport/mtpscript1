@@ -1,0 +1,8 @@
+function loop(n) {
+  if (n == 0) { 0 } else { 1 + loop(n - 1) }
+}
+
+api GET "/gas-exhaustion" uses {} {
+  const result = loop(100000); // many calls
+  respond json({ "result": result })
+}

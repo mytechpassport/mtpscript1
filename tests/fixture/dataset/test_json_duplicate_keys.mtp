@@ -1,0 +1,6 @@
+api GET "/json-duplicate-keys" uses {} {
+  const dup_json = "{\"key\": 1, \"key\": 2}";
+  const parsed = Json.parse(dup_json);
+  const result = match parsed { Ok(j) => "unexpected success" Err(e) => e };
+  respond json({ "result": result })
+}

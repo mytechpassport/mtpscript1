@@ -1,0 +1,18 @@
+api GET "/json-ops" uses {} {
+  const valid_json_str = "{\"key\": \"value\", \"num\": 42}";
+  const invalid_json_str = "{\"key\": }";
+  const obj = { "a": 1, "b": "test" };
+
+  const parsed_valid = Json.parse(valid_json_str);
+  const parsed_invalid = Json.parse(invalid_json_str);
+  const stringified = Json.stringify(obj);
+
+  const valid_result = match parsed_valid { Ok(j) => "parsed" Err(e) => e };
+  const invalid_result = match parsed_invalid { Ok(j) => "unexpected" Err(e) => e };
+
+  respond json({
+    "valid_parse": valid_result,
+    "invalid_parse": invalid_result,
+    "stringified": stringified
+  })
+}

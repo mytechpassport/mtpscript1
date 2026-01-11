@@ -1,0 +1,12 @@
+api GET "/hash-cbor" uses {} {
+  const data = "test data";
+  const hash32 = fnv1a32(data);
+  const hash64 = fnv1a64(data);
+  const cbor = cborEncode({ "test": data });
+
+  respond json({
+    "fnv1a32": hash32,
+    "fnv1a64": hash64,
+    "cbor": cbor
+  })
+}

@@ -1,0 +1,9 @@
+function log_message(msg: string) uses { Log } {
+  Log("info", msg, {});
+  msg
+}
+
+api GET "/functions-effects" uses { Log } {
+  const result = log_message("test message");
+  respond json({ "result": result })
+}

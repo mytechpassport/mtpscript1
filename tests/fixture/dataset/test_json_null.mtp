@@ -1,0 +1,6 @@
+api GET "/json-null" uses {} {
+  const json_str = "null";
+  const parsed = Json.parse(json_str);
+  const result = match parsed { Ok(j) => "null parsed" Err(e) => e };
+  respond json({ "result": result })
+}

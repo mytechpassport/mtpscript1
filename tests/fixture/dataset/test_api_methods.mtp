@@ -1,0 +1,3 @@
+api POST "/api-post" uses {} {
+  respond json({ "method": "POST" })
+}

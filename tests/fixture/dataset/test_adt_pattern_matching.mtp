@@ -1,0 +1,33 @@
+api GET "/adt-pattern-matching" uses {} {
+  const opt_some = Some(42);
+  const opt_none = None;
+  const res_ok = Ok("success");
+  const res_err = Err("failure");
+
+  const match_some = match opt_some {
+    Some(x) => x * 2
+    None => 0
+  };
+
+  const match_none = match opt_none {
+    Some(x) => x
+    None => -1
+  };
+
+  const match_ok = match res_ok {
+    Ok(msg) => msg
+    Err(_) => "error"
+  };
+
+  const match_err = match res_err {
+    Ok(_) => "ok"
+    Err(err) => err
+  };
+
+  respond json({
+    "match_some": match_some,
+    "match_none": match_none,
+    "match_ok": match_ok,
+    "match_err": match_err
+  })
+}

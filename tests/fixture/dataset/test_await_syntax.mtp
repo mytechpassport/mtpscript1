@@ -1,0 +1,9 @@
+function async_func() uses { Async } {
+  const result = await HttpOut("GET", "https://httpbin.org/json");
+  result
+}
+
+api GET "/await-syntax" uses { Async, HttpOut } {
+  const res = async_func();
+  respond json({ "result": res })
+}

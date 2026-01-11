@@ -1,0 +1,13 @@
+function factorial(n) {
+  if (n == 0) { 1 } else { n * factorial(n - 1) }
+}
+
+function tail_factorial(n, acc) {
+  if (n == 0) { acc } else { tail_factorial(n - 1, n * acc) }
+}
+
+api GET "/recursive" uses {} {
+  const fact5 = factorial(5);
+  const tail_fact5 = tail_factorial(5, 1);
+  respond json({ "factorial_5": fact5, "tail_factorial_5": tail_fact5 })
+}

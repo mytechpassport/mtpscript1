@@ -1,0 +1,11 @@
+type User {
+  id: number
+  name: string
+}
+
+api GET "/records" uses {} {
+  const user = { "id": 123, "name": "Alice" };
+  const id = user.id;
+  const name = user.name;
+  respond json({ "id": id, "name": name })
+}

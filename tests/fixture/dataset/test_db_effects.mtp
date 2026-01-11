@@ -1,0 +1,5 @@
+api POST "/db-effects" uses { DbRead, DbWrite } {
+  const insert_result = DbWrite("INSERT INTO test (id, value) VALUES (?, ?)", [1, "test"]);
+  const select_result = DbRead("SELECT value FROM test WHERE id = ?", [1]);
+  respond json({ "insert": insert_result, "select": select_result })
+}

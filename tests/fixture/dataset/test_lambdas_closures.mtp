@@ -1,0 +1,10 @@
+api GET "/lambdas-closures" uses {} {
+  const add = function(x, y) { x + y };
+  const sum = add(3, 4);
+
+  const multiplier = 2;
+  const mul_closure = function(x) { x * multiplier };
+  const mul_result = mul_closure(5);
+
+  respond json({ "sum": sum, "mul_result": mul_result })
+}

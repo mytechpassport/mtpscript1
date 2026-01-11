@@ -1,0 +1,14 @@
+api GET "/map-list" uses {} {
+  const list = [1, 2, 3, 4];
+  const empty_list = [];
+
+  const list_head = list[0];
+  const list_tail = list[3];
+
+  respond json({
+    "list": list,
+    "empty_list": empty_list,
+    "list_head": list_head,
+    "list_tail": list_tail
+  })
+}
