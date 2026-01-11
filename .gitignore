@@ -1,8 +1,10 @@
 # Opencode workspace files
 .opencode
+.claude/
 
 # Build artifacts and intermediate files
 build/
+target/
 *.o
 *.so
 *.dylib
@@ -28,6 +30,12 @@ temp/
 *.swo
 *~
 
+# Rust-specific
+*.rs.bk
+.coverage/
+*.profraw
+
 # OS files
 .DS_Store
 Thumbs.db
+Cargo.lock

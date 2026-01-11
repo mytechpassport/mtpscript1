@@ -19,7 +19,7 @@
 
 ## Section 1: Project Scaffold & Structure
 
-### - [ ] MTP-001: Initialize Rust Project Structure
+### - [x] MTP-001: Initialize Rust Project Structure
 **Effort:** S | **Files:** `Cargo.toml`, `src/lib.rs`, `src/main.rs`
 **Spec Lines:** 625-636 (§27.1 Architecture Overview)
 **Priority:** P0 - Blocker
@@ -59,7 +59,7 @@ src/
 
 ---
 
-### - [ ] MTP-002: Define Core Error Types
+### - [x] MTP-002: Define Core Error Types
 **Effort:** S | **Files:** `src/errors/mod.rs`, `src/errors/compile.rs`, `src/errors/runtime.rs`
 **Spec Lines:** 525-529 (§16 Error System)
 **Priority:** P0 - Blocker
@@ -134,7 +134,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-011: Implement String Literal Parsing
+### - [x] MTP-011: Implement String Literal Parsing
 **Effort:** S | **Files:** `src/lexer/scanner.rs`
 **Spec Lines:** 233 (string_literal definition)
 **Priority:** P0 - Blocker
@@ -155,7 +155,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-012: Implement Number Literal Parsing
+### - [x] MTP-012: Implement Number Literal Parsing
 **Effort:** S | **Files:** `src/lexer/scanner.rs`
 **Spec Lines:** 232 (number_literal definition)
 **Priority:** P0 - Blocker
@@ -1125,7 +1125,7 @@ Pseudo-test:
 
 ## Section 10: Gas Metering
 
-### - [ ] MTP-090: Implement Gas Counter
+### - [x] MTP-090: Implement Gas Counter
 **Effort:** S | **Files:** `src/gas/counter.rs`, `src/gas/mod.rs`
 **Spec Lines:** 52-115 (§0-c Gas Limit), 762-780 (Annex A)
 **Priority:** P0 - Blocker
@@ -1153,7 +1153,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-091: Implement Gas Cost Table
+### - [x] MTP-091: Implement Gas Cost Table
 **Effort:** S | **Files:** `src/gas/costs.rs`
 **Spec Lines:** 762-780 (Annex A - Gas Cost Table)
 **Priority:** P0 - Blocker
@@ -1421,7 +1421,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-113: Implement respond json() Expression
+### - [x] MTP-113: Implement respond json() Expression
 **Effort:** S | **Files:** `src/compiler/respond.rs`
 **Spec Lines:** 213 (respond expression)
 **Priority:** P1
@@ -1745,7 +1745,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-152: Implement Lexer Tests
+### - [x] MTP-152: Implement Lexer Tests
 **Effort:** S | **Files:** `tests/lexer_tests.rs`
 **Spec Lines:** 153-237 (§3 Syntax)
 **Priority:** P0 - Blocker
@@ -1766,7 +1766,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-153: Implement Parser Tests
+### - [x] MTP-153: Implement Parser Tests
 **Effort:** S | **Files:** `tests/parser_tests.rs`
 **Spec Lines:** 153-237 (§3 Syntax)
 **Priority:** P0 - Blocker
@@ -1808,7 +1808,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-155: Implement Effect Checker Tests
+### - [x] MTP-155: Implement Effect Checker Tests
 **Effort:** S | **Files:** `tests/effect_tests.rs`
 **Spec Lines:** 342-422 (§7)
 **Priority:** P0 - Blocker
@@ -1868,7 +1868,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-158: Implement Gas Metering Tests
+### - [x] MTP-158: Implement Gas Metering Tests
 **Effort:** S | **Files:** `tests/gas_tests.rs`
 **Spec Lines:** 52-115, 762-780 (§0-c, Annex A)
 **Priority:** P0 - Blocker

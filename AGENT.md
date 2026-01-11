@@ -1,9 +1,11 @@
 # AI Agent Rules for MTPScript Development
 
+## **NO MOCK OR STUB ONLY FULL IMPLEMENTATION**
+
 ## File Organization Rules
-- **Always consult `requirements/FOLDER_STRUCTURE.md`** before placing any files in the project
+- **Always consult `requirements/TECHSPECV5.md`** before placing any files in the project
 - **Never randomly place files** - follow the established directory structure and file placement guidelines
-- **Document new directories** in `FOLDER_STRUCTURE.md` when creating them
+- **Document new directories** in `TECHSPECV5.md` when creating them
 - **Follow existing patterns** for similar functionality
 
 ## Testing Methodology

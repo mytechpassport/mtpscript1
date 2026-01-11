@@ -1,0 +1,8 @@
+[package]
+name = "mtpscript"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mtpscript-core = { path = "../mtpscript-core" }
+clap = "4.0"
