@@ -35,6 +35,7 @@ pub enum BinOp {
     Ge,
     And,
     Or,
+    Not,
 }
 
 #[derive(Debug, Clone, PartialEq)]

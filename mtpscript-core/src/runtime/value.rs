@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 use crate::errors::runtime::RuntimeError;
 use crate::types::decimal::Decimal;
-use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -28,6 +28,56 @@ pub struct FunctionValue {
 impl PartialEq for FunctionValue {
     fn eq(&self, _other: &Self) -> bool {
         false // Functions are not comparable
+    }
+}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Number(n) => {
+                0u8.hash(state); // discriminant
+                n.hash(state);
+            }
+            Value::Boolean(b) => {
+                1u8.hash(state);
+                b.hash(state);
+            }
+            Value::String(s) => {
+                2u8.hash(state);
+                s.hash(state);
+            }
+            Value::Decimal(d) => {
+                3u8.hash(state);
+                d.hash(state);
+            }
+            Value::Array(arr) => {
+                4u8.hash(state);
+                // For arrays, use SHA-256 of string representation for security
+                use sha2::{Digest, Sha256};
+                let s = format!("{:?}", arr);
+                let hash = Sha256::digest(s.as_bytes());
+                hash.hash(state);
+            }
+            Value::Object(obj) => {
+                5u8.hash(state);
+                // For objects, sort keys and hash SHA-256
+                use sha2::{Digest, Sha256};
+                let mut sorted: Vec<_> = obj.iter().collect();
+                sorted.sort_by_key(|(k, _)| *k);
+                let s = format!("{:?}", sorted);
+                let hash = Sha256::digest(s.as_bytes());
+                hash.hash(state);
+            }
+            Value::Function(_) => {
+                6u8.hash(state);
+                // Functions are not hashable, but for completeness
+                // Don't hash anything, or panic? For now, use a constant.
+                0u32.hash(state);
+            }
+            Value::Null => {
+                7u8.hash(state);
+            }
+        }
     }
 }
 

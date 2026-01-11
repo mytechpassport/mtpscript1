@@ -60,16 +60,33 @@ pub fn clone_interpreter(snapshot: &[u8]) -> Result<Interpreter, RuntimeError> {
 // Placeholder for JS parsing - would implement a real JS subset parser
 fn parse_js_to_ast(js: &str) -> Result<(), RuntimeError> {
     // Forbidden constructs
-    let forbidden = ["class", "this", "eval", "try", "catch", "new", "prototype", "arguments"];
+    let forbidden = [
+        "class",
+        "this",
+        "eval",
+        "try",
+        "catch",
+        "new",
+        "prototype",
+        "arguments",
+    ];
     for word in forbidden {
         if js.contains(word) {
-            return Err(RuntimeError::ValueError(format!("Forbidden JS construct: {}", word)));
+            return Err(RuntimeError::ValueError(format!(
+                "Forbidden JS construct: {}",
+                word
+            )));
         }
     }
 
+    // Parse the JS subset
+    crate::runtime::js_parser::parse_js_program(js)?;
+
     // Must contain at least one function
     if !js.contains("function") {
-        return Err(RuntimeError::ValueError("JS code must contain function declarations".to_string()));
+        return Err(RuntimeError::ValueError(
+            "JS code must contain function declarations".to_string(),
+        ));
     }
 
     // Basic structure check: ensure balanced braces and parens
@@ -84,11 +101,15 @@ fn parse_js_to_ast(js: &str) -> Result<(), RuntimeError> {
             _ => {}
         }
         if brace_count < 0 || paren_count < 0 {
-            return Err(RuntimeError::ValueError("Unbalanced braces or parentheses".to_string()));
+            return Err(RuntimeError::ValueError(
+                "Unbalanced braces or parentheses".to_string(),
+            ));
         }
     }
     if brace_count != 0 || paren_count != 0 {
-        return Err(RuntimeError::ValueError("Unbalanced braces or parentheses".to_string()));
+        return Err(RuntimeError::ValueError(
+            "Unbalanced braces or parentheses".to_string(),
+        ));
     }
 
     Ok(())

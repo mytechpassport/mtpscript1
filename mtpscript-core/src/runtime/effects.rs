@@ -1,3 +1,4 @@
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
 use crate::errors::runtime::RuntimeError;
@@ -117,43 +118,51 @@ fn async_await_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     )))
 }
 
-pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), RuntimeError> {
-    // Inject effect functions directly into global scope
-    // In real implementation, these would be proper function objects that call the effects
+pub fn inject_effects(interp: &mut Interpreter, seed: &[u8; 32]) -> Result<(), RuntimeError> {
+    // Use seed for deterministic effect implementations and caching
+    // Cache key is (seed, effect_name)
+    let cache_key_prefix = format!("{:x}", sha2::Sha256::digest(seed));
 
-    // For now, inject as mock functions
+    // For now, inject deterministic mock functions based on seed
+    // In real implementation, these would call actual effect handlers with seed-based determinism
+
+    // DbRead: return deterministic data based on seed
+    let db_read_data = generate_deterministic_db_data(seed);
     let db_read_func = Value::Function(FunctionValue {
         name: Some("DbRead".to_string()),
         params: vec!["sql".to_string(), "params".to_string()],
-        closure: HashMap::new(),
+        closure: HashMap::from([("data".to_string(), db_read_data)]),
     });
     interp
         .global_scope
         .insert("DbRead".to_string(), db_read_func);
 
+    let db_write_result = generate_deterministic_db_write_result(seed);
     let db_write_func = Value::Function(FunctionValue {
         name: Some("DbWrite".to_string()),
         params: vec!["sql".to_string(), "params".to_string()],
-        closure: HashMap::new(),
+        closure: HashMap::from([("result".to_string(), db_write_result)]),
     });
     interp
         .global_scope
         .insert("DbWrite".to_string(), db_write_func);
 
+    let http_result = generate_deterministic_http_result(seed);
     let http_func = Value::Function(FunctionValue {
         name: Some("HttpOut".to_string()),
         params: vec!["method".to_string(), "url".to_string()],
-        closure: HashMap::new(),
+        closure: HashMap::from([("response".to_string(), http_result)]),
     });
     interp.global_scope.insert("HttpOut".to_string(), http_func);
 
     let log_func = Value::Function(FunctionValue {
         name: Some("Log".to_string()),
         params: vec!["message".to_string()],
-        closure: HashMap::new(),
+        closure: HashMap::new(), // Logging doesn't need determinism
     });
     interp.global_scope.insert("Log".to_string(), log_func);
 
+    let async_result = generate_deterministic_async_result(seed);
     let async_func = Value::Function(FunctionValue {
         name: Some("Async".to_string()),
         params: vec![
@@ -161,9 +170,49 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
             "contId".to_string(),
             "args".to_string(),
         ],
-        closure: HashMap::new(),
+        closure: HashMap::from([("async_data".to_string(), async_result)]),
     });
     interp.global_scope.insert("Async".to_string(), async_func);
 
     Ok(())
+}
+
+fn generate_deterministic_db_data(seed: &[u8; 32]) -> Value {
+    // Use seed to generate deterministic mock data
+    let id =
+        ((seed[0] as u32) << 24 | (seed[1] as u32) << 16 | (seed[2] as u32) << 8 | seed[3] as u32)
+            as i64;
+    let name_len = (seed[4] % 10) + 5; // 5-14 chars
+    let name = (0..name_len)
+        .map(|i| (b'A' + (seed[5 + i as usize] % 26)) as char)
+        .collect::<String>();
+    Value::Array(vec![Value::Object(HashMap::from([
+        ("id".to_string(), Value::Number(id)),
+        ("name".to_string(), Value::String(name)),
+    ]))])
+}
+
+fn generate_deterministic_db_write_result(seed: &[u8; 32]) -> Value {
+    let affected_rows = seed[0] as i64 % 100 + 1; // 1-100
+    Value::Object(HashMap::from([
+        ("affectedRows".to_string(), Value::Number(affected_rows)),
+        ("insertId".to_string(), Value::Number(seed[1] as i64)),
+    ]))
+}
+
+fn generate_deterministic_http_result(seed: &[u8; 32]) -> Value {
+    let status = if seed[0] % 2 == 0 { 200 } else { 404 };
+    let body_len = (seed[1] % 50) + 10; // 10-59 chars
+    let body = (0..body_len)
+        .map(|i| (b'a' + (seed[2 + i as usize] % 26)) as char)
+        .collect::<String>();
+    Value::Object(HashMap::from([
+        ("status".to_string(), Value::Number(status)),
+        ("body".to_string(), Value::String(body)),
+    ]))
+}
+
+fn generate_deterministic_async_result(seed: &[u8; 32]) -> Value {
+    let promise_id = format!("promise_{:x}", sha2::Sha256::digest(seed));
+    Value::String(promise_id)
 }

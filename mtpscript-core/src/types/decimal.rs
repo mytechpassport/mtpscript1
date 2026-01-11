@@ -120,7 +120,7 @@ impl Decimal {
     }
 
     /// Convert to canonical string representation (shortest form, no trailing zeros)
-    pub fn to_string(&self) -> String {
+    pub fn to_decimal_string(&self) -> String {
         self.to_string_with_scale(None)
     }
 

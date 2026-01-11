@@ -182,10 +182,12 @@ fn lower_expr_with_tail(
         AstExpr::Unary(op, expr) => {
             let expr_expected = match op {
                 BinOp::Add | BinOp::Sub => Type::Number, // + and - unary
-                _ => Type::Var("unary".to_string()),     // Not is boolean?
+                BinOp::Not => Type::Boolean,
+                _ => Type::Var("unary".to_string()),
             };
             let result_type = match op {
                 BinOp::Add | BinOp::Sub => Type::Number,
+                BinOp::Not => Type::Boolean,
                 _ => expected_type.clone(),
             };
             let ir_expr = lower_expr_with_tail(expr, &expr_expected, false)?;
@@ -203,6 +205,7 @@ fn lower_expr_with_tail(
                     (t.clone(), t.clone(), Type::Boolean)
                 }
                 BinOp::And | BinOp::Or => (Type::Boolean, Type::Boolean, Type::Boolean),
+                BinOp::Not => unreachable!("Not is unary"),
             };
             let ir_left = lower_expr_with_tail(left, &left_expected, false)?;
             let ir_right = lower_expr_with_tail(right, &right_expected, false)?;
@@ -279,19 +282,12 @@ fn lower_expr_with_tail(
             })
         }
 
-        AstExpr::Lambda {
-            params: _params,
-            body,
-        } => {
-            // Lambdas become function calls to anonymous functions
-            // For simplicity, treat as call to lambda
+        AstExpr::Lambda { params, body } => {
+            // Lower lambda to IR lambda
             let ir_body = lower_expr_with_tail(body, expected_type, false)?;
-            Ok(IrExpr::Call {
-                func: Box::new(IrExpr::Var(
-                    "lambda".to_string(),
-                    Type::Var("func".to_string()),
-                )),
-                args: vec![ir_body],
+            Ok(IrExpr::Lambda {
+                params: params.iter().map(|(name, _)| name.clone()).collect(),
+                body: Box::new(ir_body),
                 result_type: expected_type.clone(),
             })
         }
@@ -366,5 +362,113 @@ fn detect_tail_calls(expr: &IrExpr, func_name: &str) -> bool {
             .any(|(_, expr)| detect_tail_calls(expr, func_name)),
         IrExpr::Let { body, .. } => detect_tail_calls(body, func_name),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::ast::{BinOp, Expr, FuncDecl, Program, TypeExpr};
+
+    #[test]
+    fn test_lower_pipeline() {
+        // Test pipeline desugaring: a |> f ≡ f(a)
+        let ast = Expr::Pipeline(
+            Box::new(Expr::Number(42)),
+            Box::new(Expr::Ident("double".to_string())),
+        );
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::Call { func, args, .. } => {
+                assert_eq!(args.len(), 1);
+                assert!(matches!(*func, IrExpr::Var(ref name, _) if name == "double"));
+                assert!(matches!(args[0], IrExpr::Number(42, _)));
+            }
+            _ => panic!("Expected Call"),
+        }
+    }
+
+    #[test]
+    fn test_lower_binary_op() {
+        let ast = Expr::Binary(
+            BinOp::Add,
+            Box::new(Expr::Number(1)),
+            Box::new(Expr::Number(2)),
+        );
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::Binary(op, left, right, _) => {
+                assert_eq!(op, BinOp::Add);
+                assert!(matches!(*left, IrExpr::Number(1, _)));
+                assert!(matches!(*right, IrExpr::Number(2, _)));
+            }
+            _ => panic!("Expected Binary"),
+        }
+    }
+
+    #[test]
+    fn test_lower_function() {
+        let func = FuncDecl {
+            name: "add".to_string(),
+            params: vec![
+                ("a".to_string(), TypeExpr::Ident("number".to_string())),
+                ("b".to_string(), TypeExpr::Ident("number".to_string())),
+            ],
+            effects: vec![],
+            body: Expr::Binary(
+                BinOp::Add,
+                Box::new(Expr::Ident("a".to_string())),
+                Box::new(Expr::Ident("b".to_string())),
+            ),
+        };
+
+        let ir_func = lower_func(&func).unwrap();
+        assert_eq!(ir_func.name, "add");
+        assert_eq!(ir_func.params.len(), 2);
+        assert_eq!(ir_func.effects.len(), 0);
+
+        match ir_func.body {
+            IrExpr::Binary(op, left, right, _) => {
+                assert_eq!(op, BinOp::Add);
+                assert!(matches!(*left, IrExpr::Var(ref name, _) if name == "a"));
+                assert!(matches!(*right, IrExpr::Var(ref name, _) if name == "b"));
+            }
+            _ => panic!("Expected Binary in body"),
+        }
+    }
+
+    #[test]
+    fn test_equivalence_pipeline_desugaring() {
+        // Ensure a |> f is equivalent to f(a)
+        let pipeline_ast = Expr::Pipeline(
+            Box::new(Expr::Number(10)),
+            Box::new(Expr::Ident("inc".to_string())),
+        );
+
+        let direct_call_ast = Expr::Call {
+            func: Box::new(Expr::Ident("inc".to_string())),
+            args: vec![Expr::Number(10)],
+        };
+
+        let pipeline_ir = lower_expr(&pipeline_ast, &Type::Number).unwrap();
+        let direct_ir = lower_expr(&direct_call_ast, &Type::Number).unwrap();
+
+        // Both should produce the same IR structure
+        match (&pipeline_ir, &direct_ir) {
+            (
+                IrExpr::Call {
+                    func: pf, args: pa, ..
+                },
+                IrExpr::Call {
+                    func: df, args: da, ..
+                },
+            ) => {
+                assert_eq!(pf, df);
+                assert_eq!(pa, da);
+            }
+            _ => panic!("Both should be Call expressions"),
+        }
     }
 }

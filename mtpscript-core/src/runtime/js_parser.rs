@@ -902,11 +902,7 @@ impl JsParser {
                     self.advance();
                     s
                 }
-                _ => {
-                    return Err(RuntimeError::ValueError(
-                        "Expected object key".to_string(),
-                    ))
-                }
+                _ => return Err(RuntimeError::ValueError("Expected object key".to_string())),
             };
 
             self.expect(JsToken::Colon)?;

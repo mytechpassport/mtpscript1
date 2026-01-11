@@ -1,8 +1,7 @@
-use crate::security::verify::verify_snapshot_integrity;
-
 #[cfg(test)]
 mod fuzz_tests {
     use super::*;
+    use crate::security::verify::verify_snapshot_integrity;
 
     /// Fuzz test for ECDSA-P256 signing and verification
     #[test]

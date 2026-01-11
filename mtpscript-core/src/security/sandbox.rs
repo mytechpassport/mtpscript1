@@ -209,7 +209,9 @@ impl SandboxedInterpreter {
         }
 
         // Execute in the sandboxed interpreter and return JSON string
-        self.interpreter.execute_to_json(code).map_err(MtpError::from)
+        self.interpreter
+            .execute_to_json(code)
+            .map_err(MtpError::from)
     }
 
     /// Check if seccomp is enabled

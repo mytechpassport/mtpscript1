@@ -1,6 +1,5 @@
 use super::Json;
 use crate::errors::MtpError;
-use std::collections::HashMap;
 
 /// Serialize Json to canonical JSON string (RFC 8785)
 /// - Object keys sorted by §5 rules (type tag + hash + CBOR tie-break)
@@ -113,11 +112,29 @@ mod tests {
 
     #[test]
     fn test_canonical_object() {
-        let mut obj = HashMap::new();
+        let mut obj = std::collections::HashMap::new();
         obj.insert("b".to_string(), Json::Int(2));
         obj.insert("a".to_string(), Json::Int(1));
         let json = Json::Object(obj);
         // Keys sorted alphabetically
         assert_eq!(serialize_canonical(&json).unwrap(), r#"{"a":1,"b":2}"#);
+    }
+
+    #[test]
+    fn test_multi_run_determinism() {
+        let mut obj = std::collections::HashMap::new();
+        obj.insert("z".to_string(), Json::Int(3));
+        obj.insert("a".to_string(), Json::Int(1));
+        obj.insert(
+            "b".to_string(),
+            Json::Array(vec![Json::Bool(true), Json::Null]),
+        );
+        let json = Json::Object(obj);
+
+        let expected = serialize_canonical(&json).unwrap();
+        for _ in 0..100 {
+            let canonical = serialize_canonical(&json).unwrap();
+            assert_eq!(canonical, expected);
+        }
     }
 }

@@ -167,6 +167,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
             let op_js = match op {
                 crate::parser::ast::BinOp::Add => "+",
                 crate::parser::ast::BinOp::Sub => "-",
+                crate::parser::ast::BinOp::Not => "!",
                 crate::parser::ast::BinOp::Mul => "*", // Not really unary, but handle anyway
                 crate::parser::ast::BinOp::Div => "/", // Not really unary, but handle anyway
                 _ => {
@@ -195,6 +196,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
                 crate::parser::ast::BinOp::Ge => ">=",
                 crate::parser::ast::BinOp::And => "&&",
                 crate::parser::ast::BinOp::Or => "||",
+                crate::parser::ast::BinOp::Not => unreachable!("Not is unary"),
             };
             Ok(format!("{} {} {}", left_js, op_js, right_js))
         }
@@ -254,6 +256,11 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
             let args_js: Result<Vec<String>, _> = args.iter().map(|a| compile_expr(a, 0)).collect();
             let args_js = args_js?;
             Ok(format!("{}({})", name, args_js.join(", ")))
+        }
+
+        IrExpr::Lambda { params, body, .. } => {
+            let body_js = compile_expr(body, 0)?;
+            Ok(format!("function({}) {{ {} }}", params.join(", "), body_js))
         }
 
         IrExpr::RespondJson(expr, _) => {

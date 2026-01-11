@@ -40,6 +40,7 @@ mod tests {
     use crate::ir::nodes::{IrExpr, IrFunction};
     use crate::parser::ast::BinOp;
     use crate::types::Type;
+    use proptest::prelude::*;
 
     #[test]
     fn test_tail_recursive_factorial() {
@@ -79,5 +80,45 @@ mod tests {
 
         analyze_function_tail_calls(&mut func);
         assert!(!func.is_tail_recursive); // Not tail recursive because then branch is not a call
+    }
+
+    proptest! {
+        #[test]
+        fn tail_call_detection_complex_expressions(depth in 0..10usize) {
+            // Generate a function with nested if/match expressions and check tail call detection
+            let func_name = "test_func";
+            let body = generate_nested_expr(depth, func_name);
+            let mut func = IrFunction {
+                name: func_name.to_string(),
+                params: vec![],
+                return_type: Type::Number,
+                effects: vec![],
+                body,
+                is_tail_recursive: false,
+            };
+
+            analyze_function_tail_calls(&mut func);
+            // The property is that it doesn't crash and produces a boolean result
+            let _is_tail_recursive = func.is_tail_recursive;
+        }
+    }
+
+    fn generate_nested_expr(depth: usize, func_name: &str) -> IrExpr {
+        if depth == 0 {
+            // Base case: direct tail call
+            IrExpr::Call {
+                func: Box::new(IrExpr::Var(func_name.to_string(), Type::Number)),
+                args: vec![],
+                result_type: Type::Number,
+            }
+        } else {
+            // Recursive case: nested in if
+            IrExpr::If {
+                condition: Box::new(IrExpr::Number(1, Type::Number)),
+                then_branch: Box::new(generate_nested_expr(depth - 1, func_name)),
+                else_branch: Box::new(IrExpr::Number(0, Type::Number)),
+                result_type: Type::Number,
+            }
+        }
     }
 }

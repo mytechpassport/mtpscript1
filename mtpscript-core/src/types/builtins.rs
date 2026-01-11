@@ -125,9 +125,7 @@ mod tests {
 
     #[test]
     fn test_option_result_acceptance_criteria() {
-        use super::super::{Type, TypeContext};
-
-        let _ctx = TypeContext::with_builtins();
+        use super::super::Type;
 
         // Test that Option<T> and Result<T,E> can be constructed
         let option_number = Type::option(Type::Number);

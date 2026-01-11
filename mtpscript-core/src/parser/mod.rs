@@ -366,7 +366,7 @@ impl<'a> Parser<'a> {
     fn parse_unary(&mut self) -> Result<Expr, CompileError> {
         if self.match_token(Token::Bang) || self.match_token(Token::Minus) {
             let op = match self.previous().token {
-                Token::Bang => BinOp::Or, // reusing for now
+                Token::Bang => BinOp::Not,
                 Token::Minus => BinOp::Sub,
                 _ => unreachable!(),
             };
@@ -634,11 +634,6 @@ impl<'a> Parser<'a> {
             Token::Ident(name) => Ok(name.clone()),
             _ => Err(CompileError::ParserError("Expected identifier".to_string())),
         }
-    }
-
-    #[allow(dead_code)]
-    fn check_next(&self, token: Token) -> bool {
-        self.current + 1 < self.tokens.len() && self.tokens[self.current + 1].token == token
     }
 
     fn previous(&self) -> &TokenInfo {

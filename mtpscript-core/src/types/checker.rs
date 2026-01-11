@@ -55,7 +55,8 @@ impl TypeChecker {
             } => {
                 // Set type vars for this declaration
                 for param in type_params {
-                    self.type_vars.insert(param.clone(), Type::TypeVar(param.clone()));
+                    self.type_vars
+                        .insert(param.clone(), Type::TypeVar(param.clone()));
                 }
 
                 let adt_variants = variants
@@ -198,6 +199,33 @@ impl TypeChecker {
                             ))
                         }
                     }
+                    ast::BinOp::Not => unreachable!("Not is unary"),
+                }
+            }
+            Expr::Unary(op, expr) => {
+                let expr_type = self.typecheck_expr(expr, context)?;
+                match op {
+                    ast::BinOp::Add | ast::BinOp::Sub => {
+                        if expr_type == Type::Number {
+                            Ok(Type::Number)
+                        } else {
+                            Err(CompileError::TypeError(
+                                "Unary +/- require number".to_string(),
+                            ))
+                        }
+                    }
+                    ast::BinOp::Not => {
+                        if expr_type == Type::Boolean {
+                            Ok(Type::Boolean)
+                        } else {
+                            Err(CompileError::TypeError(
+                                "Unary ! requires boolean".to_string(),
+                            ))
+                        }
+                    }
+                    _ => Err(CompileError::TypeError(
+                        "Unsupported unary operator".to_string(),
+                    )),
                 }
             }
             Expr::If {

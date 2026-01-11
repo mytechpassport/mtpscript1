@@ -367,9 +367,7 @@ impl Interpreter {
                 Ok(val)
             }
 
-            JsExpr::ExprStmt(expr) => {
-                self.eval_expr(expr, local_scope)
-            }
+            JsExpr::ExprStmt(expr) => self.eval_expr(expr, local_scope),
         }
     }
 

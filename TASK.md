@@ -2254,4 +2254,1104 @@ MTP-030-036     MTP-040-043     │
 
 ---
 
-*Generated from TECHSPECV5.md Version 5.1*
+## Section 17: Bug Fixes from BUGFIX.md
+
+### - [ ] MTP-180: Fix Non-Deterministic Async Effect Hashing
+**Effort:** S | **Files:** `src/effects/async_effect.rs:140`
+**Spec Lines:** §7-a (Async Effect)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Replace `format!("{:?}", expr)` with a deterministic serialization method for promiseHash computation to ensure consistent hashing across runs.
+
+**Implementation Steps:**
+1. Implement a deterministic `to_string` or serialization for `Expr` types.
+2. Replace the format! with the deterministic version.
+
+**Pseudo-test:**
+```rust
+let expr1 = parse_expr("async_call(arg)");
+let expr2 = parse_expr("async_call(arg)");
+assert(hash_expr(expr1) == hash_expr(expr2));
+```
+
+---
+
+### - [x] MTP-181: Implement JS Subset Parser for Interpreter Cloning
+**Effort:** M | **Files:** `src/runtime/clone.rs:61`
+**Spec Lines:** §27.3 (Interpreter Cloning)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement `parse_js_to_ast` to properly parse and validate JS subset code instead of always erroring, enabling successful interpreter cloning.
+
+**Implementation Steps:**
+1. Extend JS lexer to tokenize JS subset.
+2. Implement parser for JS subset grammar.
+3. Validate against forbidden constructs.
+4. Return proper AST or error.
+
+**Pseudo-test:**
+```rust
+let js = "function main() { return 42; }";
+let ast = parse_js_to_ast(js)?;
+assert(ast.is_valid_subset());
+```
+
+---
+
+### - [x] MTP-182: Make Effect Injection Use Seed Deterministically
+**Effort:** M | **Files:** `src/runtime/effects.rs:120`
+**Spec Lines:** §27.4 (Effect Injection)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Modify `inject_effects` to use the provided `seed` for deterministic effect implementation and caching, rather than ignoring it.
+
+**Implementation Steps:**
+1. Use seed to generate deterministic function implementations.
+2. Implement caching based on (seed, effect_name).
+3. Ensure effects produce consistent results.
+
+**Pseudo-test:**
+```rust
+let seed1 = [0u8; 32];
+let seed2 = [0u8; 32];
+inject_effects(interp1, &seed1);
+inject_effects(interp2, &seed2);
+assert(interp1.call("DbRead", args) == interp2.call("DbRead", args));
+```
+
+---
+
+### - [x] MTP-183: Implement Actual API Handler Execution
+**Effort:** L | **Files:** `src/api/handler.rs:98`
+**Spec Lines:** §27.1 (Host Process Flow)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Replace hardcoded success response with actual execution of the API handler function and return its result.
+
+**Implementation Steps:**
+1. Execute the matched handler function with prepared arguments.
+2. Handle errors and return appropriate responses.
+3. Ensure proper serialization of results.
+
+**Pseudo-test:**
+```rust
+let req = HttpRequest { method: "GET", path: "/test", ... };
+let resp = execute_handler(&interp, &req)?;
+assert(resp.status == 200);
+assert(resp.body == expected_json);
+```
+
+---
+
+### - [x] MTP-184: Add Fuzz Tests for Type Checker
+**Effort:** L | **Files:** `src/types/checker.rs`, `tests/fuzz/type_checker_fuzz.rs`
+**Spec Lines:** §4 (Type System)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Implement cargo-fuzz integration for adversarial AST inputs to prevent type confusion attacks.
+
+**Implementation Steps:**
+1. Set up fuzz target for type checker.
+2. Generate random ASTs and check for crashes.
+3. Add property-based tests.
+
+**Pseudo-test:**
+```rust
+cargo fuzz run type_checker -- -runs=10000
+// No crashes or hangs
+```
+
+---
+
+### - [ ] MTP-185: Add Depth and Size Limits to JSON Parser
+**Effort:** M | **Files:** `src/json/parse.rs`
+**Spec Lines:** §9 (JSON Model)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement configurable limits to prevent DoS via billion laughs or deep nesting attacks.
+
+**Implementation Steps:**
+1. Add max_depth and max_size parameters.
+2. Track depth during parsing.
+3. Reject inputs exceeding limits.
+
+**Pseudo-test:**
+```rust
+let deep_json = "{".repeat(1000) + "}";
+assert(parse_json(deep_json).is_err());
+```
+
+---
+
+### - [ ] MTP-186: Add Input Validation to Built-in Functions
+**Effort:** M | **Files:** `src/effects/builtins.rs`
+**Spec Lines:** §7-c (Built-in Functions)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add bounds checking and sanitization for all builtin function inputs to prevent injection attacks.
+
+**Implementation Steps:**
+1. Validate string lengths.
+2. Check number ranges.
+3. Sanitize inputs.
+
+**Pseudo-test:**
+```rust
+assert(call("Json.parse", ["<script>alert(1)</script>"]).is_err());
+```
+
+---
+
+### - [ ] MTP-187: Implement IR Schema Validation
+**Effort:** M | **Files:** `src/ir/mod.rs`, `src/ir/validate.rs`
+**Spec Lines:** §12 (Compilation Pipeline)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Add validation before lowering to prevent malformed IR from causing runtime failures.
+
+**Implementation Steps:**
+1. Define IR schema.
+2. Implement validation function.
+3. Call before lowering.
+
+**Pseudo-test:**
+```rust
+let ir = lower(ast)?;
+assert(validate_ir(&ir).is_ok());
+```
+
+---
+
+### - [x] MTP-188: Add Equivalence Tests for AST to IR Lowering
+**Effort:** M | **Files:** `tests/compiler/ir_lowering_tests.rs`
+**Spec Lines:** §12 (Compilation Pipeline)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Implement unit tests to ensure lowering correctness and prevent regressions.
+
+**Implementation Steps:**
+1. Test various AST constructs.
+2. Verify IR equivalence.
+3. Add property tests.
+
+**Pseudo-test:**
+```rust
+let ast = parse("a + b * c");
+let ir = lower(ast)?;
+assert(ir_represents("a + (b * c)"));
+```
+
+---
+
+### - [x] MTP-189: Add Property-Based Tests for Tail Call Detection
+**Effort:** L | **Files:** `tests/ir/tail_call_tests.rs`
+**Spec Lines:** §6 (Tail Calls)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Implement comprehensive tests for complex expressions to ensure optimization opportunities are detected.
+
+**Implementation Steps:**
+1. Use proptest for random functions.
+2. Check tail call detection.
+3. Verify gas costs.
+
+**Pseudo-test:**
+```rust
+proptest! {
+    #[test]
+    fn tail_call_detection(func in arb_function()) {
+        let ir = compile(func)?;
+        assert(tail_calls_marked_correctly(ir));
+    }
+}
+```
+
+---
+
+### - [x] MTP-190: Add Whitelist Validation for Effect Parameters
+**Effort:** M | **Files:** `src/compiler/effects.rs`
+**Spec Lines:** §7-b (Effect Invocation)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement whitelist validation for effect parameters to prevent malicious arguments.
+
+**Implementation Steps:**
+1. Define allowed parameter types.
+2. Validate before compilation.
+3. Reject invalid params.
+
+**Pseudo-test:**
+```rust
+let invalid = "DbRead('SELECT *', malicious_object)";
+assert(compile_effect_call(invalid).is_err());
+```
+
+---
+
+### - [x] MTP-191: Add Cross-Platform Determinism Tests for Code Generation
+**Effort:** L | **Files:** `tests/compiler/determinism_tests.rs`
+**Spec Lines:** §26 (Formal Determinism)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Implement tests across different environments to ensure reproducible builds.
+
+**Implementation Steps:**
+1. Test on different OS/arch.
+2. Verify identical output.
+3. Check variable naming consistency.
+
+**Pseudo-test:**
+```rust
+let js_linux = compile_on("linux", src)?;
+let js_macos = compile_on("macos", src)?;
+assert(sha256(js_linux) == sha256(js_macos));
+```
+
+---
+
+### - [x] MTP-192: Integrate Fuzzing for Malicious JSON Inputs
+**Effort:** L | **Files:** `tests/fuzz/json_fuzz.rs`
+**Spec Lines:** §9 (JSON Model)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Add fuzz testing to catch edge cases like invalid UTF-8 or control characters.
+
+**Implementation Steps:**
+1. Set up fuzz target for JSON parser.
+2. Test with random bytes.
+3. Ensure no crashes.
+
+**Pseudo-test:**
+```rust
+cargo fuzz run json_parser -- -runs=100000
+// No crashes
+```
+
+---
+
+### - [x] MTP-193: Add Multi-Run Determinism Tests for Canonical JSON
+**Effort:** S | **Files:** `tests/json/canonical_tests.rs`
+**Spec Lines:** §23 (Canonical JSON)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Verify canonical JSON serialization produces identical output across runs.
+
+**Implementation Steps:**
+1. Serialize same Json multiple times.
+2. Assert byte equality.
+
+**Pseudo-test:**
+```rust
+for _ in 0..100 {
+    let canonical1 = json.to_canonical_string();
+    let canonical2 = json.to_canonical_string();
+    assert(canonical1 == canonical2);
+}
+```
+
+---
+
+### - [x] MTP-194: Add CBOR Spec Compliance and Size Limits
+**Effort:** M | **Files:** `src/json/cbor.rs`
+**Spec Lines:** § (CBOR mentions)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Implement validation and size limits for CBOR encoder to prevent invalid output or DoS.
+
+**Implementation Steps:**
+1. Validate CBOR output against spec.
+2. Add size limits.
+3. Handle errors properly.
+
+**Pseudo-test:**
+```rust
+let cbor = encode_cbor(json)?;
+assert(cbor.len() < MAX_SIZE);
+assert(is_valid_cbor(&cbor));
+```
+
+---
+
+### - [ ] MTP-195: Implement Hash Trait for Value Type
+**Effort:** M | **Files:** `src/runtime/value.rs`
+**Spec Lines:** § (Hashing requirements)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add secure Hash implementation using SHA-256 for large values.
+
+**Implementation Steps:**
+1. Implement std::hash::Hash for Value.
+2. Use SHA-256 for complex values.
+3. Ensure constant time.
+
+**Pseudo-test:**
+```rust
+use std::collections::HashMap;
+let mut map = HashMap::new();
+map.insert(Value::String("key".into()), Value::Number(42));
+assert(map.get(&Value::String("key".into())) == Some(&Value::Number(42)));
+```
+
+---
+
+### - [ ] MTP-196: Add Input Validation and Rate Limiting to API Handlers
+**Effort:** L | **Files:** `src/api/handler.rs`
+**Spec Lines:** §8 (API System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement sanitization and rate limiting to prevent injection and DoS attacks.
+
+**Implementation Steps:**
+1. Validate and sanitize inputs.
+2. Implement rate limiting.
+3. Add request size limits.
+
+**Pseudo-test:**
+```rust
+let malicious_req = HttpRequest { body: vec![0; 1000000], .. };
+assert(handle_request(malicious_req).is_err()); // rate limited or size exceeded
+```
+
+---
+
+### - [ ] MTP-197: Implement FIPS-Compliant Key Validation
+**Effort:** M | **Files:** `src/security/sign.rs`
+**Spec Lines:** § (Signature verification)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add key strength validation and management policies for ECDSA.
+
+**Implementation Steps:**
+1. Validate key strength.
+2. Implement key rotation.
+3. Use FIPS-compliant methods.
+
+**Pseudo-test:**
+```rust
+let weak_key = generate_weak_key();
+assert(validate_key(&weak_key).is_err());
+```
+
+---
+
+### - [ ] MTP-198: Add Cryptographic Verification for Imported Modules
+**Effort:** L | **Files:** `src/modules/import.rs`
+**Spec Lines:** §10 (Module System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement signing verification for static imports to prevent supply chain attacks.
+
+**Implementation Steps:**
+1. Verify module signatures.
+2. Check against trusted keys.
+3. Reject unsigned modules.
+
+**Pseudo-test:**
+```rust
+let signed_module = load_module("trusted.mod");
+assert(verify_signature(&signed_module).is_ok());
+```
+
+---
+
+### - [ ] MTP-199: Conduct Full External Security Assessment
+**Effort:** XL | **Files:** `docs/security_audit.md`, `src/`
+**Spec Lines:** § (Security requirements)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Complete external security audit and implement all findings before production.
+
+**Implementation Steps:**
+1. Hire external auditors.
+2. Address all issues.
+3. Document results.
+
+**Pseudo-test:**
+```rust
+// Audit complete
+assert(security_audit_passed());
+```
+
+---
+
+### - [ ] MTP-200: Implement Chaos Engineering Testing Suite
+**Effort:** L | **Files:** `tests/chaos/`
+**Spec Lines:** § (Resilience)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Add failure injection and chaos monkey testing to mask resilience issues.
+
+**Implementation Steps:**
+1. Set up chaos framework.
+2. Inject failures.
+3. Test system stability.
+
+**Pseudo-test:**
+```rust
+chaos_test! {
+    inject_failure("network");
+    assert(system_recovers());
+}
+```
+
+---
+
+### - [ ] MTP-201: Apply Formal Verification to Critical Components
+**Effort:** XL | **Files:** `formal/`
+**Spec Lines:** § (Formal methods)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Use model checking and theorem proving where feasible.
+
+**Implementation Steps:**
+1. Identify critical components.
+2. Apply formal methods.
+3. Prove properties.
+
+**Pseudo-test:**
+```rust
+assert(formally_verified(type_checker()));
+```
+
+---
+
+### - [ ] MTP-202: Implement Centralized Logging and Monitoring
+**Effort:** L | **Files:** `src/audit/`, `monitoring/`
+**Spec Lines:** §27.7 (Audit Logger)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add security event detection and alerting system.
+
+**Implementation Steps:**
+1. Centralize logs.
+2. Implement monitoring.
+3. Add alerting.
+
+**Pseudo-test:**
+```rust
+log_security_event("suspicious_activity");
+assert(alert_triggered());
+```
+
+---
+
+### - [ ] MTP-203: Implement Continuous Profiling and Optimization
+**Effort:** L | **Files:** `perf/`, `src/`
+**Spec Lines:** § (Performance)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Add benchmarking and optimization to prevent undetected bottlenecks.
+
+**Implementation Steps:**
+1. Set up profiling.
+2. Identify bottlenecks.
+3. Optimize.
+
+**Pseudo-test:**
+```rust
+let perf = benchmark_execution();
+assert(perf < threshold);
+```
+
+---
+
+### - [ ] MTP-204: Conduct Full Compliance Audit
+**Effort:** L | **Files:** `compliance/`
+**Spec Lines:** § (Compliance)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Audit against GDPR, PCI-DSS, etc., and remediate violations.
+
+**Implementation Steps:**
+1. Review requirements.
+2. Audit system.
+3. Fix issues.
+
+**Pseudo-test:**
+```rust
+assert(compliant_with(GDPR));
+```
+
+---
+
+### - [ ] MTP-205: Add Input Size Limits and Unicode Validation to Lexer
+**Effort:** M | **Files:** `src/lexer/mod.rs`
+**Spec Lines:** §3 (Syntax & Grammar)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement limits and proper UTF-8 validation to prevent DoS and encoding attacks.
+
+**Implementation Steps:**
+1. Add size limits.
+2. Validate UTF-8.
+3. Handle Unicode security issues.
+
+**Pseudo-test:**
+```rust
+let huge_input = "a".repeat(1000000);
+assert(lex(huge_input).is_err());
+```
+
+---
+
+### - [ ] MTP-206: Implement Recursion Limits in Parser
+**Effort:** M | **Files:** `src/parser/mod.rs`
+**Spec Lines:** §3 (Grammar)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add stack depth limits to prevent recursive descent stack overflows.
+
+**Implementation Steps:**
+1. Track recursion depth.
+2. Add limits.
+3. Implement robust error recovery.
+
+**Pseudo-test:**
+```rust
+let deep_expr = "(".repeat(1000) + "1" + ")".repeat(1000);
+assert(parse_expr(deep_expr).is_err());
+```
+
+---
+
+### - [ ] MTP-207: Add Depth Limits to Type Checker Recursion
+**Effort:** M | **Files:** `src/types/checker.rs`
+**Spec Lines:** §4 (Type System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement bounds checking on type recursion depth to prevent DoS via deep nesting.
+
+**Implementation Steps:**
+1. Track depth in unification.
+2. Add limits.
+3. Detect cycles.
+
+**Pseudo-test:**
+```rust
+let deep_type = "A<B<C<...>>>".repeat(100);
+assert(check_type(deep_type).is_err());
+```
+
+---
+
+### - [ ] MTP-208: Add Timeouts and Resource Quotas to Interpreter
+**Effort:** L | **Files:** `src/runtime/interpreter.rs`
+**Spec Lines:** §27 (Interpreter Runtime)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement execution timeouts and metering to prevent infinite loops and resource exhaustion.
+
+**Implementation Steps:**
+1. Add timeout mechanism.
+2. Track resource usage.
+3. Terminate on exceed.
+
+**Pseudo-test:**
+```rust
+let infinite_loop = "while(true) {}";
+assert(execute_with_timeout(infinite_loop, 1s).is_err());
+```
+
+---
+
+### - [ ] MTP-209: Conduct Comprehensive Cryptography Audit
+**Effort:** L | **Files:** `src/security/`
+**Spec Lines:** § (Security)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Audit crypto implementations and implement FIPS-compliant key management.
+
+**Implementation Steps:**
+1. Review all crypto code.
+2. Implement key rotation.
+3. Ensure FIPS compliance.
+
+**Pseudo-test:**
+```rust
+assert(crypto_audit_passed());
+```
+
+---
+
+### - [ ] MTP-210: Add Comprehensive Input Validation to API Handlers
+**Effort:** M | **Files:** `src/api/handler.rs`
+**Spec Lines:** §8 (API System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement strict validation and XSS prevention for all API inputs.
+
+**Implementation Steps:**
+1. Validate all inputs.
+2. Sanitize data.
+3. Prevent XSS.
+
+**Pseudo-test:**
+```rust
+let xss_input = "<script>alert(1)</script>";
+assert(validate_input(xss_input).is_err());
+```
+
+---
+
+### - [ ] MTP-211: Implement Constant-Time Operations for Values
+**Effort:** M | **Files:** `src/runtime/value.rs`
+**Spec Lines:** § (Security)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Ensure all value operations are constant-time to prevent timing attacks.
+
+**Implementation Steps:**
+1. Use constant-time comparisons.
+2. Avoid branching on secrets.
+3. Implement secure operations.
+
+**Pseudo-test:**
+```rust
+let secret1 = Value::String("secret");
+let secret2 = Value::String("secret");
+assert(timing_attack_resistant_compare(&secret1, &secret2));
+```
+
+---
+
+### - [ ] MTP-212: Implement Static and Dynamic Taint Analysis
+**Effort:** XL | **Files:** `taint/`, `src/`
+**Spec Lines:** § (Security)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Add data flow analysis and taint tracking to prevent information leaks.
+
+**Implementation Steps:**
+1. Implement taint tracking.
+2. Analyze data flows.
+3. Block leaks.
+
+**Pseudo-test:**
+```rust
+let tainted = taint(Value::String("secret"));
+let result = process(tainted);
+assert(!leaks_taint(result));
+```
+
+---
+
+### - [ ] MTP-213: Integrate AFL/libFuzzer for Comprehensive Fuzzing
+**Effort:** L | **Files:** `tests/fuzz/`
+**Spec Lines:** § (Testing)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Set up continuous fuzzing across all components to find edge cases.
+
+**Implementation Steps:**
+1. Add fuzz targets.
+2. Integrate with CI.
+3. Fix found issues.
+
+**Pseudo-test:**
+```rust
+fuzz_all_components();
+// No crashes after 24h
+```
+
+---
+
+### - [ ] MTP-214: Implement SBOM Generation and Dependency Scanning
+**Effort:** M | **Files:** `sbom/`, `src/modules/`
+**Spec Lines:** §10 (Module System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Generate SBOM and scan dependencies for supply chain security.
+
+**Implementation Steps:**
+1. Generate SBOM.
+2. Scan for vulnerabilities.
+3. Block unsafe deps.
+
+**Pseudo-test:**
+```rust
+let sbom = generate_sbom();
+assert(no_vulnerable_deps(&sbom));
+```
+
+---
+
+### - [ ] MTP-215: Implement Comprehensive Error Recovery
+**Effort:** L | **Files:** `src/errors/`, `src/`
+**Spec Lines:** §16 (Error System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add graceful degradation and comprehensive error propagation.
+
+**Implementation Steps:**
+1. Improve error handling.
+2. Add recovery mechanisms.
+3. Ensure no crashes.
+
+**Pseudo-test:**
+```rust
+let bad_input = "invalid";
+let result = process(bad_input);
+assert(result.is_err() && !crashed());
+```
+
+---
+
+### - [ ] MTP-216: Add Additional Memory Safety Checks
+**Effort:** M | **Files:** `src/runtime/`
+**Spec Lines:** § (Safety)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement bounds validation beyond Rust defaults for complex scenarios.
+
+**Implementation Steps:**
+1. Add bounds checks.
+2. Validate memory operations.
+3. Prevent use-after-free.
+
+**Pseudo-test:**
+```rust
+let unsafe_op = dangerous_operation();
+assert(memory_safe(&unsafe_op));
+```
+
+---
+
+### - [ ] MTP-217: Implement Race Condition Detection and Synchronization
+**Effort:** L | **Files:** `src/runtime/`
+**Spec Lines:** § (Concurrency)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add proper synchronization primitives and race detection for concurrent operations.
+
+**Implementation Steps:**
+1. Identify concurrent code.
+2. Add synchronization.
+3. Test for races.
+
+**Pseudo-test:**
+```rust
+concurrent_test! {
+    assert(no_race_conditions());
+}
+```
+
+---
+
+### - [ ] MTP-218: Implement Multiple Security Layers
+**Effort:** L | **Files:** `src/security/`
+**Spec Lines:** § (Security)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add defense-in-depth strategies to avoid single points of failure.
+
+**Implementation Steps:**
+1. Add multiple layers.
+2. Implement fail-safes.
+3. Test redundancy.
+
+**Pseudo-test:**
+```rust
+disable_layer("firewall");
+assert(still_secure());
+```
+
+---
+
+### - [ ] MTP-219: Add Schema Validation Everywhere
+**Effort:** L | **Files:** `src/`
+**Spec Lines:** § (Validation)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement schema validation at all boundaries to prevent malformed data propagation.
+
+**Implementation Steps:**
+1. Define schemas.
+2. Validate inputs/outputs.
+3. Reject invalid data.
+
+**Pseudo-test:**
+```rust
+let malformed = "bad data";
+assert(validate_schema(malformed).is_err());
+```
+
+---
+
+### - [ ] MTP-220: Implement Adaptive Rate Limiting
+**Effort:** M | **Files:** `src/api/`
+**Spec Lines:** §8 (API System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add rate limiting across all interfaces to prevent DoS attacks.
+
+**Implementation Steps:**
+1. Implement rate limiter.
+2. Adapt to load.
+3. Block abusers.
+
+**Pseudo-test:**
+```rust
+flood_requests();
+assert(rate_limited());
+```
+
+---
+
+### - [ ] MTP-221: Implement Strict State Isolation
+**Effort:** M | **Files:** `src/runtime/`
+**Spec Lines:** §27 (Interpreter Runtime)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add session management and state isolation to prevent cross-request contamination.
+
+**Implementation Steps:**
+1. Isolate interpreter state.
+2. Clean up after requests.
+3. Prevent leakage.
+
+**Pseudo-test:**
+```rust
+let interp1 = clone_for_request1();
+let interp2 = clone_for_request2();
+assert(states_isolated(interp1, interp2));
+```
+
+---
+
+### - [ ] MTP-222: Add Checksums and Validation for Critical Structures
+**Effort:** M | **Files:** `src/`
+**Spec Lines:** § (Integrity)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Implement integrity checks on internal data structures.
+
+**Implementation Steps:**
+1. Add checksums.
+2. Validate structures.
+3. Detect corruption.
+
+**Pseudo-test:**
+```rust
+let corrupted = tamper_with(data);
+assert(integrity_check(corrupted).is_err());
+```
+
+---
+
+### - [ ] MTP-223: Implement Comprehensive Audit Logging
+**Effort:** L | **Files:** `src/audit/`
+**Spec Lines:** §27.7 (Audit Logger)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add tamper-evident storage for all security-relevant operations.
+
+**Implementation Steps:**
+1. Log all operations.
+2. Make logs tamper-evident.
+3. Ensure completeness.
+
+**Pseudo-test:**
+```rust
+perform_operation();
+assert(audit_log_contains(operation));
+```
+
+---
+
+### - [ ] MTP-224: Implement Privacy-by-Design Principles
+**Effort:** L | **Files:** `src/`
+**Spec Lines:** § (Privacy)
+**Priority:** P1
+
+**Acceptance Criteria:**
+Add zero-knowledge and privacy-preserving features where applicable.
+
+**Implementation Steps:**
+1. Minimize data collection.
+2. Implement privacy features.
+3. Ensure compliance.
+
+**Pseudo-test:**
+```rust
+let private_data = process_data();
+assert(no_privacy_leaks(private_data));
+```
+
+---
+
+### - [ ] MTP-225: Implement RAII Patterns and Resource Tracking
+**Effort:** M | **Files:** `src/runtime/`
+**Spec Lines:** § (Resource Management)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add proper resource cleanup and lifecycle management.
+
+**Implementation Steps:**
+1. Use RAII.
+2. Track resources.
+3. Ensure cleanup.
+
+**Pseudo-test:**
+```rust
+{
+    let resource = acquire();
+    // use
+}
+assert(resource_cleaned_up());
+```
+
+---
+
+### - [ ] MTP-226: Implement Constant-Time Algorithms and Mitigations
+**Effort:** M | **Files:** `src/`
+**Spec Lines:** § (Security)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add side-channel attack protections for timing, power, etc.
+
+**Implementation Steps:**
+1. Use constant-time algorithms.
+2. Mitigate side channels.
+3. Test resistance.
+
+**Pseudo-test:**
+```rust
+let secret1 = "secret1";
+let secret2 = "secret2";
+assert(timing_indistinguishable(compare(secret1, secret2)));
+```
+
+---
+
+### - [ ] MTP-227: Create Security Requirements Traceability Matrix
+**Effort:** L | **Files:** `docs/security_traceability.md`
+**Spec Lines:** § (Requirements)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Document formal security requirements and validate acceptance criteria.
+
+**Implementation Steps:**
+1. Define requirements.
+2. Create traceability matrix.
+3. Validate implementation.
+
+**Pseudo-test:**
+```rust
+assert(all_requirements_traced());
+```
+
+---
+
+### - [ ] MTP-228: Implement Automated Security Scanning in CI/CD
+**Effort:** M | **Files:** `.github/workflows/`, `ci/`
+**Spec Lines:** § (CI/CD)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Add continuous security monitoring and vulnerability scanning.
+
+**Implementation Steps:**
+1. Integrate security scans.
+2. Monitor for regressions.
+3. Alert on issues.
+
+**Pseudo-test:**
+```rust
+ci_pipeline();
+assert(no_security_regressions());
+```
+
+---
+
+### - [ ] MTP-229: Develop and Test Incident Response Plan
+**Effort:** L | **Files:** `docs/incident_response.md`
+**Spec Lines:** § (Operations)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Create and test incident response capabilities.
+
+**Implementation Steps:**
+1. Develop plan.
+2. Test procedures.
+3. Train team.
+
+**Pseudo-test:**
+```rust
+simulate_incident();
+assert(response_effective());
+```
+
+---
+
+### - [ ] MTP-230: Implement Full JS Subset Interpreter
+**Effort:** L | **Files:** `src/runtime/interpreter.rs:180`
+**Spec Lines:** §27.1 (Interpreter Runtime)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+Replace placeholder execute method with full JavaScript subset interpreter that parses and evaluates generated code.
+
+**Implementation Steps:**
+1. Extend JsExpr for full subset.
+2. Implement parsing.
+3. Add evaluation logic.
+4. Return actual results.
+
+**Pseudo-test:**
+```rust
+let js = "function add(a, b) { return a + b; } add(1, 2)";
+let result = execute(js)?;
+assert(result == Value::Number(3));
+```
+
+---
+
+*Generated from TECHSPECV5.md Version 5.1 and BUGFIX.md*

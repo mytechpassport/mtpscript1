@@ -61,30 +61,28 @@ impl<'a> JsonParser<'a> {
         while let Some(c) = self.next() {
             match c {
                 '"' => return Ok(result),
-                '\\' => {
-                    match self.next() {
-                        Some('"') => result.push('"'),
-                        Some('\\') => result.push('\\'),
-                        Some('/') => result.push('/'),
-                        Some('b') => result.push('\x08'),
-                        Some('f') => result.push('\x0c'),
-                        Some('n') => result.push('\n'),
-                        Some('r') => result.push('\r'),
-                        Some('t') => result.push('\t'),
-                        Some('u') => {
-                            let mut code = 0u32;
-                            for _ in 0..4 {
-                                let c = self.next().ok_or(ParseError::UnexpectedEnd)?;
-                                let digit = c.to_digit(16).ok_or(ParseError::InvalidEscape(c))?;
-                                code = code * 16 + digit;
-                            }
-                            let ch = char::from_u32(code).ok_or(ParseError::InvalidEscape('u'))?;
-                            result.push(ch);
+                '\\' => match self.next() {
+                    Some('"') => result.push('"'),
+                    Some('\\') => result.push('\\'),
+                    Some('/') => result.push('/'),
+                    Some('b') => result.push('\x08'),
+                    Some('f') => result.push('\x0c'),
+                    Some('n') => result.push('\n'),
+                    Some('r') => result.push('\r'),
+                    Some('t') => result.push('\t'),
+                    Some('u') => {
+                        let mut code = 0u32;
+                        for _ in 0..4 {
+                            let c = self.next().ok_or(ParseError::UnexpectedEnd)?;
+                            let digit = c.to_digit(16).ok_or(ParseError::InvalidEscape(c))?;
+                            code = code * 16 + digit;
                         }
-                        Some(c) => return Err(ParseError::InvalidEscape(c)),
-                        None => return Err(ParseError::UnexpectedEnd),
+                        let ch = char::from_u32(code).ok_or(ParseError::InvalidEscape('u'))?;
+                        result.push(ch);
                     }
-                }
+                    Some(c) => return Err(ParseError::InvalidEscape(c)),
+                    None => return Err(ParseError::UnexpectedEnd),
+                },
                 c => result.push(c),
             }
         }

@@ -54,7 +54,10 @@ impl AdtType {
             match variant {
                 AdtVariant::Unit(name) => new_variants.push(AdtVariant::Unit(name.clone())),
                 AdtVariant::Tuple(name, types) => {
-                    let new_types = types.iter().map(|t| Self::substitute_type(t, substitutions)).collect();
+                    let new_types = types
+                        .iter()
+                        .map(|t| Self::substitute_type(t, substitutions))
+                        .collect();
                     new_variants.push(AdtVariant::Tuple(name.clone(), new_types));
                 }
             }
@@ -66,9 +69,15 @@ impl AdtType {
         }
     }
 
-    fn substitute_type(typ: &Type, substitutions: &std::collections::HashMap<String, Type>) -> Type {
+    fn substitute_type(
+        typ: &Type,
+        substitutions: &std::collections::HashMap<String, Type>,
+    ) -> Type {
         match typ {
-            Type::TypeVar(name) => substitutions.get(name).cloned().unwrap_or_else(|| Type::TypeVar(name.clone())),
+            Type::TypeVar(name) => substitutions
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| Type::TypeVar(name.clone())),
             Type::Adt(adt) => Type::Adt(Box::new(adt.substitute(substitutions))),
             Type::Record(record) => {
                 // Assuming RecordType needs substitution too, but for now
@@ -118,13 +127,13 @@ impl Type {
         match self {
             Type::Number => 64,
             Type::Boolean => 1,
-            Type::String => 0,    // Variable size
-            Type::Decimal => 128, // Approximation
+            Type::String => 0,     // Variable size
+            Type::Decimal => 128,  // Approximation
             Type::TypeVar(_) => 0, // Unknown
-            Type::Record(_) => 0, // Variable size
-            Type::Adt(_) => 0,    // Variable
-            Type::Json => 0,      // Variable size
-            Type::Var(_) => 0,    // Unknown
+            Type::Record(_) => 0,  // Variable size
+            Type::Adt(_) => 0,     // Variable
+            Type::Json => 0,       // Variable size
+            Type::Var(_) => 0,     // Unknown
         }
     }
 

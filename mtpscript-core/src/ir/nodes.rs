@@ -27,6 +27,11 @@ pub enum IrExpr {
         args: Vec<IrExpr>,
         result_type: Type,
     },
+    Lambda {
+        params: Vec<String>,
+        body: Box<IrExpr>,
+        result_type: Type,
+    },
     Unary(BinOp, Box<IrExpr>, Type),
     Binary(BinOp, Box<IrExpr>, Box<IrExpr>, Type),
 
@@ -130,6 +135,7 @@ impl IrExpr {
             | IrExpr::Index(_, _, t)
             | IrExpr::Call { result_type: t, .. }
             | IrExpr::TailCall { result_type: t, .. }
+            | IrExpr::Lambda { result_type: t, .. }
             | IrExpr::Unary(_, _, t)
             | IrExpr::Binary(_, _, _, t)
             | IrExpr::If { result_type: t, .. }
