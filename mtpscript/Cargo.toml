@@ -6,3 +6,10 @@ edition = "2021"
 [dependencies]
 mtpscript-core = { path = "../mtpscript-core" }
 clap = "4.0"
+sha2 = "0.10"
+crc32fast = "1.3"
+tiny_http = "0.12"
+
+[[bin]]
+name = "mtp"
+path = "src/main.rs"

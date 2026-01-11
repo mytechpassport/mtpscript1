@@ -1,5 +1,5 @@
 use crate::errors::compile::CompileError;
-use crate::parser::ast::{Program, ModuleDecl, FuncDecl, ApiDecl, Expr};
+use crate::parser::ast::{ApiDecl, Expr, FuncDecl, ModuleDecl, Program};
 use std::collections::HashSet;
 
 const BUILT_IN_EFFECTS: &[&str] = &["DbRead", "DbWrite", "HttpOut", "Log", "Async"];
@@ -63,26 +63,30 @@ fn check_expr_effects(
             }
             check_expr_effects(inner, declared_effects, allow_respond)?;
         }
-        Expr::Binary(_, left, right)
-        | Expr::Pipeline(left, right) => {
+        Expr::Binary(_, left, right) | Expr::Pipeline(left, right) => {
             check_expr_effects(left, declared_effects, allow_respond)?;
             check_expr_effects(right, declared_effects, allow_respond)?;
         }
-        Expr::Unary(_, inner)
-        | Expr::Dot(inner, _)
-        | Expr::Group(inner) => {
+        Expr::Unary(_, inner) | Expr::Dot(inner, _) | Expr::Group(inner) => {
             check_expr_effects(inner, declared_effects, allow_respond)?;
         }
         Expr::Index(array, index) => {
             check_expr_effects(array, declared_effects, allow_respond)?;
             check_expr_effects(index, declared_effects, allow_respond)?;
         }
-        Expr::If { condition, then_branch, else_branch } => {
+        Expr::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
             check_expr_effects(condition, declared_effects, allow_respond)?;
             check_expr_effects(then_branch, declared_effects, allow_respond)?;
             check_expr_effects(else_branch, declared_effects, allow_respond)?;
         }
-        Expr::Match { expr: match_expr, cases } => {
+        Expr::Match {
+            expr: match_expr,
+            cases,
+        } => {
             check_expr_effects(match_expr, declared_effects, allow_respond)?;
             for (_, case_expr) in cases {
                 check_expr_effects(case_expr, declared_effects, allow_respond)?;
@@ -107,7 +111,11 @@ fn check_expr_effects(
             }
         }
         // Literals and identifiers don't use effects
-        Expr::String(_) | Expr::Number(_) | Expr::Decimal(_) | Expr::Boolean(_) | Expr::Ident(_) => {}
+        Expr::String(_)
+        | Expr::Number(_)
+        | Expr::Decimal(_)
+        | Expr::Boolean(_)
+        | Expr::Ident(_) => {}
     }
     Ok(())
 }

@@ -58,9 +58,9 @@ pub enum Token {
     PipeGreater, // |>
 
     // Other
-    Arrow, // =>
-    Equal, // =
-    Pipe, // |
+    Arrow,      // =>
+    Equal,      // =
+    Pipe,       // |
     Underscore, // _
 
     // End of file

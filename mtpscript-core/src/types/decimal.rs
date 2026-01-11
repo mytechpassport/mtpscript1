@@ -1,4 +1,5 @@
 use crate::errors::compile::CompileError;
+use std::fmt;
 
 /// Decimal type for precise fixed-point arithmetic per §4-a of the spec.
 /// - value: canonical integer significand (1-34 digits, no leading zeros)
@@ -554,6 +555,40 @@ impl Decimal {
         }
 
         result == 0
+    }
+}
+
+impl fmt::Display for Decimal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut significand = self.significand.clone();
+        let scale = self.scale as usize;
+
+        // Insert decimal point
+        if scale > 0 {
+            if scale >= significand.len() {
+                // Add leading zeros
+                let zeros = "0".repeat(scale - significand.len() + 1);
+                significand = format!("{}{}", zeros, significand);
+            }
+            let pos = significand.len() - scale;
+            significand.insert(pos, '.');
+            // Remove trailing zeros after decimal
+            while significand.ends_with('0')
+                && significand.chars().nth(significand.len() - 2) != Some('.')
+            {
+                significand.pop();
+            }
+            // Remove decimal point if no digits after
+            if significand.ends_with('.') {
+                significand.pop();
+            }
+        }
+
+        if self.negative {
+            write!(f, "-{}", significand)
+        } else {
+            write!(f, "{}", significand)
+        }
     }
 }
 

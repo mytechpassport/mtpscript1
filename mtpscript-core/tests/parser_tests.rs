@@ -157,10 +157,11 @@ fn test_multiple_api_decls() {
 #[test]
 fn test_full_compilation_pipeline() {
     let source = r#"function add(a: number, b: number) { a + b }"#;
-    
+
     let program = parse_source(source).expect("Failed to parse");
     let ir = mtpscript_core::ir::lower::lower_ast_to_ir(&program).expect("Failed to lower to IR");
-    let js = mtpscript_core::compiler::codegen::compile_ir_to_js(&ir).expect("Failed to compile to JS");
+    let js =
+        mtpscript_core::compiler::codegen::compile_ir_to_js(&ir).expect("Failed to compile to JS");
 
     println!("Generated JS:\n{}", js);
 

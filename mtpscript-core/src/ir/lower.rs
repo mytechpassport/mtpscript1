@@ -1,7 +1,9 @@
+use super::nodes::{IrApi, IrDecl, IrExpr, IrFunction, IrPattern, IrProgram};
 use crate::errors::compile::CompileError;
-use crate::parser::ast::{Program, ModuleDecl, FuncDecl, ApiDecl, Expr as AstExpr, Pattern as AstPattern};
+use crate::parser::ast::{
+    ApiDecl, Expr as AstExpr, FuncDecl, ModuleDecl, Pattern as AstPattern, Program,
+};
 use crate::types::Type;
-use super::nodes::{IrProgram, IrDecl, IrFunction, IrApi, IrExpr, IrPattern};
 
 /// Lower AST to IR. Assumes type checking has been performed.
 /// In a real implementation, this would take typed AST.
@@ -29,7 +31,9 @@ pub fn lower_ast_to_ir(ast: &Program) -> Result<IrProgram, CompileError> {
 
 fn lower_func(func: &FuncDecl) -> Result<IrFunction, CompileError> {
     // Placeholder types - in real implementation, these would come from type checker
-    let params: Vec<(String, Type)> = func.params.iter()
+    let params: Vec<(String, Type)> = func
+        .params
+        .iter()
         .map(|(name, _)| (name.clone(), Type::Var("unknown".to_string())))
         .collect();
     let return_type = Type::Var("unknown".to_string());
@@ -62,7 +66,11 @@ fn lower_expr(ast_expr: &AstExpr, expected_type: &Type) -> Result<IrExpr, Compil
     lower_expr_with_tail(ast_expr, expected_type, false)
 }
 
-fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool) -> Result<IrExpr, CompileError> {
+fn lower_expr_with_tail(
+    ast_expr: &AstExpr,
+    expected_type: &Type,
+    is_tail: bool,
+) -> Result<IrExpr, CompileError> {
     match ast_expr {
         AstExpr::String(s) => Ok(IrExpr::String(s.clone(), Type::String)),
         AstExpr::Number(n) => Ok(IrExpr::Number(*n, Type::Number)),
@@ -71,43 +79,64 @@ fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool)
         AstExpr::Ident(name) => Ok(IrExpr::Var(name.clone(), expected_type.clone())),
 
         AstExpr::Array(elements) => {
-            let ir_elements = elements.iter()
+            let ir_elements = elements
+                .iter()
                 .map(|e| lower_expr_with_tail(e, &Type::Var("elem".to_string()), false))
                 .collect::<Result<_, _>>()?;
             Ok(IrExpr::Array(ir_elements, Type::Var("array".to_string())))
         }
 
         AstExpr::Object(fields) => {
-            let ir_fields = fields.iter()
-                .map(|(k, v)| Ok((k.clone(), lower_expr_with_tail(v, &Type::Var("field".to_string()), false)?)))
+            let ir_fields = fields
+                .iter()
+                .map(|(k, v)| {
+                    Ok((
+                        k.clone(),
+                        lower_expr_with_tail(v, &Type::Var("field".to_string()), false)?,
+                    ))
+                })
                 .collect::<Result<_, _>>()?;
             Ok(IrExpr::Object(ir_fields, Type::Var("object".to_string())))
         }
 
         AstExpr::Dot(expr, field) => {
             let ir_expr = lower_expr_with_tail(expr, &Type::Var("receiver".to_string()), false)?;
-            Ok(IrExpr::Dot(Box::new(ir_expr), field.clone(), expected_type.clone()))
+            Ok(IrExpr::Dot(
+                Box::new(ir_expr),
+                field.clone(),
+                expected_type.clone(),
+            ))
         }
 
         AstExpr::Index(array, index) => {
             let ir_array = lower_expr_with_tail(array, &Type::Var("array".to_string()), false)?;
             let ir_index = lower_expr_with_tail(index, &Type::Number, false)?;
-            Ok(IrExpr::Index(Box::new(ir_array), Box::new(ir_index), expected_type.clone()))
+            Ok(IrExpr::Index(
+                Box::new(ir_array),
+                Box::new(ir_index),
+                expected_type.clone(),
+            ))
         }
 
         AstExpr::Call { func, args } => {
             // Check if this is an effect call
             if let AstExpr::Ident(name) = func.as_ref() {
                 if is_effect_function(name) {
-                    let ir_args = args.iter()
+                    let ir_args = args
+                        .iter()
                         .map(|a| lower_expr_with_tail(a, &Type::Var("arg".to_string()), false))
                         .collect::<Result<_, _>>()?;
-                    return Ok(IrExpr::EffectCall(name.clone(), ir_args, expected_type.clone()));
+                    return Ok(IrExpr::EffectCall(
+                        name.clone(),
+                        ir_args,
+                        expected_type.clone(),
+                    ));
                 }
             }
 
             let ir_func = lower_expr_with_tail(func, &Type::Var("func".to_string()), false)?;
-            let ir_args = args.iter()
+            let ir_args = args
+                .iter()
                 .map(|a| lower_expr_with_tail(a, &Type::Var("arg".to_string()), false))
                 .collect::<Result<_, _>>()?;
             if is_tail {
@@ -127,13 +156,22 @@ fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool)
 
         AstExpr::Unary(op, expr) => {
             let ir_expr = lower_expr_with_tail(expr, &Type::Var("unary".to_string()), false)?;
-            Ok(IrExpr::Unary(op.clone(), Box::new(ir_expr), expected_type.clone()))
+            Ok(IrExpr::Unary(
+                op.clone(),
+                Box::new(ir_expr),
+                expected_type.clone(),
+            ))
         }
 
         AstExpr::Binary(op, left, right) => {
             let ir_left = lower_expr_with_tail(left, &Type::Var("binary".to_string()), false)?;
             let ir_right = lower_expr_with_tail(right, &Type::Var("binary".to_string()), false)?;
-            Ok(IrExpr::Binary(op.clone(), Box::new(ir_left), Box::new(ir_right), expected_type.clone()))
+            Ok(IrExpr::Binary(
+                op.clone(),
+                Box::new(ir_left),
+                Box::new(ir_right),
+                expected_type.clone(),
+            ))
         }
 
         AstExpr::Pipeline(left, right) => {
@@ -156,7 +194,11 @@ fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool)
             }
         }
 
-        AstExpr::If { condition, then_branch, else_branch } => {
+        AstExpr::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
             let ir_condition = lower_expr_with_tail(condition, &Type::Boolean, false)?;
             let ir_then = lower_expr_with_tail(then_branch, expected_type, is_tail)?;
             let ir_else = lower_expr_with_tail(else_branch, expected_type, is_tail)?;
@@ -170,8 +212,14 @@ fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool)
 
         AstExpr::Match { expr, cases } => {
             let ir_expr = lower_expr_with_tail(expr, &Type::Var("match".to_string()), false)?;
-            let ir_cases = cases.iter()
-                .map(|(pat, expr)| Ok((lower_pattern(pat)?, lower_expr_with_tail(expr, expected_type, is_tail)?)))
+            let ir_cases = cases
+                .iter()
+                .map(|(pat, expr)| {
+                    Ok((
+                        lower_pattern(pat)?,
+                        lower_expr_with_tail(expr, expected_type, is_tail)?,
+                    ))
+                })
                 .collect::<Result<_, _>>()?;
             Ok(IrExpr::Match {
                 expr: Box::new(ir_expr),
@@ -196,7 +244,10 @@ fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool)
             // For simplicity, treat as call to lambda
             let ir_body = lower_expr_with_tail(body, expected_type, false)?;
             Ok(IrExpr::Call {
-                func: Box::new(IrExpr::Var("lambda".to_string(), Type::Var("func".to_string()))),
+                func: Box::new(IrExpr::Var(
+                    "lambda".to_string(),
+                    Type::Var("func".to_string()),
+                )),
                 args: vec![ir_body],
                 result_type: expected_type.clone(),
             })
@@ -204,14 +255,19 @@ fn lower_expr_with_tail(ast_expr: &AstExpr, expected_type: &Type, is_tail: bool)
 
         AstExpr::RespondJson(expr) => {
             let ir_expr = lower_expr_with_tail(expr, &Type::Var("json".to_string()), false)?;
-            Ok(IrExpr::RespondJson(Box::new(ir_expr), expected_type.clone()))
+            Ok(IrExpr::RespondJson(
+                Box::new(ir_expr),
+                expected_type.clone(),
+            ))
         }
 
         AstExpr::Group(expr) => lower_expr_with_tail(expr, expected_type, is_tail),
 
         AstExpr::Await(_) => {
             // Await should have been desugared by async effect pass
-            Err(CompileError::ParserError("Await found in IR lowering - should have been desugared".to_string()))
+            Err(CompileError::ParserError(
+                "Await found in IR lowering - should have been desugared".to_string(),
+            ))
         }
     }
 }
@@ -225,13 +281,15 @@ fn lower_pattern(ast_pattern: &AstPattern) -> Result<IrPattern, CompileError> {
             Ok(IrPattern::Literal(ir_expr))
         }
         AstPattern::Variant(name, sub_patterns) => {
-            let ir_sub = sub_patterns.iter()
+            let ir_sub = sub_patterns
+                .iter()
                 .map(lower_pattern)
                 .collect::<Result<_, _>>()?;
             Ok(IrPattern::Variant(name.clone(), ir_sub))
         }
         AstPattern::Record(name, fields) => {
-            let ir_fields = fields.iter()
+            let ir_fields = fields
+                .iter()
                 .map(|(k, p)| Ok((k.clone(), lower_pattern(p)?)))
                 .collect::<Result<_, _>>()?;
             Ok(IrPattern::Record(name.clone(), ir_fields))
@@ -240,7 +298,10 @@ fn lower_pattern(ast_pattern: &AstPattern) -> Result<IrPattern, CompileError> {
 }
 
 fn is_effect_function(name: &str) -> bool {
-    matches!(name, "DbRead" | "DbWrite" | "HttpOut" | "Log" | "Async" | "Async.await")
+    matches!(
+        name,
+        "DbRead" | "DbWrite" | "HttpOut" | "Log" | "Async" | "Async.await"
+    )
 }
 
 fn detect_tail_calls(expr: &IrExpr, func_name: &str) -> bool {
@@ -252,12 +313,14 @@ fn detect_tail_calls(expr: &IrExpr, func_name: &str) -> bool {
                 false
             }
         }
-        IrExpr::If { then_branch, else_branch, .. } => {
-            detect_tail_calls(then_branch, func_name) || detect_tail_calls(else_branch, func_name)
-        }
-        IrExpr::Match { cases, .. } => {
-            cases.iter().any(|(_, expr)| detect_tail_calls(expr, func_name))
-        }
+        IrExpr::If {
+            then_branch,
+            else_branch,
+            ..
+        } => detect_tail_calls(then_branch, func_name) || detect_tail_calls(else_branch, func_name),
+        IrExpr::Match { cases, .. } => cases
+            .iter()
+            .any(|(_, expr)| detect_tail_calls(expr, func_name)),
         IrExpr::Let { body, .. } => detect_tail_calls(body, func_name),
         _ => false,
     }

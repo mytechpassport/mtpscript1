@@ -7,6 +7,13 @@ pub enum RuntimeError {
     InvalidGasLimit,
     EffectNotFound(String),
     ValueError(String),
+    TypeError(String),
+}
+
+impl From<crate::errors::compile::CompileError> for RuntimeError {
+    fn from(err: crate::errors::compile::CompileError) -> Self {
+        RuntimeError::ValueError(format!("Compile error: {:?}", err))
+    }
 }
 
 impl From<RuntimeError> for MtpError {
@@ -15,22 +22,18 @@ impl From<RuntimeError> for MtpError {
             RuntimeError::GasExhausted {
                 gas_limit,
                 gas_used,
-            } => MtpError::with_details(
-                "RuntimeGasExhausted",
-                "Gas limit exceeded",
-                json!({
-                    "gasLimit": gas_limit,
-                    "gasUsed": gas_used
-                }),
-            ),
+            } => MtpError::GasExhausted {
+                gas_limit,
+                gas_used,
+            },
             RuntimeError::InvalidGasLimit => {
-                MtpError::new("RuntimeInvalidGasLimit", "Invalid gas limit specified")
+                MtpError::Runtime("Invalid gas limit specified".to_string())
             }
-            RuntimeError::EffectNotFound(name) => MtpError::new(
-                "RuntimeEffectNotFound",
-                &format!("Effect '{}' not found", name),
-            ),
-            RuntimeError::ValueError(msg) => MtpError::new("RuntimeValue", &msg),
+            RuntimeError::EffectNotFound(name) => {
+                MtpError::Runtime(format!("Effect '{}' not found", name))
+            }
+            RuntimeError::ValueError(msg) => MtpError::Runtime(format!("Value error: {}", msg)),
+            RuntimeError::TypeError(msg) => MtpError::Runtime(format!("Type error: {}", msg)),
         }
     }
 }

@@ -1,7 +1,6 @@
 use crate::errors::compile::CompileError;
 use crate::ir::nodes::{IrExpr, IrPattern};
 
-
 /// Advanced pattern matching compilation for complex patterns
 /// This handles nested patterns, guards, and optimizations
 
@@ -17,7 +16,12 @@ impl PatternCompiler {
     }
 
     /// Compile a match expression with advanced pattern matching
-    pub fn compile_match(&mut self, expr: &IrExpr, cases: &[(IrPattern, IrExpr)], indent: usize) -> Result<String, CompileError> {
+    pub fn compile_match(
+        &mut self,
+        expr: &IrExpr,
+        cases: &[(IrPattern, IrExpr)],
+        indent: usize,
+    ) -> Result<String, CompileError> {
         let indent_str = "  ".repeat(indent);
         let expr_js = self.compile_expr(expr, 0)?;
 
@@ -26,7 +30,10 @@ impl PatternCompiler {
 
         // Bind the expression to a variable to avoid re-evaluation
         let match_var = self.next_temp_var();
-        output.push_str(&format!("{}  const {} = {};\n", indent_str, match_var, expr_js));
+        output.push_str(&format!(
+            "{}  const {} = {};\n",
+            indent_str, match_var, expr_js
+        ));
 
         // Generate pattern matching logic
         let match_body = self.compile_pattern_cases(&match_var, cases, indent + 1)?;
@@ -37,7 +44,12 @@ impl PatternCompiler {
     }
 
     /// Compile pattern cases as a series of if-else statements
-    fn compile_pattern_cases(&mut self, match_var: &str, cases: &[(IrPattern, IrExpr)], indent: usize) -> Result<String, CompileError> {
+    fn compile_pattern_cases(
+        &mut self,
+        match_var: &str,
+        cases: &[(IrPattern, IrExpr)],
+        indent: usize,
+    ) -> Result<String, CompileError> {
         let indent_str = "  ".repeat(indent);
         let mut output = String::new();
 
@@ -54,7 +66,10 @@ impl PatternCompiler {
 
             // Add variable bindings
             for (var_name, var_expr) in bindings {
-                output.push_str(&format!("{}  const {} = {};\n", indent_str, var_name, var_expr));
+                output.push_str(&format!(
+                    "{}  const {} = {};\n",
+                    indent_str, var_name, var_expr
+                ));
             }
 
             // Compile the body
@@ -70,12 +85,19 @@ impl PatternCompiler {
     }
 
     /// Compile a pattern and return (condition, variable_bindings)
-    fn compile_pattern_binding(&mut self, pattern: &IrPattern, expr_var: &str) -> Result<(String, Vec<(String, String)>), CompileError> {
+    fn compile_pattern_binding(
+        &mut self,
+        pattern: &IrPattern,
+        expr_var: &str,
+    ) -> Result<(String, Vec<(String, String)>), CompileError> {
         match pattern {
             IrPattern::Wildcard => Ok(("true".to_string(), vec![])),
             IrPattern::Var(name) => {
                 // Variable binding - always matches
-                Ok(("true".to_string(), vec![(name.clone(), expr_var.to_string())]))
+                Ok((
+                    "true".to_string(),
+                    vec![(name.clone(), expr_var.to_string())],
+                ))
             }
             IrPattern::Literal(lit_expr) => {
                 let lit_js = self.compile_expr(lit_expr, 0)?;
@@ -84,13 +106,16 @@ impl PatternCompiler {
             IrPattern::Variant(name, sub_patterns) => {
                 self.compile_variant_pattern(name, sub_patterns, expr_var)
             }
-            IrPattern::Record(name, fields) => {
-                self.compile_record_pattern(name, fields, expr_var)
-            }
+            IrPattern::Record(name, fields) => self.compile_record_pattern(name, fields, expr_var),
         }
     }
 
-    fn compile_variant_pattern(&mut self, name: &str, sub_patterns: &[IrPattern], expr_var: &str) -> Result<(String, Vec<(String, String)>), CompileError> {
+    fn compile_variant_pattern(
+        &mut self,
+        name: &str,
+        sub_patterns: &[IrPattern],
+        expr_var: &str,
+    ) -> Result<(String, Vec<(String, String)>), CompileError> {
         let mut conditions = vec![format!("{}.tag === \"{}\"", expr_var, name)];
         let mut bindings = vec![];
 
@@ -111,14 +136,16 @@ impl PatternCompiler {
                     conditions.push(format!("{} === {}", temp_var, lit_js));
                 }
                 IrPattern::Variant(sub_name, sub_subs) => {
-                    let (sub_cond, sub_bindings) = self.compile_variant_pattern(sub_name, sub_subs, &temp_var)?;
+                    let (sub_cond, sub_bindings) =
+                        self.compile_variant_pattern(sub_name, sub_subs, &temp_var)?;
                     if sub_cond != "true" {
                         conditions.push(sub_cond);
                     }
                     bindings.extend(sub_bindings);
                 }
                 IrPattern::Record(rec_name, rec_fields) => {
-                    let (rec_cond, rec_bindings) = self.compile_record_pattern(rec_name, rec_fields, &temp_var)?;
+                    let (rec_cond, rec_bindings) =
+                        self.compile_record_pattern(rec_name, rec_fields, &temp_var)?;
                     if rec_cond != "true" {
                         conditions.push(rec_cond);
                     }
@@ -130,7 +157,12 @@ impl PatternCompiler {
         Ok((conditions.join(" && "), bindings))
     }
 
-    fn compile_record_pattern(&mut self, name: &str, fields: &[(String, IrPattern)], expr_var: &str) -> Result<(String, Vec<(String, String)>), CompileError> {
+    fn compile_record_pattern(
+        &mut self,
+        name: &str,
+        fields: &[(String, IrPattern)],
+        expr_var: &str,
+    ) -> Result<(String, Vec<(String, String)>), CompileError> {
         let mut conditions = vec![format!("{}.type === \"{}\"", expr_var, name)];
         let mut bindings = vec![];
 
@@ -151,14 +183,16 @@ impl PatternCompiler {
                     conditions.push(format!("{} === {}", temp_var, lit_js));
                 }
                 IrPattern::Variant(sub_name, sub_subs) => {
-                    let (sub_cond, sub_bindings) = self.compile_variant_pattern(sub_name, sub_subs, &temp_var)?;
+                    let (sub_cond, sub_bindings) =
+                        self.compile_variant_pattern(sub_name, sub_subs, &temp_var)?;
                     if sub_cond != "true" {
                         conditions.push(sub_cond);
                     }
                     bindings.extend(sub_bindings);
                 }
                 IrPattern::Record(rec_name, rec_fields) => {
-                    let (rec_cond, rec_bindings) = self.compile_record_pattern(rec_name, rec_fields, &temp_var)?;
+                    let (rec_cond, rec_bindings) =
+                        self.compile_record_pattern(rec_name, rec_fields, &temp_var)?;
                     if rec_cond != "true" {
                         conditions.push(rec_cond);
                     }
@@ -188,7 +222,9 @@ impl PatternCompiler {
                 let index_js = self.compile_expr(index, 0)?;
                 Ok(format!("{}[{}]", array_js, index_js))
             }
-            _ => Err(CompileError::CodeGenError("Complex expressions in patterns not yet supported".to_string())),
+            _ => Err(CompileError::CodeGenError(
+                "Complex expressions in patterns not yet supported".to_string(),
+            )),
         }
     }
 
@@ -200,7 +236,11 @@ impl PatternCompiler {
 }
 
 /// Public interface for compiling patterns
-pub fn compile_match_with_patterns(expr: &IrExpr, cases: &[(IrPattern, IrExpr)], indent: usize) -> Result<String, CompileError> {
+pub fn compile_match_with_patterns(
+    expr: &IrExpr,
+    cases: &[(IrPattern, IrExpr)],
+    indent: usize,
+) -> Result<String, CompileError> {
     let mut compiler = PatternCompiler::new();
     compiler.compile_match(expr, cases, indent)
 }

@@ -14,19 +14,21 @@ pub enum CompileError {
 impl From<CompileError> for MtpError {
     fn from(err: CompileError) -> Self {
         match err {
-            CompileError::LexerError(msg) => MtpError::new("CompileLexer", &msg),
-            CompileError::ParserError(msg) => MtpError::new("CompileParser", &msg),
-            CompileError::TypeError(msg) => MtpError::new("CompileType", &msg),
+            CompileError::LexerError(msg) => MtpError::Build(format!("Lexer error: {}", msg)),
+            CompileError::ParserError(msg) => MtpError::Build(format!("Parser error: {}", msg)),
+            CompileError::TypeError(msg) => MtpError::Build(format!("Type error: {}", msg)),
             CompileError::EffectNotDeclared { effect } => {
-                MtpError::new("CompileEffect", &format!("Effect '{}' not declared", effect))
+                MtpError::Build(format!("Effect '{}' not declared", effect))
             }
             CompileError::AwaitWithoutAsync => {
-                MtpError::new("CompileEffect", "await used without Async effect declared")
+                MtpError::Build("await used without Async effect declared".to_string())
             }
             CompileError::RespondOutsideApi => {
-                MtpError::new("CompileEffect", "respond json used outside API declaration")
+                MtpError::Build("respond json used outside API declaration".to_string())
             }
-            CompileError::CodeGenError(msg) => MtpError::new("CompileCodeGen", &msg),
+            CompileError::CodeGenError(msg) => {
+                MtpError::Build(format!("Code generation error: {}", msg))
+            }
         }
     }
 }

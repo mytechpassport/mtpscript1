@@ -1,5 +1,5 @@
-pub mod checker;
 pub mod async_effect;
+pub mod checker;
 
 use crate::errors::compile::CompileError;
 use crate::parser::ast::Program;

@@ -53,7 +53,10 @@ pub enum Expr {
     Index(Box<Expr>, Box<Expr>),
 
     // Function calls and operators
-    Call { func: Box<Expr>, args: Vec<Expr> },
+    Call {
+        func: Box<Expr>,
+        args: Vec<Expr>,
+    },
     Unary(BinOp, Box<Expr>), // reusing BinOp for simplicity
     Binary(BinOp, Box<Expr>, Box<Expr>),
     Pipeline(Box<Expr>, Box<Expr>),

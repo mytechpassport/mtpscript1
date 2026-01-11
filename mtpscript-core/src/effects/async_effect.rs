@@ -1,5 +1,5 @@
 use crate::errors::compile::CompileError;
-use crate::parser::ast::{Expr, Program, ModuleDecl};
+use crate::parser::ast::{Expr, ModuleDecl, Program};
 use sha2::{Digest, Sha256};
 
 /// Desugars await expressions to Async.await calls
@@ -47,26 +47,30 @@ fn desugar_expr_async(expr: &mut Expr, cont_id_counter: &mut u32) -> Result<(), 
                 desugar_expr_async(arg, cont_id_counter)?;
             }
         }
-        Expr::Binary(_, left, right)
-        | Expr::Pipeline(left, right) => {
+        Expr::Binary(_, left, right) | Expr::Pipeline(left, right) => {
             desugar_expr_async(left, cont_id_counter)?;
             desugar_expr_async(right, cont_id_counter)?;
         }
-        Expr::Unary(_, inner)
-        | Expr::Dot(inner, _)
-        | Expr::Group(inner) => {
+        Expr::Unary(_, inner) | Expr::Dot(inner, _) | Expr::Group(inner) => {
             desugar_expr_async(inner, cont_id_counter)?;
         }
         Expr::Index(array, index) => {
             desugar_expr_async(array, cont_id_counter)?;
             desugar_expr_async(index, cont_id_counter)?;
         }
-        Expr::If { condition, then_branch, else_branch } => {
+        Expr::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
             desugar_expr_async(condition, cont_id_counter)?;
             desugar_expr_async(then_branch, cont_id_counter)?;
             desugar_expr_async(else_branch, cont_id_counter)?;
         }
-        Expr::Match { expr: match_expr, cases } => {
+        Expr::Match {
+            expr: match_expr,
+            cases,
+        } => {
             desugar_expr_async(match_expr, cont_id_counter)?;
             for (_, case_expr) in cases {
                 desugar_expr_async(case_expr, cont_id_counter)?;
@@ -93,7 +97,11 @@ fn desugar_expr_async(expr: &mut Expr, cont_id_counter: &mut u32) -> Result<(), 
             desugar_expr_async(inner, cont_id_counter)?;
         }
         // Literals don't need desugaring
-        Expr::String(_) | Expr::Number(_) | Expr::Decimal(_) | Expr::Boolean(_) | Expr::Ident(_) => {}
+        Expr::String(_)
+        | Expr::Number(_)
+        | Expr::Decimal(_)
+        | Expr::Boolean(_)
+        | Expr::Ident(_) => {}
     }
     Ok(())
 }

@@ -1,6 +1,6 @@
-use crate::errors::compile::CompileError;
-use crate::ir::nodes::{IrProgram, IrDecl, IrFunction, IrApi, IrExpr};
 use crate::compiler::pattern::compile_match_with_patterns;
+use crate::errors::compile::CompileError;
+use crate::ir::nodes::{IrApi, IrDecl, IrExpr, IrFunction, IrProgram};
 
 /// Compile an IR program to JavaScript
 pub fn compile_ir_to_js(ir: &IrProgram) -> Result<String, CompileError> {
@@ -96,15 +96,15 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
         IrExpr::Boolean(b, _) => Ok(b.to_string()),
 
         IrExpr::Array(elements, _) => {
-            let elements_js: Result<Vec<String>, _> = elements.iter()
-                .map(|e| compile_expr(e, 0))
-                .collect();
+            let elements_js: Result<Vec<String>, _> =
+                elements.iter().map(|e| compile_expr(e, 0)).collect();
             let elements_js = elements_js?;
             Ok(format!("[{}]", elements_js.join(", ")))
         }
 
         IrExpr::Object(fields, _) => {
-            let fields_js: Result<Vec<String>, _> = fields.iter()
+            let fields_js: Result<Vec<String>, _> = fields
+                .iter()
                 .map(|(k, v)| {
                     let v_js = compile_expr(v, 0)?;
                     Ok(format!("\"{}\": {}", k, v_js))
@@ -129,9 +129,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
 
         IrExpr::Call { func, args, .. } => {
             let func_js = compile_expr(func, 0)?;
-            let args_js: Result<Vec<String>, _> = args.iter()
-                .map(|a| compile_expr(a, 0))
-                .collect();
+            let args_js: Result<Vec<String>, _> = args.iter().map(|a| compile_expr(a, 0)).collect();
             let args_js = args_js?;
             Ok(format!("{}({})", func_js, args_js.join(", ")))
         }
@@ -139,9 +137,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
         IrExpr::TailCall { func, args, .. } => {
             // Tail calls are compiled as regular calls since we don't have TCO in JS
             let func_js = compile_expr(func, 0)?;
-            let args_js: Result<Vec<String>, _> = args.iter()
-                .map(|a| compile_expr(a, 0))
-                .collect();
+            let args_js: Result<Vec<String>, _> = args.iter().map(|a| compile_expr(a, 0)).collect();
             let args_js = args_js?;
             Ok(format!("{}({})", func_js, args_js.join(", ")))
         }
@@ -153,7 +149,12 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
                 crate::parser::ast::BinOp::Sub => "-",
                 crate::parser::ast::BinOp::Mul => "*", // Not really unary, but handle anyway
                 crate::parser::ast::BinOp::Div => "/", // Not really unary, but handle anyway
-                _ => return Err(CompileError::CodeGenError(format!("Unsupported unary operator: {:?}", op))),
+                _ => {
+                    return Err(CompileError::CodeGenError(format!(
+                        "Unsupported unary operator: {:?}",
+                        op
+                    )))
+                }
             };
             Ok(format!("{}{}", op_js, expr_js))
         }
@@ -178,7 +179,12 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
             Ok(format!("{} {} {}", left_js, op_js, right_js))
         }
 
-        IrExpr::If { condition, then_branch, else_branch, .. } => {
+        IrExpr::If {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => {
             let mut output = String::new();
             output.push_str(&indent_str);
             output.push_str("if (");
@@ -207,7 +213,9 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
             compile_match_with_patterns(expr, cases, indent)
         }
 
-        IrExpr::Let { name, value, body, .. } => {
+        IrExpr::Let {
+            name, value, body, ..
+        } => {
             let mut output = String::new();
             output.push_str(&indent_str);
             output.push_str("const ");
@@ -223,9 +231,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
         }
 
         IrExpr::EffectCall(name, args, _) => {
-            let args_js: Result<Vec<String>, _> = args.iter()
-                .map(|a| compile_expr(a, 0))
-                .collect();
+            let args_js: Result<Vec<String>, _> = args.iter().map(|a| compile_expr(a, 0)).collect();
             let args_js = args_js?;
             Ok(format!("{}({})", name, args_js.join(", ")))
         }

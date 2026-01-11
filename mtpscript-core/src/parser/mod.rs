@@ -2,7 +2,10 @@ pub mod ast;
 
 use crate::errors::compile::CompileError;
 use crate::lexer::token::{Token, TokenInfo};
-use ast::{ApiDecl, Expr, FuncDecl, HttpMethod, ImportDecl, ModuleDecl, Pattern, Program, TypeDecl, TypeExpr, VariantDecl, BinOp};
+use ast::{
+    ApiDecl, BinOp, Expr, FuncDecl, HttpMethod, ImportDecl, ModuleDecl, Pattern, Program, TypeDecl,
+    TypeExpr, VariantDecl,
+};
 
 pub struct Parser<'a> {
     tokens: &'a [TokenInfo],
@@ -14,7 +17,7 @@ impl<'a> Parser<'a> {
         Self { tokens, current: 0 }
     }
 
-    pub     fn parse(&mut self) -> Result<Program, CompileError> {
+    pub fn parse(&mut self) -> Result<Program, CompileError> {
         let mut decls = Vec::new();
 
         while !self.is_at_end() {
@@ -24,8 +27,6 @@ impl<'a> Parser<'a> {
 
         Ok(Program { decls })
     }
-
-
 
     fn parse_module_decl(&mut self) -> Result<ModuleDecl, CompileError> {
         match self.peek().token {
@@ -43,7 +44,10 @@ impl<'a> Parser<'a> {
     fn parse_import_decl(&mut self) -> Result<ImportDecl, CompileError> {
         self.consume(Token::Import, "Expected 'import'")?;
         let path = self.parse_string_literal()?;
-        self.consume(Token::Ident("as".to_string()), "Expected 'as' after import path")?;
+        self.consume(
+            Token::Ident("as".to_string()),
+            "Expected 'as' after import path",
+        )?;
         let alias = self.parse_identifier()?;
         Ok(ImportDecl { path, alias })
     }
@@ -307,8 +311,11 @@ impl<'a> Parser<'a> {
     fn parse_comparison(&mut self) -> Result<Expr, CompileError> {
         let mut expr = self.parse_term()?;
 
-        while self.match_token(Token::Less) || self.match_token(Token::LessEqual) ||
-              self.match_token(Token::Greater) || self.match_token(Token::GreaterEqual) {
+        while self.match_token(Token::Less)
+            || self.match_token(Token::LessEqual)
+            || self.match_token(Token::Greater)
+            || self.match_token(Token::GreaterEqual)
+        {
             let op = match self.previous().token {
                 Token::Less => BinOp::Lt,
                 Token::LessEqual => BinOp::Le,
@@ -557,7 +564,10 @@ impl<'a> Parser<'a> {
         let body = self.parse_expr()?;
         self.consume(Token::RBrace, "Expected '}' after lambda body")?;
 
-        Ok(Expr::Lambda { params, body: Box::new(body) })
+        Ok(Expr::Lambda {
+            params,
+            body: Box::new(body),
+        })
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern, CompileError> {
@@ -621,9 +631,7 @@ impl<'a> Parser<'a> {
     fn parse_identifier(&mut self) -> Result<String, CompileError> {
         match &self.advance().token {
             Token::Ident(name) => Ok(name.clone()),
-            _ => Err(CompileError::ParserError(
-                "Expected identifier".to_string(),
-            )),
+            _ => Err(CompileError::ParserError("Expected identifier".to_string())),
         }
     }
 
@@ -764,8 +772,14 @@ mod tests {
             ModuleDecl::Type(TypeDecl::Record { name, fields }) => {
                 assert_eq!(name, "User");
                 assert_eq!(fields.len(), 2);
-                assert_eq!(fields[0], ("id".to_string(), TypeExpr::Ident("number".to_string())));
-                assert_eq!(fields[1], ("name".to_string(), TypeExpr::Ident("string".to_string())));
+                assert_eq!(
+                    fields[0],
+                    ("id".to_string(), TypeExpr::Ident("number".to_string()))
+                );
+                assert_eq!(
+                    fields[1],
+                    ("name".to_string(), TypeExpr::Ident("string".to_string()))
+                );
             }
             _ => panic!("Expected record type declaration"),
         }
@@ -784,7 +798,11 @@ mod tests {
         assert_eq!(program.decls.len(), 1);
 
         match &program.decls[0] {
-            ModuleDecl::Type(TypeDecl::Adt { name, type_params, variants }) => {
+            ModuleDecl::Type(TypeDecl::Adt {
+                name,
+                type_params,
+                variants,
+            }) => {
                 assert_eq!(name, "Result");
                 assert_eq!(type_params, &["T", "E"]);
                 assert_eq!(variants.len(), 2);

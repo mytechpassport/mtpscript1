@@ -1502,7 +1502,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-122: Implement Sandboxing
+### - [x] MTP-122: Implement Sandboxing
 **Effort:** L | **Files:** `src/security/sandbox.rs`
 **Spec Lines:** 676-680 (Isolation), 745-746 (§27.8 seccomp)
 **Priority:** P1
@@ -1532,7 +1532,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-123: Implement Reproducible Builds
+### - [x] MTP-123: Implement Reproducible Builds
 **Effort:** L | **Files:** `src/security/reproducible.rs`
 **Spec Lines:** 541-542 (§18 reproducible builds)
 **Priority:** P2
@@ -1615,7 +1615,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-132: Implement npm Bridge (Unsafe)
+### - [x] MTP-132: Implement npm Bridge (Unsafe)
 **Effort:** L | **Files:** `src/modules/npm_bridge.rs`
 **Spec Lines:** 558-568 (§21 npm Bridging)
 **Priority:** P2
@@ -1932,7 +1932,7 @@ Pseudo-benchmarks:
 
 ## Section 17: AWS Lambda Integration
 
-### - [ ] MTP-170: Implement Lambda Custom Runtime
+### - [x] MTP-170: Implement Lambda Custom Runtime
 **Effort:** L | **Files:** `src/lambda/runtime.rs`, `src/lambda/mod.rs`
 **Spec Lines:** 503-511 (§14 Serverless Deployment)
 **Priority:** P2

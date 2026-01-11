@@ -147,7 +147,10 @@ impl TypeContext {
 
 impl AdtType {
     /// Check if a match expression exhaustively covers all variants
-    pub fn check_exhaustive_match(&self, patterns: &[&super::parser::ast::Pattern]) -> Result<(), String> {
+    pub fn check_exhaustive_match(
+        &self,
+        patterns: &[&super::parser::ast::Pattern],
+    ) -> Result<(), String> {
         let mut covered_variants = std::collections::HashSet::new();
 
         for pattern in patterns {
@@ -169,7 +172,10 @@ impl AdtType {
                 AdtVariant::Unit(name) | AdtVariant::Tuple(name, _) => name,
             };
             if !covered_variants.contains(variant_name) {
-                return Err(format!("Pattern match is not exhaustive. Missing case for variant '{}'", variant_name));
+                return Err(format!(
+                    "Pattern match is not exhaustive. Missing case for variant '{}'",
+                    variant_name
+                ));
             }
         }
 

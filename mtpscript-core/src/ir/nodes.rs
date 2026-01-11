@@ -1,4 +1,4 @@
-use crate::parser::ast::{HttpMethod, BinOp};
+use crate::parser::ast::{BinOp, HttpMethod};
 use crate::types::Type;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,8 +17,16 @@ pub enum IrExpr {
     Index(Box<IrExpr>, Box<IrExpr>, Type),
 
     // Function calls and operators
-    Call { func: Box<IrExpr>, args: Vec<IrExpr>, result_type: Type },
-    TailCall { func: Box<IrExpr>, args: Vec<IrExpr>, result_type: Type },
+    Call {
+        func: Box<IrExpr>,
+        args: Vec<IrExpr>,
+        result_type: Type,
+    },
+    TailCall {
+        func: Box<IrExpr>,
+        args: Vec<IrExpr>,
+        result_type: Type,
+    },
     Unary(BinOp, Box<IrExpr>, Type),
     Binary(BinOp, Box<IrExpr>, Box<IrExpr>, Type),
 
@@ -95,7 +103,9 @@ impl IrProgram {
                     if func.body.result_type() != func.return_type {
                         return Err(format!(
                             "Function {} return type mismatch: expected {:?}, got {:?}",
-                            func.name, func.return_type, func.body.result_type()
+                            func.name,
+                            func.return_type,
+                            func.body.result_type()
                         ));
                     }
                 }
@@ -118,7 +128,7 @@ impl IrExpr {
             | IrExpr::Var(_, t)
             | IrExpr::Dot(_, _, t)
             | IrExpr::Index(_, _, t)
-            |             IrExpr::Call { result_type: t, .. }
+            | IrExpr::Call { result_type: t, .. }
             | IrExpr::TailCall { result_type: t, .. }
             | IrExpr::Unary(_, _, t)
             | IrExpr::Binary(_, _, _, t)
