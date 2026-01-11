@@ -274,13 +274,13 @@ fn serve_command(snapshot_path: &Path, port: u16) -> Result<(), CliError> {
     // Create request handler
     let handler = mtpscript_core::api::handler::RequestHandler::new(snapshot, gas_limit, router);
 
-    for request in server.incoming_requests() {
+    for mut request in server.incoming_requests() {
         // Convert tiny_http request to our HttpRequest
         let method = request.method().to_string();
         let path = request.url().to_string();
-        let mut headers = HashMap::new();
-        for (name, value) in request.headers() {
-            headers.insert(name.to_string(), value.to_string());
+        let mut headers = std::collections::HashMap::new();
+        for header in request.headers() {
+            headers.insert(header.field.to_string(), header.value.to_string());
         }
         let mut body = Vec::new();
         request.as_reader().read_to_end(&mut body)?;

@@ -6,6 +6,8 @@ use std::collections::HashMap;
 pub struct TypeChecker {
     context: TypeContext,
     type_vars: HashMap<String, Type>,
+    recursion_depth: usize,
+    max_recursion_depth: usize,
 }
 
 impl TypeChecker {
@@ -13,7 +15,23 @@ impl TypeChecker {
         TypeChecker {
             context: TypeContext::with_builtins(),
             type_vars: HashMap::new(),
+            recursion_depth: 0,
+            max_recursion_depth: 50,
         }
+    }
+
+    fn enter_recursion(&mut self) -> Result<(), CompileError> {
+        self.recursion_depth += 1;
+        if self.recursion_depth > self.max_recursion_depth {
+            return Err(CompileError::TypeError(
+                "Type recursion depth limit exceeded".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn exit_recursion(&mut self) {
+        self.recursion_depth = self.recursion_depth.saturating_sub(1);
     }
 
     pub fn typecheck_program(&mut self, program: &ast::Program) -> Result<(), CompileError> {
@@ -253,8 +271,9 @@ impl TypeChecker {
         }
     }
 
-    fn resolve_type_expr(&self, type_expr: &TypeExpr) -> Result<Type, CompileError> {
-        match type_expr {
+    fn resolve_type_expr(&mut self, type_expr: &TypeExpr) -> Result<Type, CompileError> {
+        self.enter_recursion()?;
+        let result = match type_expr {
             TypeExpr::Ident(name) => {
                 if let Some(t) = self.context.lookup(name) {
                     Ok(t.clone())
@@ -281,6 +300,8 @@ impl TypeChecker {
                     ))),
                 }
             }
-        }
+        };
+        self.exit_recursion();
+        result
     }
 }

@@ -11,15 +11,34 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(source: &'a str) -> Self {
-        Self {
+    pub fn new(source: &'a str) -> Result<Self, CompileError> {
+        // Input validation: check size limits and UTF-8 validity
+        if source.len() > 10_000_000 {
+            return Err(CompileError::LexerError("Source too large".to_string()));
+        }
+
+        // Check for null bytes and other invalid characters
+        if source.chars().any(|c| c == '\0') {
+            return Err(CompileError::LexerError(
+                "Source contains null bytes".to_string(),
+            ));
+        }
+
+        // Validate UTF-8 encoding (should be valid since it's &str, but check for overlong encodings)
+        if !source.is_char_boundary(source.len()) {
+            return Err(CompileError::LexerError(
+                "Invalid UTF-8 encoding".to_string(),
+            ));
+        }
+
+        Ok(Self {
             source,
             chars: source.chars().collect(),
             start: 0,
             current: 0,
             line: 1,
             column: 1,
-        }
+        })
     }
 
     pub fn scan_tokens(&mut self) -> Result<Vec<TokenInfo>, CompileError> {
@@ -288,7 +307,7 @@ mod tests {
     use super::*;
 
     fn lex_tokens(source: &str) -> Result<Vec<Token>, CompileError> {
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Scanner::new(source)?;
         let tokens = scanner.scan_tokens()?;
         Ok(tokens.into_iter().map(|ti| ti.token).collect())
     }

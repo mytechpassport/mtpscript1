@@ -10,11 +10,32 @@ use ast::{
 pub struct Parser<'a> {
     tokens: &'a [TokenInfo],
     current: usize,
+    recursion_depth: usize,
+    max_recursion_depth: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a [TokenInfo]) -> Self {
-        Self { tokens, current: 0 }
+        Self {
+            tokens,
+            current: 0,
+            recursion_depth: 0,
+            max_recursion_depth: 100,
+        }
+    }
+
+    fn enter_recursion(&mut self) -> Result<(), CompileError> {
+        self.recursion_depth += 1;
+        if self.recursion_depth > self.max_recursion_depth {
+            return Err(CompileError::ParserError(
+                "Maximum recursion depth exceeded".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn exit_recursion(&mut self) {
+        self.recursion_depth = self.recursion_depth.saturating_sub(1);
     }
 
     pub fn parse(&mut self) -> Result<Program, CompileError> {
@@ -257,7 +278,10 @@ impl<'a> Parser<'a> {
 
     // Expression parsing with precedence
     fn parse_expr(&mut self) -> Result<Expr, CompileError> {
-        self.parse_pipeline()
+        self.enter_recursion()?;
+        let result = self.parse_pipeline();
+        self.exit_recursion();
+        result
     }
 
     fn parse_pipeline(&mut self) -> Result<Expr, CompileError> {
@@ -695,7 +719,7 @@ mod tests {
     use crate::lexer::scanner::Scanner;
 
     fn parse_source(source: &str) -> Result<Program, CompileError> {
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Scanner::new(source)?;
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(&tokens);
         parser.parse()

@@ -21,3 +21,15 @@ pub fn get_gas_limit() -> u64 {
         .and_then(|s| s.parse().ok())
         .unwrap_or(10_000_000)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_gas_limit_from_env() {
+        std::env::set_var("MTP_GAS_LIMIT", "5000000");
+        assert_eq!(get_gas_limit(), 5_000_000);
+        std::env::remove_var("MTP_GAS_LIMIT");
+    }
+}

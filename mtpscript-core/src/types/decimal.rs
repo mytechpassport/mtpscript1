@@ -831,6 +831,31 @@ mod tests {
     }
 
     #[test]
+    fn test_decimal_canonical_to_string() {
+        // Test that to_string produces shortest canonical form
+        let d1 = Decimal::from_str("100.0").unwrap();
+        assert_eq!(d1.to_string(), "100"); // Should remove trailing .0
+
+        let d2 = Decimal::from_str("100.00").unwrap();
+        assert_eq!(d2.to_string(), "100");
+
+        let d3 = Decimal::from_str("123.450").unwrap();
+        assert_eq!(d3.to_string(), "123.45"); // Remove trailing zero
+
+        let d4 = Decimal::from_str("0.500").unwrap();
+        assert_eq!(d4.to_string(), "0.5");
+    }
+
+    #[test]
+    fn test_decimal_mul_canonical() {
+        // Test that mul produces canonical results
+        let d1 = Decimal::from_str("10").unwrap();
+        let d2 = Decimal::from_str("10").unwrap();
+        let prod = d1.mul(&d2).unwrap();
+        assert_eq!(prod.to_string(), "100"); // Should be canonical
+    }
+
+    #[test]
     fn test_acceptance_criteria_from_spec() {
         // From TASK.md acceptance criteria:
 

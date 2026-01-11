@@ -68,4 +68,12 @@ mod tests {
         wipe_string(&mut s);
         assert!(s.is_empty());
     }
+
+    #[test]
+    fn test_wipe_box() {
+        let data = Box::new(42i32);
+        let wiped = wipe_box(data);
+        // Can't check contents easily, but ensure it's a valid Box
+        assert_eq!(*wiped, 0); // Should be default value
+    }
 }

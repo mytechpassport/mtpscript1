@@ -7,7 +7,7 @@
 - [x] `mtpscript-core/src/effects/async_effect.rs:101` – The fallback `format!("{:?}", expr)` when encoding complex expressions for `promiseHash` produces non-deterministic bytes, breaking the Async await hashing guarantees required by §7-a.
 - [x] `mtpscript-core/src/runtime/clone.rs:39-62` – `parse_js_to_ast` always errors out, so `clone_interpreter` can never complete and no interpreter instance is ever produced, defeating the MTP-082 requirements for snapshot cloning and initialization.
 - [x] `mtpscript-core/src/runtime/effects.rs:101-141` – `inject_effects` ignores the supplied `seed` and merely injects stub `FunctionValue`s without tying them to deterministic effect implementations or caching, leaving MTP-083’s deterministic effect contract unfulfilled.
-- [ ] `mtpscript-core/src/api/handler.rs:85-92` – `execute_handler` always returns a hardcoded success object rather than the actual API implementation, so the request handler never executes user code (MTP-111).
+- [x] `mtpscript-core/src/api/handler.rs:85-92` – `execute_handler` always returns a hardcoded success object rather than the actual API implementation, so the request handler never executes user code (MTP-111).
 - [x] `mtpscript-core/src/types/checker.rs` – Type checker lacks fuzz tests for adversarial inputs, potentially allowing type confusion attacks or DoS via deep nesting; add cargo-fuzz integration for AST type checking.
 - [x] `mtpscript-core/src/json/parse.rs` – JSON parser has no depth or size limits, vulnerable to DoS attacks (e.g., billion laughs); add configurable limits to prevent resource exhaustion.
 - [ ] `mtpscript-core/src/effects/builtins.rs` – Built-in functions lack input validation and sanitization, allowing potential injection attacks; add bounds checking and sanitization for all builtin inputs.
@@ -33,6 +33,7 @@
 - [ ] `mtpscript-core/src/parser/mod.rs` – Parser has no stack depth limits, allowing recursive descent stack overflows; implement recursion limits and robust error recovery.
 - [ ] `mtpscript-core/src/types/checker.rs` – Type checker lacks bounds checking on type recursion depth, enabling DoS via deep type nesting; add depth limits and cycle detection.
 - [ ] `mtpscript-core/src/runtime/interpreter.rs` – Interpreter lacks execution timeouts and resource quotas, allowing infinite loops and resource exhaustion; add configurable timeouts and metering.
+- [ ] `mtpscript-core/src/errors/mod.rs:8-27` – `MtpError::GasExhausted` currently serializes as `{"error":"GasExhausted","details":{"gas_limit":...}}` because of `#[serde(tag="error", content="details")]` and snake_case fields, which contradicts §0-c/§6’s deterministic error shape `{"error":"GasExhausted","gasLimit":<uint64>,"gasUsed":<uint64>}`; produce the flat camelCase payload and add a regression test that serializes a `GasExhausted` to the canonical string.
 - [ ] `mtpscript-core/src/security/mod.rs` – No comprehensive cryptography audit or key management policies, allowing weak signatures and key compromise; implement FIPS-compliant crypto and key rotation.
 - [ ] `mtpscript-core/src/api/handler.rs` – API handlers lack comprehensive input validation and sanitization, vulnerable to injection attacks; add strict validation and XSS prevention.
 - [ ] `mtpscript-core/src/runtime/value.rs` – Value operations lack constant-time implementations, enabling timing attacks on sensitive data; implement constant-time comparisons and operations.
@@ -54,17 +55,19 @@
 - [ ] `mtpscript-core/src/` – Missing formal security requirements and acceptance criteria validation, allowing implementation gaps; create security requirements traceability matrix.
 - [ ] `mtpscript-core/src/` – No continuous security monitoring or vulnerability scanning in CI/CD, allowing regressions; implement automated security scanning and alerting.
 - [ ] `mtpscript-core/src/` – Lack of incident response plan and security operations procedures, risking ineffective breach response; develop and test incident response capabilities.
-- [ ] `mtpscript-core/src/runtime/interpreter.rs:83-88` – The `execute` method is a placeholder that only returns the input JS code as a string without parsing or running it, so compiled MTPScript programs cannot actually execute; implement a full JavaScript subset interpreter to evaluate the generated code and return the actual result (e.g., for the API handler, call the generated function and return its JSON output).
-- [ ] `mtpscript-core/src/types/decimal.rs` – Decimal type to_string does not produce shortest canonical string; e.g., 100.0 instead of 100, failing tests and spec §4-a.
-- [ ] `mtpscript-core/src/types/decimal.rs` – Decimal mul and div operations produce strings with trailing .0, not shortest form, violating canonical serialization.
-- [ ] `mtpscript-core/src/runtime/clone.rs` – Clone interpreter parses JS AST but does not use it to initialize the interpreter's function_bodies; instead, execute re-parses, defeating the purpose of pre-cloning and wasting time.
-- [ ] `mtpscript-core/src/runtime/wipe.rs` – Secure wipe implementation missing; file does not exist, violating §27.3 and secure disposal requirements.
-- [ ] `mtpscript/src/cli/commands.rs:251-272` – Serve command is placeholder returning hardcoded string; does not implement HTTP server for API execution as per §15 Local Web Server.
-- [ ] `mtpscript-core/src/api/handler.rs:62` – Snapshot hash in seed computation is hardcoded to [0u8;32] instead of SHA-256 of actual snapshot, violating deterministic seed per §0-b.
-- [ ] `mtpscript-core/src/runtime/interpreter.rs:70` – Interpreter gas counter initialized to hardcoded 10M instead of injected gas_limit from request, violating §0-c gas limit injection.
-- [ ] `mtpscript-core/src/runtime/mod.rs` – Gas limit not read from MTP_GAS_LIMIT env var as required by §0-c host adapter contract; defaults to 10M without validation.
-- [ ] `tests/integration.rs:135-137` – E2E test for API compilation skips on failure, indicating API declarations not fully supported in compilation pipeline; violates full pipeline requirement in §12.
-- [ ] `mtpscript-core/src/runtime/clone.rs:48-58` – Parsed JS AST discarded after checking; interpreter not pre-populated with function definitions, forcing re-parsing on every execute call, violating pre-clone optimization.
-- [ ] `mtpscript-core/src/effects/async_effect.rs:140` – `deterministic_expr_serialize` function not implemented, causing compilation failure; required for deterministic promiseHash in Async effect.
+- [x] `mtpscript-core/src/runtime/interpreter.rs:83-88` – The `execute` method is a placeholder that only returns the input JS code as a string without parsing or running it, so compiled MTPScript programs cannot actually execute; implement a full JavaScript subset interpreter to evaluate the generated code and return the actual result (e.g., for the API handler, call the generated function and return its JSON output).
+- [x] `mtpscript-core/src/types/decimal.rs` – Decimal type to_string does not produce shortest canonical string; e.g., 100.0 instead of 100, failing tests and spec §4-a.
+- [x] `mtpscript-core/src/types/decimal.rs` – Decimal mul and div operations produce strings with trailing .0, not shortest form, violating canonical serialization.
+- [x] `mtpscript-core/src/runtime/clone.rs` – Clone interpreter parses JS AST but does not use it to initialize the interpreter's function_bodies; instead, execute re-parses, defeating the purpose of pre-cloning and wasting time.
+- [x] `mtpscript-core/src/runtime/wipe.rs` – Secure wipe implementation missing; file does not exist, violating §27.3 and secure disposal requirements.
+- [x] `mtpscript/src/cli/commands.rs:251-272` – Serve command is placeholder returning hardcoded string; does not implement HTTP server for API execution as per §15 Local Web Server.
+- [x] `mtpscript-core/src/api/handler.rs:62` – Snapshot hash in seed computation is hardcoded to [0u8;32] instead of SHA-256 of actual snapshot, violating deterministic seed per §0-b.
+- [x] `mtpscript-core/src/runtime/interpreter.rs:70` – Interpreter gas counter initialized to hardcoded 10M instead of injected gas_limit from request, violating §0-c gas limit injection.
+- [x] `mtpscript-core/src/runtime/mod.rs` – Gas limit not read from MTP_GAS_LIMIT env var as required by §0-c host adapter contract; defaults to 10M without validation.
+- [x] `tests/integration.rs:135-137` – E2E test for API compilation skips on failure, indicating API declarations not fully supported in compilation pipeline; violates full pipeline requirement in §12.
+- [x] `mtpscript-core/src/runtime/clone.rs:48-58` – Parsed JS AST discarded after checking; interpreter not pre-populated with function definitions, forcing re-parsing on every execute call, violating pre-clone optimization.
+- [ ] `mtpscript-core/src/runtime/clone.rs:41-58` – `clone_interpreter` returns an `Interpreter` but never calls `wipe_interpreter`, so PCI-classified pages are not zeroed after each request as §0-a requires; hook `wipe_interpreter(interp, true)` (or similar) into the request lifecycle/drop path and verify the heap is zeroed when the PCI flag is set.
+- [ ] `mtpscript-core/src/runtime/clone.rs:5-33` – The runtime only checks magic/version before accepting `.msqs`, skipping the ECDSA-P256 signature/CRC verification mandated by §14, so tampered snapshots load silently; call `security::verify::verify_snapshot` (or equivalent) and fail clone when signature validation fails.
+- [x] `mtpscript-core/src/effects/async_effect.rs:140` – `deterministic_expr_serialize` function not implemented, causing compilation failure; required for deterministic promiseHash in Async effect.
 
 complete

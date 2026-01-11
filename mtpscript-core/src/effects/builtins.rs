@@ -7,19 +7,36 @@ use std::collections::HashMap;
 
 pub fn json_parse(s: Value) -> Result<Value, String> {
     match s {
-        Value::String(s) => match Json::parse(&s) {
-            Ok(json) => Ok(json.to_value()),
-            Err(e) => Err(format!("JSON parse error: {}", e)),
-        },
+        Value::String(s) => {
+            // Input validation: check string length and content
+            if s.len() > 10_000_000 {
+                return Err("JSON string too large".to_string());
+            }
+            if s.chars()
+                .any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t')
+            {
+                return Err("JSON string contains invalid control characters".to_string());
+            }
+            match Json::parse(&s) {
+                Ok(json) => Ok(json.to_value()),
+                Err(e) => Err(format!("JSON parse error: {}", e)),
+            }
+        }
         _ => Err("Json.parse expects string".to_string()),
     }
 }
 
 pub fn json_stringify(v: Value) -> Result<Value, String> {
-    // Convert Value to Json and serialize
+    // Input validation: check for reasonable object/array depth and size
+    validate_value_depth(&v, 100)?;
     let json = value_to_json(v);
     match json.to_canonical_string() {
-        Ok(s) => Ok(Value::String(s)),
+        Ok(s) => {
+            if s.len() > 10_000_000 {
+                return Err("JSON output too large".to_string());
+            }
+            Ok(Value::String(s))
+        }
         Err(e) => Err(format!("JSON stringify error: {:?}", e)),
     }
 }
@@ -43,9 +60,21 @@ pub fn value_to_json(v: Value) -> Json {
 
 pub fn decimal_from_string(s: Value) -> Result<Value, String> {
     match s {
-        Value::String(s) => Decimal::from_str(&s)
-            .map(Value::Decimal)
-            .map_err(|_| "Invalid decimal string".to_string()),
+        Value::String(s) => {
+            // Input validation: check string length and basic format
+            if s.len() > 100 {
+                return Err("Decimal string too long".to_string());
+            }
+            if !s
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
+            {
+                return Err("Invalid characters in decimal string".to_string());
+            }
+            Decimal::from_str(&s)
+                .map(Value::Decimal)
+                .map_err(|_| "Invalid decimal string".to_string())
+        }
         _ => Err("Decimal.fromString expects string".to_string()),
     }
 }
@@ -60,6 +89,10 @@ pub fn decimal_to_string(d: Value) -> Result<Value, String> {
 pub fn fnv1a32(data: Value) -> Result<Value, String> {
     match data {
         Value::String(s) => {
+            // Input validation: check string length
+            if s.len() > 1_000_000 {
+                return Err("Input string too large for hashing".to_string());
+            }
             let hash = fnv1a_32(s.as_bytes());
             Ok(Value::Number(hash as i64))
         }
@@ -70,6 +103,10 @@ pub fn fnv1a32(data: Value) -> Result<Value, String> {
 pub fn fnv1a64(data: Value) -> Result<Value, String> {
     match data {
         Value::String(s) => {
+            // Input validation: check string length
+            if s.len() > 1_000_000 {
+                return Err("Input string too large for hashing".to_string());
+            }
             let hash = fnv1a_64(s.as_bytes());
             Ok(Value::Number(hash as i64))
         }
@@ -78,12 +115,53 @@ pub fn fnv1a64(data: Value) -> Result<Value, String> {
 }
 
 pub fn cbor_encode(v: Value) -> Result<Value, String> {
+    // Input validation: check depth and size
+    validate_value_depth(&v, 50)?;
     // Encode to CBOR and return hex string
     let json = value_to_json(v);
     match json.to_cbor_hex() {
-        Ok(hex) => Ok(Value::String(hex)),
+        Ok(hex) => {
+            if hex.len() > 2_000_000 {
+                return Err("CBOR output too large".to_string());
+            }
+            Ok(Value::String(hex))
+        }
         Err(e) => Err(format!("CBOR encode error: {:?}", e)),
     }
+}
+
+// Input validation functions
+
+fn validate_value_depth(v: &Value, max_depth: usize) -> Result<(), String> {
+    fn check_depth(v: &Value, current_depth: usize, max_depth: usize) -> Result<(), String> {
+        if current_depth > max_depth {
+            return Err("Value exceeds maximum nesting depth".to_string());
+        }
+        match v {
+            Value::Array(arr) => {
+                if arr.len() > 10_000 {
+                    return Err("Array too large".to_string());
+                }
+                for item in arr {
+                    check_depth(item, current_depth + 1, max_depth)?;
+                }
+            }
+            Value::Object(obj) => {
+                if obj.len() > 1_000 {
+                    return Err("Object too large".to_string());
+                }
+                for (k, v) in obj {
+                    if k.len() > 1_000 {
+                        return Err("Object key too long".to_string());
+                    }
+                    check_depth(v, current_depth + 1, max_depth)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    check_depth(v, 0, max_depth)
 }
 
 // FNV-1a hash implementations

@@ -9,7 +9,7 @@ mod tests {
     use mtpscript_core::parser::Parser;
 
     fn parse_program(src: &str) -> ast::Program {
-        let mut scanner = Scanner::new(src);
+        let mut scanner = Scanner::new(src).unwrap();
         let tokens = scanner.scan_tokens().unwrap();
         let mut parser = Parser::new(&tokens);
         parser.parse().unwrap()

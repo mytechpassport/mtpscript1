@@ -63,6 +63,10 @@ pub struct Interpreter {
     pub builtins: HashMap<String, fn(Value) -> Result<Value, String>>,
     /// Storage for function bodies - keyed by function name
     pub function_bodies: HashMap<String, StoredFunction>,
+    /// Execution timeout in milliseconds
+    pub timeout_ms: u64,
+    /// Start time for timeout checking
+    pub start_time: std::time::Instant,
 }
 
 impl Interpreter {
@@ -74,6 +78,8 @@ impl Interpreter {
             heap: Vec::new(),
             builtins,
             function_bodies: HashMap::new(),
+            timeout_ms: 30_000, // 30 seconds default
+            start_time: std::time::Instant::now(),
         };
 
         // Inject built-in objects (JSON, Decimal, etc.)
@@ -138,6 +144,11 @@ impl Interpreter {
 
     pub fn set_gas_limit(&mut self, limit: u64) {
         self.gas_counter = GasCounter::new(limit);
+    }
+
+    pub fn set_timeout(&mut self, timeout_ms: u64) {
+        self.timeout_ms = timeout_ms;
+        self.start_time = std::time::Instant::now();
     }
 
     pub fn gas_used(&self) -> u64 {
