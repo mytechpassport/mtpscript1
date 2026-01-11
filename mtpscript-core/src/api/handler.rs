@@ -59,7 +59,7 @@ impl RequestHandler {
             .unwrap_or_else(|| "1".to_string());
 
         // 3. Compute seed
-        let snapshot_hash = [0u8; 32]; // Placeholder - would compute from snapshot
+        let snapshot_hash = sha256_bytes(&self.snapshot);
         let seed_req = SeedRequest::new(
             request_id.clone(),
             account_id,
@@ -72,7 +72,10 @@ impl RequestHandler {
         // 4. Clone interpreter
         let mut interp = clone_interpreter(&self.snapshot)?;
 
-        // 5. Inject effects
+        // 5. Set gas limit
+        interp.set_gas_limit(self.gas_limit);
+
+        // 6. Inject effects
         inject_effects(&mut interp, &seed)?;
 
         // 6. Route and execute handler
@@ -147,15 +150,20 @@ impl RequestHandler {
     }
 }
 
-// Placeholder SHA-256 function
-fn sha256(data: &str) -> [u8; 32] {
+// SHA-256 function for bytes
+fn sha256_bytes(data: &[u8]) -> [u8; 32] {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
-    hasher.update(data.as_bytes());
+    hasher.update(data);
     let result = hasher.finalize();
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&result);
     hash
+}
+
+// Placeholder SHA-256 function for strings
+fn sha256(data: &str) -> [u8; 32] {
+    sha256_bytes(data.as_bytes())
 }
 
 #[cfg(test)]

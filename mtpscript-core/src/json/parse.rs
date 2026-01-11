@@ -3,8 +3,16 @@ use crate::types::Decimal;
 use std::collections::HashMap;
 
 pub fn parse_json(input: &str) -> Result<Json, ParseError> {
-    let mut parser = JsonParser::new(input);
-    let result = parser.parse_value()?;
+    parse_json_with_limits(input, 1000, 10_000_000) // default limits: depth 1000, size 10M
+}
+
+pub fn parse_json_with_limits(
+    input: &str,
+    max_depth: usize,
+    max_size: usize,
+) -> Result<Json, ParseError> {
+    let mut parser = JsonParser::new(input, max_depth, max_size);
+    let result = parser.parse_value(0)?;
     if !parser.is_at_end() {
         return Err(ParseError::TrailingCharacters);
     }
@@ -15,26 +23,40 @@ struct JsonParser<'a> {
     input: &'a str,
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     pos: usize,
+    max_depth: usize,
+    max_size: usize,
 }
 
 impl<'a> JsonParser<'a> {
-    fn new(input: &'a str) -> Self {
+    fn new(input: &'a str, max_depth: usize, max_size: usize) -> Self {
         Self {
             input,
             chars: input.chars().peekable(),
             pos: 0,
+            max_depth,
+            max_size,
         }
     }
 
-    fn parse_value(&mut self) -> Result<Json, ParseError> {
+    fn parse_value(&mut self, depth: usize) -> Result<Json, ParseError> {
+        if depth > self.max_depth {
+            return Err(ParseError::InvalidNumber(
+                "Maximum depth exceeded".to_string(),
+            ));
+        }
+        if self.pos > self.max_size {
+            return Err(ParseError::InvalidNumber(
+                "Maximum size exceeded".to_string(),
+            ));
+        }
         self.skip_whitespace();
         match self.peek() {
             Some('n') => self.parse_null(),
             Some('t') | Some('f') => self.parse_bool(),
             Some('"') => self.parse_string().map(Json::String),
             Some('0'..='9') | Some('-') => self.parse_number(),
-            Some('[') => self.parse_array(),
-            Some('{') => self.parse_object(),
+            Some('[') => self.parse_array(depth + 1),
+            Some('{') => self.parse_object(depth + 1),
             Some(c) => Err(ParseError::UnexpectedChar(c, self.pos)),
             None => Err(ParseError::UnexpectedEnd),
         }
@@ -115,7 +137,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse_array(&mut self) -> Result<Json, ParseError> {
+    fn parse_array(&mut self, depth: usize) -> Result<Json, ParseError> {
         self.expect('[')?;
         let mut elements = Vec::new();
         loop {
@@ -124,7 +146,7 @@ impl<'a> JsonParser<'a> {
                 self.next();
                 break;
             }
-            elements.push(self.parse_value()?);
+            elements.push(self.parse_value(depth)?);
             self.skip_whitespace();
             if self.peek() == Some(',') {
                 self.next();
@@ -137,7 +159,7 @@ impl<'a> JsonParser<'a> {
         Ok(Json::Array(elements))
     }
 
-    fn parse_object(&mut self) -> Result<Json, ParseError> {
+    fn parse_object(&mut self, depth: usize) -> Result<Json, ParseError> {
         self.expect('{')?;
         let mut object = HashMap::new();
         loop {
@@ -149,7 +171,7 @@ impl<'a> JsonParser<'a> {
             let key = self.parse_string()?;
             self.skip_whitespace();
             self.expect(':')?;
-            let value = self.parse_value()?;
+            let value = self.parse_value(depth)?;
             if object.contains_key(&key) {
                 return Err(ParseError::DuplicateKey(key));
             }

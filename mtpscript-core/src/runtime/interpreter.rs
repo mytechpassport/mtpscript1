@@ -70,7 +70,7 @@ impl Interpreter {
         let builtins = crate::effects::builtins::get_builtin_functions();
         let mut interpreter = Self {
             global_scope: HashMap::new(),
-            gas_counter: GasCounter::new(10_000_000), // Default gas limit
+            gas_counter: GasCounter::new(crate::runtime::get_gas_limit()),
             heap: Vec::new(),
             builtins,
             function_bodies: HashMap::new(),

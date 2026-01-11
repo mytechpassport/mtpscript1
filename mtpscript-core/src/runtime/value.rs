@@ -1,3 +1,4 @@
+use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
@@ -6,7 +7,7 @@ use std::hash::{Hash, Hasher};
 use crate::errors::runtime::RuntimeError;
 use crate::types::decimal::Decimal;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     Number(i64),
     Boolean(bool),
@@ -31,6 +32,8 @@ impl PartialEq for FunctionValue {
     }
 }
 
+impl Eq for FunctionValue {}
+
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
@@ -53,7 +56,6 @@ impl Hash for Value {
             Value::Array(arr) => {
                 4u8.hash(state);
                 // For arrays, use SHA-256 of string representation for security
-                use sha2::{Digest, Sha256};
                 let s = format!("{:?}", arr);
                 let hash = Sha256::digest(s.as_bytes());
                 hash.hash(state);
@@ -61,7 +63,6 @@ impl Hash for Value {
             Value::Object(obj) => {
                 5u8.hash(state);
                 // For objects, sort keys and hash SHA-256
-                use sha2::{Digest, Sha256};
                 let mut sorted: Vec<_> = obj.iter().collect();
                 sorted.sort_by_key(|(k, _)| *k);
                 let s = format!("{:?}", sorted);
@@ -222,5 +223,22 @@ impl PartialOrd for Value {
             (Value::Decimal(a), Value::Decimal(b)) => a.partial_cmp(b),
             _ => None, // Other types are not ordered per spec
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_value_hash() {
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert(Value::String("key".into()), Value::Number(42));
+        assert_eq!(
+            map.get(&Value::String("key".into())),
+            Some(&Value::Number(42))
+        );
     }
 }

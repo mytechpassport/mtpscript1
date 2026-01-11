@@ -2587,7 +2587,7 @@ assert(is_valid_cbor(&cbor));
 
 ---
 
-### - [ ] MTP-195: Implement Hash Trait for Value Type
+### - [x] MTP-195: Implement Hash Trait for Value Type
 **Effort:** M | **Files:** `src/runtime/value.rs`
 **Spec Lines:** § (Hashing requirements)
 **Priority:** P0 - Blocker

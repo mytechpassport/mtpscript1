@@ -66,17 +66,31 @@ mod e2e_tests {
 
         // Compile using the CLI
         let output = Command::new("cargo")
-            .args(&["run", "--bin", "mtp", "--", "compile", mtp_path.to_str().unwrap()])
+            .args(&[
+                "run",
+                "--bin",
+                "mtp",
+                "--",
+                "compile",
+                mtp_path.to_str().unwrap(),
+            ])
             .output()
             .unwrap();
 
-        assert!(output.status.success(), "Compilation failed: {:?}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.status.success(),
+            "Compilation failed: {:?}",
+            String::from_utf8_lossy(&output.stderr)
+        );
 
         // Check that JS was generated
         assert!(js_path.exists(), "JS file was not created");
 
         let js_content = fs::read_to_string(&js_path).unwrap();
-        assert!(js_content.contains("function add"), "JS does not contain expected function");
+        assert!(
+            js_content.contains("function add"),
+            "JS does not contain expected function"
+        );
     }
 
     #[test]
@@ -93,11 +107,24 @@ mod e2e_tests {
 
         // Create snapshot using the CLI
         let output = Command::new("cargo")
-            .args(&["run", "--bin", "mtp", "--", "snapshot", js_path.to_str().unwrap(), "-o", snapshot_path.to_str().unwrap()])
+            .args(&[
+                "run",
+                "--bin",
+                "mtp",
+                "--",
+                "snapshot",
+                js_path.to_str().unwrap(),
+                "-o",
+                snapshot_path.to_str().unwrap(),
+            ])
             .output()
             .unwrap();
 
-        assert!(output.status.success(), "Snapshot creation failed: {:?}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.status.success(),
+            "Snapshot creation failed: {:?}",
+            String::from_utf8_lossy(&output.stderr)
+        );
 
         // Check that snapshot was created
         assert!(snapshot_path.exists(), "Snapshot file was not created");
@@ -106,7 +133,11 @@ mod e2e_tests {
         assert!(snapshot_content.len() > 100, "Snapshot seems too small");
 
         // Check snapshot magic bytes
-        assert_eq!(&snapshot_content[0..8], b"MTPJS\x00\x00\x00", "Invalid snapshot magic bytes");
+        assert_eq!(
+            &snapshot_content[0..8],
+            b"MTPJS\x00\x00\x00",
+            "Invalid snapshot magic bytes"
+        );
     }
 
     #[test]
@@ -127,20 +158,31 @@ mod e2e_tests {
 
         // Compile
         let compile_output = Command::new("cargo")
-            .args(&["run", "--bin", "mtp", "--", "compile", mtp_path.to_str().unwrap()])
+            .args(&[
+                "run",
+                "--bin",
+                "mtp",
+                "--",
+                "compile",
+                mtp_path.to_str().unwrap(),
+            ])
             .output()
             .unwrap();
 
-        if !compile_output.status.success() {
-            // If compilation fails (API not fully supported), skip this test
-            println!("API compilation not fully supported yet, skipping test");
-            return;
-        }
+        // API compilation must succeed for full pipeline support
+        assert!(
+            compile_output.status.success(),
+            "API compilation failed: {:?}",
+            String::from_utf8_lossy(&compile_output.stderr)
+        );
 
         assert!(js_path.exists(), "JS file was not created");
 
         let js_content = fs::read_to_string(&js_path).unwrap();
-        assert!(js_content.contains("hello"), "JS does not contain API function");
+        assert!(
+            js_content.contains("hello"),
+            "JS does not contain API function"
+        );
     }
 
     #[test]
@@ -154,12 +196,22 @@ mod e2e_tests {
         fs::write(&mtp_path, invalid_mtp).unwrap();
 
         let output = Command::new("cargo")
-            .args(&["run", "--bin", "mtp", "--", "compile", mtp_path.to_str().unwrap()])
+            .args(&[
+                "run",
+                "--bin",
+                "mtp",
+                "--",
+                "compile",
+                mtp_path.to_str().unwrap(),
+            ])
             .output()
             .unwrap();
 
         // Should fail for invalid syntax
-        assert!(!output.status.success(), "Expected compilation to fail for invalid syntax");
+        assert!(
+            !output.status.success(),
+            "Expected compilation to fail for invalid syntax"
+        );
     }
 
     #[test]
@@ -183,7 +235,14 @@ mod e2e_tests {
             let js_path = temp_dir.path().join(format!("calc_{}.js", i));
 
             let output = Command::new("cargo")
-                .args(&["run", "--bin", "mtp", "--", "compile", mtp_path.to_str().unwrap()])
+                .args(&[
+                    "run",
+                    "--bin",
+                    "mtp",
+                    "--",
+                    "compile",
+                    mtp_path.to_str().unwrap(),
+                ])
                 .output()
                 .unwrap();
 
@@ -226,7 +285,14 @@ mod e2e_tests {
 
         // Compile to JS
         let compile_output = Command::new("cargo")
-            .args(&["run", "--bin", "mtp", "--", "compile", mtp_path.to_str().unwrap()])
+            .args(&[
+                "run",
+                "--bin",
+                "mtp",
+                "--",
+                "compile",
+                mtp_path.to_str().unwrap(),
+            ])
             .output()
             .unwrap();
 
@@ -234,7 +300,16 @@ mod e2e_tests {
 
         // Create snapshot
         let snapshot_output = Command::new("cargo")
-            .args(&["run", "--bin", "mtp", "--", "snapshot", js_path.to_str().unwrap(), "-o", snapshot_path.to_str().unwrap()])
+            .args(&[
+                "run",
+                "--bin",
+                "mtp",
+                "--",
+                "snapshot",
+                js_path.to_str().unwrap(),
+                "-o",
+                snapshot_path.to_str().unwrap(),
+            ])
             .output()
             .unwrap();
 

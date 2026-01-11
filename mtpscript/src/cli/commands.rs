@@ -91,7 +91,8 @@ pub fn run() -> Result<(), CliError> {
         }
         Some(("serve", sub)) => {
             let port = *sub.get_one::<u16>("port").unwrap();
-            serve_command(port)
+            let snapshot = PathBuf::from(sub.get_one::<String>("snapshot").unwrap());
+            serve_command(&snapshot, port)
         }
         Some(("run", sub)) => {
             let input = PathBuf::from(sub.get_one::<String>("input").unwrap());
@@ -145,6 +146,11 @@ fn build_cli() -> Command {
         .subcommand(
             Command::new("serve")
                 .about("Start the reference HTTP server (hot reload not supported)")
+                .arg(
+                    Arg::new("snapshot")
+                        .help("Snapshot file to serve")
+                        .required(true),
+                )
                 .arg(
                     Arg::new("port")
                         .short('p')
@@ -248,17 +254,67 @@ fn run_command(snapshot_path: &Path, cert: Option<&Path>) -> Result<(), CliError
     Ok(())
 }
 
-fn serve_command(port: u16) -> Result<(), CliError> {
+fn serve_command(snapshot_path: &Path, port: u16) -> Result<(), CliError> {
     let server = Server::http(("0.0.0.0", port)).map_err(|e| CliError::TinyHttp(e.to_string()))?;
-    println!("Serving MTPScript runtime on http://0.0.0.0:{}", port);
+    println!(
+        "Serving MTPScript API from snapshot '{}' on http://0.0.0.0:{}",
+        snapshot_path.display(),
+        port
+    );
+
+    // Load snapshot
+    let snapshot = fs::read(snapshot_path)?;
+
+    // Create router (placeholder - in real impl, would parse from snapshot or config)
+    let router = mtpscript_core::api::router::Router::new();
+
+    // Gas limit from env
+    let gas_limit = mtpscript_core::runtime::get_gas_limit();
+
+    // Create request handler
+    let handler = mtpscript_core::api::handler::RequestHandler::new(snapshot, gas_limit, router);
 
     for request in server.incoming_requests() {
-        let header = Header::from_bytes(b"Content-Type", b"text/plain; charset=utf-8")
-            .map_err(|_| CliError::TinyHttp("Invalid header".to_string()))?;
-        let response = Response::from_string("MTPScript runtime placeholder").with_header(header);
-        request
-            .respond(response)
-            .map_err(|e| CliError::TinyHttp(e.to_string()))?;
+        // Convert tiny_http request to our HttpRequest
+        let method = request.method().to_string();
+        let path = request.url().to_string();
+        let mut headers = HashMap::new();
+        for (name, value) in request.headers() {
+            headers.insert(name.to_string(), value.to_string());
+        }
+        let mut body = Vec::new();
+        request.as_reader().read_to_end(&mut body)?;
+
+        let http_req = mtpscript_core::api::handler::HttpRequest {
+            method,
+            path,
+            headers,
+            body,
+        };
+
+        // Handle request
+        match handler.handle_request(http_req) {
+            Ok(resp) => {
+                let mut response = Response::from_data(resp.body);
+                for (name, value) in resp.headers {
+                    if let Ok(header) = Header::from_bytes(name.as_bytes(), value.as_bytes()) {
+                        response = response.with_header(header);
+                    }
+                }
+                if let Err(e) = request.respond(response) {
+                    eprintln!("Error responding to request: {}", e);
+                }
+            }
+            Err(e) => {
+                let error_msg = format!("Internal server error: {:?}", e);
+                let response = Response::from_string(error_msg)
+                    .with_status_code(500)
+                    .with_header(Header::from_bytes(b"Content-Type", b"text/plain").unwrap());
+                if let Err(e) = request.respond(response) {
+                    eprintln!("Error responding with error: {}", e);
+                }
+            }
+        }
     }
 
     Ok(())

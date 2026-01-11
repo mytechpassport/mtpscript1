@@ -35,16 +35,24 @@ impl Decimal {
         }
         // Normalize: remove leading zeros (except keep single "0")
         let normalized = significand.trim_start_matches('0');
-        let normalized = if normalized.is_empty() {
-            "0"
+        let mut normalized = if normalized.is_empty() {
+            "0".to_string()
         } else {
-            normalized
+            normalized.to_string()
         };
 
+        // Canonicalize: remove trailing zeros and adjust scale for shortest form
+        let mut adjusted_scale = scale;
+        while adjusted_scale > 0 && normalized.ends_with('0') && normalized != "0" {
+            normalized.pop();
+            adjusted_scale -= 1;
+        }
+
+        let is_zero = normalized == "0";
         Ok(Decimal {
-            significand: normalized.to_string(),
-            negative: negative && normalized != "0", // -0 becomes 0
-            scale,
+            significand: normalized,
+            negative: negative && !is_zero, // -0 becomes 0
+            scale: adjusted_scale,
         })
     }
 

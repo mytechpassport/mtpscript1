@@ -1,5 +1,5 @@
 use crate::errors::compile::CompileError;
-use crate::parser::ast::{Expr, ModuleDecl, Program};
+use crate::parser::ast::{BinOp, Expr, ModuleDecl, Pattern, Program};
 use sha2::{Digest, Sha256};
 
 /// Desugars await expressions to Async.await calls
@@ -106,6 +106,139 @@ fn desugar_expr_async(expr: &mut Expr, cont_id_counter: &mut u32) -> Result<(), 
     Ok(())
 }
 
+/// Deterministic serialization of expressions for promise hash
+fn deterministic_expr_serialize(expr: &Expr) -> String {
+    match expr {
+        Expr::String(s) => format!("String({})", s),
+        Expr::Number(n) => format!("Number({})", n),
+        Expr::Decimal(d) => format!("Decimal({})", d),
+        Expr::Boolean(b) => format!("Boolean({})", b),
+        Expr::Ident(name) => format!("Ident({})", name),
+        Expr::Array(elements) => {
+            let mut s = "Array(".to_string();
+            for (i, e) in elements.iter().enumerate() {
+                if i > 0 {
+                    s.push(',');
+                }
+                s.push_str(&deterministic_expr_serialize(e));
+            }
+            s.push(')');
+            s
+        }
+        Expr::Object(fields) => {
+            let mut s = "Object(".to_string();
+            // Sort fields by key for determinism
+            let mut sorted = fields.clone();
+            sorted.sort_by(|a, b| a.0.cmp(&b.0));
+            for (i, (k, v)) in sorted.iter().enumerate() {
+                if i > 0 {
+                    s.push(',');
+                }
+                s.push_str(&format!("{}:{}", k, deterministic_expr_serialize(v)));
+            }
+            s.push(')');
+            s
+        }
+        Expr::Binary(op, left, right) => format!(
+            "Binary({:?},{},{})",
+            op,
+            deterministic_expr_serialize(left),
+            deterministic_expr_serialize(right)
+        ),
+        Expr::Unary(op, expr) => format!("Unary({:?},{})", op, deterministic_expr_serialize(expr)),
+        Expr::Call { func, args } => {
+            let mut s = format!("Call({}", deterministic_expr_serialize(func));
+            for arg in args {
+                s.push(',');
+                s.push_str(&deterministic_expr_serialize(arg));
+            }
+            s.push(')');
+            s
+        }
+        Expr::Dot(expr, field) => format!("Dot({},{}),", deterministic_expr_serialize(expr), field),
+        Expr::Index(array, index) => format!(
+            "Index({},{})",
+            deterministic_expr_serialize(array),
+            deterministic_expr_serialize(index)
+        ),
+        Expr::Pipeline(left, right) => format!(
+            "Pipeline({},{})",
+            deterministic_expr_serialize(left),
+            deterministic_expr_serialize(right)
+        ),
+        Expr::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => format!(
+            "If({},{},{})",
+            deterministic_expr_serialize(condition),
+            deterministic_expr_serialize(then_branch),
+            deterministic_expr_serialize(else_branch)
+        ),
+        Expr::Match {
+            expr: match_expr,
+            cases,
+        } => {
+            let mut s = format!("Match({}", deterministic_expr_serialize(match_expr));
+            for (pat, body) in cases {
+                s.push(',');
+                s.push_str(&deterministic_pattern_serialize(pat));
+                s.push(':');
+                s.push_str(&deterministic_expr_serialize(body));
+            }
+            s.push(')');
+            s
+        }
+        Expr::Const { name, value, body } => format!(
+            "Const({},{},{})",
+            name,
+            deterministic_expr_serialize(value),
+            deterministic_expr_serialize(body)
+        ),
+        Expr::Lambda { params, body } => {
+            let param_str = params
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            format!(
+                "Lambda([{}],{})",
+                param_str,
+                deterministic_expr_serialize(body)
+            )
+        }
+        Expr::RespondJson(expr) => format!("RespondJson({})", deterministic_expr_serialize(expr)),
+        Expr::Await(expr) => format!("Await({})", deterministic_expr_serialize(expr)),
+        Expr::Group(expr) => format!("Group({})", deterministic_expr_serialize(expr)),
+    }
+}
+
+fn deterministic_pattern_serialize(pat: &Pattern) -> String {
+    match pat {
+        Pattern::Wildcard => "Wildcard".to_string(),
+        Pattern::Ident(name) => format!("Ident({})", name),
+        Pattern::Literal(expr) => format!("Literal({})", deterministic_expr_serialize(expr)),
+        Pattern::Variant(name, sub) => {
+            let sub_str = sub
+                .iter()
+                .map(deterministic_pattern_serialize)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("Variant({},[{}])", name, sub_str)
+        }
+        Pattern::Record(name, fields) => {
+            let mut s = format!("Record({}", name);
+            for (k, p) in fields {
+                s.push(',');
+                s.push_str(&format!("{}:{}", k, deterministic_pattern_serialize(p)));
+            }
+            s.push(')');
+            s
+        }
+    }
+}
+
 /// Simple CBOR encoding of expressions for promise hash computation
 /// This is a simplified implementation - real CBOR would be more complex
 fn cbor_encode_expr(expr: &Expr) -> Result<Vec<u8>, CompileError> {
@@ -135,9 +268,9 @@ fn cbor_encode_expr(expr: &Expr) -> Result<Vec<u8>, CompileError> {
             }
         }
         _ => {
-            // For other expressions, use a simple representation
-            // Real implementation would need full CBOR encoding
-            data.extend(format!("{:?}", expr).as_bytes());
+            // For other expressions, use a deterministic serialization
+            // to ensure promiseHash is deterministic
+            data.extend(deterministic_expr_serialize(expr).as_bytes());
         }
     }
     Ok(data)
