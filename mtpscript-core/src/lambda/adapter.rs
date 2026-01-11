@@ -19,6 +19,7 @@ impl LambdaAdapter {
         // Validate gas limit range
         if gas_limit < 1 || gas_limit > 2_000_000_000 {
             return Err(MtpError::GasLimitOutOfRange {
+                error: "GasLimitOutOfRange".to_string(),
                 provided: gas_limit,
                 min: 1,
                 max: 2_000_000_000,
@@ -123,10 +124,10 @@ pub fn validate_lambda_environment() -> Result<(), MtpError> {
 
     for var in &required_vars {
         if env::var(var).is_err() {
-            return Err(MtpError::Runtime(format!(
-                "Required environment variable {} not set",
-                var
-            )));
+            return Err(MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: format!("Required environment variable {} not set", var),
+            });
         }
     }
 
@@ -147,10 +148,10 @@ impl LambdaError {
             error_message: error.to_string(),
             error_type: match error {
                 MtpError::GasExhausted { .. } => "GasExhausted",
-                MtpError::Security(_) => "SecurityError",
-                MtpError::Runtime(_) => "RuntimeError",
-                MtpError::Build(_) => "BuildError",
-                MtpError::Io(_) => "IoError",
+                MtpError::Security { .. } => "SecurityError",
+                MtpError::Runtime { .. } => "RuntimeError",
+                MtpError::Build { .. } => "BuildError",
+                MtpError::Io { .. } => "IoError",
                 MtpError::GasLimitOutOfRange { .. } => "GasLimitOutOfRange",
             }
             .to_string(),
@@ -161,8 +162,10 @@ impl LambdaError {
 
 /// Send error response to Lambda runtime API
 pub fn send_lambda_error(error: &MtpError, request_id: &str) -> Result<(), MtpError> {
-    let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API")
-        .map_err(|_| MtpError::Runtime("AWS_LAMBDA_RUNTIME_API not set".to_string()))?;
+    let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
+        error: "Runtime".to_string(),
+        message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
+    })?;
 
     let client = reqwest::blocking::Client::new();
     let url = format!(
@@ -177,7 +180,10 @@ pub fn send_lambda_error(error: &MtpError, request_id: &str) -> Result<(), MtpEr
         .post(&url)
         .body(body)
         .send()
-        .map_err(|e| MtpError::Runtime(format!("Failed to send error: {}", e)))?;
+        .map_err(|e| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: format!("Failed to send error: {}", e),
+        })?;
 
     Ok(())
 }
@@ -207,8 +213,9 @@ mod tests {
     #[test]
     fn test_lambda_error_creation() {
         let error = MtpError::GasExhausted {
-            gas_limit: 1000,
-            gas_used: 1001,
+            error: "GasExhausted".to_string(),
+            gasLimit: 1000,
+            gasUsed: 1001,
         };
         let lambda_error = LambdaError::from_mtp_error(&error);
 

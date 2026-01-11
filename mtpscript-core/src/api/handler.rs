@@ -39,9 +39,15 @@ impl RequestHandler {
     }
 
     pub fn handle_request(&self, req: HttpRequest) -> Result<HttpResponse, RuntimeError> {
-        // 1. Parse request (already parsed)
+        // 1. Validate input
+        self.validate_request(&req)?;
 
-        // 2. Extract metadata
+        // 2. Check rate limit (placeholder - would check against rate limiter)
+        self.check_rate_limit(&req)?;
+
+        // 3. Parse request (already parsed)
+
+        // 4. Extract metadata
         let request_id = req
             .headers
             .get("x-request-id")
@@ -75,10 +81,10 @@ impl RequestHandler {
         // 5. Set gas limit
         interp.set_gas_limit(self.gas_limit);
 
-        // 6. Inject effects
+        // 7. Inject effects
         inject_effects(&mut interp, &seed)?;
 
-        // 6. Route and execute handler
+        // 8. Route and execute handler
         let result = self.execute_handler(&mut interp, &req)?;
 
         // 7. Serialize response to canonical JSON
@@ -147,6 +153,62 @@ impl RequestHandler {
         });
 
         eprintln!("{}", audit_entry);
+    }
+
+    fn validate_request(&self, req: &HttpRequest) -> Result<(), RuntimeError> {
+        // Validate method
+        let valid_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
+        if !valid_methods.contains(&req.method.as_str()) {
+            return Err(RuntimeError::ValueError(format!(
+                "Invalid HTTP method: {}",
+                req.method
+            )));
+        }
+
+        // Validate path length
+        if req.path.is_empty() || req.path.len() > 2048 {
+            return Err(RuntimeError::ValueError("Invalid path length".to_string()));
+        }
+
+        // Validate path characters (basic)
+        if !req
+            .path
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "/-_.".contains(c))
+        {
+            return Err(RuntimeError::ValueError(
+                "Invalid path characters".to_string(),
+            ));
+        }
+
+        // Validate headers
+        for (name, value) in &req.headers {
+            if name.len() > 128 || value.len() > 4096 {
+                return Err(RuntimeError::ValueError("Header too long".to_string()));
+            }
+            // Check for suspicious headers
+            if name.to_lowercase().contains("script") || value.contains("<script") {
+                return Err(RuntimeError::ValueError(
+                    "Suspicious header content".to_string(),
+                ));
+            }
+        }
+
+        // Validate body size
+        if req.body.len() > 10_000_000 {
+            // 10MB limit
+            return Err(RuntimeError::ValueError(
+                "Request body too large".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn check_rate_limit(&self, _req: &HttpRequest) -> Result<(), RuntimeError> {
+        // Placeholder: would check against a rate limiter
+        // For now, always allow
+        Ok(())
     }
 }
 

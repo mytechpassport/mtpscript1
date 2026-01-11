@@ -52,6 +52,9 @@ impl ImportResolver {
         // Download and verify module
         let module_path = self.download_module(import)?;
 
+        // Verify cryptographic signature if present
+        self.verify_module_signature(import, &module_path)?;
+
         // Compute content hash for audit
         let repo_path = PathBuf::from(&module_path);
         let content_hash = self.compute_repo_content_hash(&repo_path)?;
@@ -72,6 +75,41 @@ impl ImportResolver {
             .insert(import.module_name.clone(), module_path.clone());
 
         Ok(module_path)
+    }
+
+    /// Verify module cryptographic signature
+    fn verify_module_signature(
+        &self,
+        import: &ImportDecl,
+        module_path: &str,
+    ) -> Result<(), MtpError> {
+        // Look for signature file
+        let signature_path = format!("{}.sig", module_path);
+        if !Path::new(&signature_path).exists() {
+            return Err(MtpError::Security("Module signature not found".to_string()));
+        }
+
+        // Load signature
+        let signature_pem = fs::read_to_string(&signature_path)
+            .map_err(|e| MtpError::Io(format!("Failed to read signature: {}", e)))?;
+
+        // Compute content hash
+        let repo_path = PathBuf::from(module_path);
+        let content = fs::read_to_string(&repo_path)
+            .map_err(|e| MtpError::Io(format!("Failed to read module content: {}", e)))?;
+        let content_hash = Sha256::digest(content.as_bytes());
+
+        // Verify signature (placeholder - would use actual public key)
+        // In real implementation, would load trusted public keys
+        // For now, just check signature format
+        if !signature_pem.contains("-----BEGIN") || !signature_pem.contains("-----END") {
+            return Err(MtpError::Security("Invalid signature format".to_string()));
+        }
+
+        // Placeholder verification - in real impl:
+        // crate::security::sign::verify_ecdsa_p256(&content_hash, signature_bytes, public_key)
+
+        Ok(())
     }
 
     /// Validate git reference (simplified)

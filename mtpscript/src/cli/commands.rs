@@ -175,7 +175,7 @@ fn build_cli() -> Command {
 
 fn compile_command(input: &Path, output: &Path) -> Result<(), CliError> {
     let source = fs::read_to_string(input)?;
-    let mut scanner = Scanner::new(&source);
+    let mut scanner = Scanner::new(&source)?;
     let tokens = scanner.scan_tokens()?;
     let mut parser = Parser::new(&tokens);
     let program = parser.parse()?;

@@ -1,5 +1,6 @@
 use crate::errors::runtime::RuntimeError;
 use crate::runtime::interpreter::{Interpreter, JsExpr, StoredFunction};
+use crc32fast;
 
 // Placeholder for snapshot verification - would verify signature, etc.
 fn verify_snapshot(snapshot: &[u8]) -> Result<(), RuntimeError> {
@@ -16,6 +17,22 @@ fn verify_snapshot(snapshot: &[u8]) -> Result<(), RuntimeError> {
     let version = u32::from_le_bytes(snapshot[8..12].try_into().unwrap());
     if version != 51 {
         return Err(RuntimeError::ValueError("Unsupported version".to_string()));
+    }
+
+    // Verify CRC32
+    if snapshot.len() < 4 {
+        return Err(RuntimeError::ValueError(
+            "Snapshot too small for CRC".to_string(),
+        ));
+    }
+    let crc_start = snapshot.len() - 4;
+    let expected_crc = u32::from_le_bytes(snapshot[crc_start..].try_into().unwrap());
+    let content = &snapshot[..crc_start];
+    let computed_crc = crc32fast::hash(content);
+    if computed_crc != expected_crc {
+        return Err(RuntimeError::ValueError(
+            "CRC32 verification failed".to_string(),
+        ));
     }
 
     Ok(())
@@ -53,6 +70,9 @@ pub fn clone_interpreter(snapshot: &[u8]) -> Result<Interpreter, RuntimeError> {
 
     // Initialize with parsed AST
     populate_interpreter_from_ast(&mut interp, &ast)?;
+
+    // Mark as containing potentially PCI data
+    interp.pci_touched = true;
 
     Ok(interp)
 }

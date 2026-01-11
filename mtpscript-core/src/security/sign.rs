@@ -6,6 +6,9 @@ use std::fs;
 
 /// Sign data with ECDSA-P256
 pub fn sign_ecdsa_p256(data: &[u8], private_key_pem: &str) -> Result<Vec<u8>, MtpError> {
+    // Validate key strength and format
+    validate_private_key(private_key_pem)?;
+
     // Parse PEM private key
     let private_key_der = parse_pem_private_key(private_key_pem)?;
 
@@ -77,6 +80,47 @@ pub fn load_signing_key(path: &str) -> Result<String, MtpError> {
 /// Load certificate from file
 pub fn load_certificate(path: &str) -> Result<String, MtpError> {
     fs::read_to_string(path).map_err(|e| MtpError::Io(e.to_string()))
+}
+
+/// Validate private key strength and format
+fn validate_private_key(private_key_pem: &str) -> Result<(), MtpError> {
+    // Check PEM format
+    if !private_key_pem.contains("-----BEGIN") || !private_key_pem.contains("-----END") {
+        return Err(MtpError::Security("Invalid PEM format".to_string()));
+    }
+
+    // For ECDSA-P256, we require FIPS-compliant key
+    // Check if it's ECDSA-P256 specifically
+    if !private_key_pem.contains("EC PRIVATE KEY") {
+        return Err(MtpError::Security(
+            "Only ECDSA-P256 private keys are supported".to_string(),
+        ));
+    }
+
+    // Parse to check validity
+    let _der = parse_pem_private_key(private_key_pem)?;
+
+    // Additional strength checks could be added here
+    // For ECDSA-P256, the curve parameters are fixed and secure
+
+    Ok(())
+}
+
+/// Validate public key
+pub fn validate_public_key(public_key_pem: &str) -> Result<(), MtpError> {
+    // Check PEM format
+    if !public_key_pem.contains("-----BEGIN") || !public_key_pem.contains("-----END") {
+        return Err(MtpError::Security("Invalid PEM format".to_string()));
+    }
+
+    if !public_key_pem.contains("PUBLIC KEY") {
+        return Err(MtpError::Security("Invalid public key format".to_string()));
+    }
+
+    // Parse to check validity
+    let _der = parse_pem_public_key(public_key_pem)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

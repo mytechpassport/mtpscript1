@@ -22,17 +22,26 @@ impl From<RuntimeError> for MtpError {
                 gas_limit,
                 gas_used,
             } => MtpError::GasExhausted {
-                gas_limit,
-                gas_used,
+                error: "GasExhausted".to_string(),
+                gasLimit: gas_limit,
+                gasUsed: gas_used,
             },
-            RuntimeError::InvalidGasLimit => {
-                MtpError::Runtime("Invalid gas limit specified".to_string())
-            }
-            RuntimeError::EffectNotFound(name) => {
-                MtpError::Runtime(format!("Effect '{}' not found", name))
-            }
-            RuntimeError::ValueError(msg) => MtpError::Runtime(format!("Value error: {}", msg)),
-            RuntimeError::TypeError(msg) => MtpError::Runtime(format!("Type error: {}", msg)),
+            RuntimeError::InvalidGasLimit => MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: "Invalid gas limit specified".to_string(),
+            },
+            RuntimeError::EffectNotFound(name) => MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: format!("Effect '{}' not found", name),
+            },
+            RuntimeError::ValueError(msg) => MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: format!("Value error: {}", msg),
+            },
+            RuntimeError::TypeError(msg) => MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: format!("Type error: {}", msg),
+            },
         }
     }
 }

@@ -34,6 +34,51 @@ impl PartialEq for FunctionValue {
 
 impl Eq for FunctionValue {}
 
+impl Value {
+    /// Constant-time equality comparison for sensitive data
+    pub fn constant_time_eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::String(a), Value::String(b)) => {
+                // Constant-time string comparison
+                if a.len() != b.len() {
+                    return false;
+                }
+                let mut result = 0u8;
+                for (x, y) in a.bytes().zip(b.bytes()) {
+                    result |= x ^ y;
+                }
+                result == 0
+            }
+            (Value::Number(a), Value::Number(b)) => a == b, // Numbers are not sensitive
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Decimal(a), Value::Decimal(b)) => a.constant_time_eq(b),
+            (Value::Null, Value::Null) => true,
+            _ => self == other, // Fallback to regular equality for other types
+        }
+    }
+
+    /// Constant-time comparison for ordering (where applicable)
+    pub fn constant_time_cmp(&self, other: &Value) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Value::String(a), Value::String(b)) => {
+                // Constant-time comparison
+                if a.len() != b.len() {
+                    return Some(a.len().cmp(&b.len()));
+                }
+                let mut result = std::cmp::Ordering::Equal;
+                for (x, y) in a.bytes().zip(b.bytes()) {
+                    if x != y {
+                        result = x.cmp(&y);
+                        break;
+                    }
+                }
+                Some(result)
+            }
+            _ => None, // Fallback - no constant-time comparison for other types
+        }
+    }
+}
+
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {

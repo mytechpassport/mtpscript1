@@ -2256,7 +2256,7 @@ MTP-030-036     MTP-040-043     │
 
 ## Section 17: Bug Fixes from BUGFIX.md
 
-### - [ ] MTP-180: Fix Non-Deterministic Async Effect Hashing
+### - [x] MTP-180: Fix Non-Deterministic Async Effect Hashing
 **Effort:** S | **Files:** `src/effects/async_effect.rs:140`
 **Spec Lines:** §7-a (Async Effect)
 **Priority:** P1
@@ -2368,7 +2368,7 @@ cargo fuzz run type_checker -- -runs=10000
 
 ---
 
-### - [ ] MTP-185: Add Depth and Size Limits to JSON Parser
+### - [x] MTP-185: Add Depth and Size Limits to JSON Parser
 **Effort:** M | **Files:** `src/json/parse.rs`
 **Spec Lines:** §9 (JSON Model)
 **Priority:** P0 - Blocker
@@ -2389,7 +2389,7 @@ assert(parse_json(deep_json).is_err());
 
 ---
 
-### - [ ] MTP-186: Add Input Validation to Built-in Functions
+### - [x] MTP-186: Add Input Validation to Built-in Functions
 **Effort:** M | **Files:** `src/effects/builtins.rs`
 **Spec Lines:** §7-c (Built-in Functions)
 **Priority:** P0 - Blocker
@@ -2610,7 +2610,7 @@ assert(map.get(&Value::String("key".into())) == Some(&Value::Number(42)));
 
 ---
 
-### - [ ] MTP-196: Add Input Validation and Rate Limiting to API Handlers
+### - [x] MTP-196: Add Input Validation and Rate Limiting to API Handlers
 **Effort:** L | **Files:** `src/api/handler.rs`
 **Spec Lines:** §8 (API System)
 **Priority:** P0 - Blocker
@@ -2631,7 +2631,7 @@ assert(handle_request(malicious_req).is_err()); // rate limited or size exceeded
 
 ---
 
-### - [ ] MTP-197: Implement FIPS-Compliant Key Validation
+### - [x] MTP-197: Implement FIPS-Compliant Key Validation
 **Effort:** M | **Files:** `src/security/sign.rs`
 **Spec Lines:** § (Signature verification)
 **Priority:** P0 - Blocker
@@ -2652,7 +2652,7 @@ assert(validate_key(&weak_key).is_err());
 
 ---
 
-### - [ ] MTP-198: Add Cryptographic Verification for Imported Modules
+### - [x] MTP-198: Add Cryptographic Verification for Imported Modules
 **Effort:** L | **Files:** `src/modules/import.rs`
 **Spec Lines:** §10 (Module System)
 **Priority:** P0 - Blocker
@@ -2799,7 +2799,7 @@ assert(compliant_with(GDPR));
 
 ---
 
-### - [ ] MTP-205: Add Input Size Limits and Unicode Validation to Lexer
+### - [x] MTP-205: Add Input Size Limits and Unicode Validation to Lexer
 **Effort:** M | **Files:** `src/lexer/mod.rs`
 **Spec Lines:** §3 (Syntax & Grammar)
 **Priority:** P0 - Blocker
@@ -2820,7 +2820,7 @@ assert(lex(huge_input).is_err());
 
 ---
 
-### - [ ] MTP-206: Implement Recursion Limits in Parser
+### - [x] MTP-206: Implement Recursion Limits in Parser
 **Effort:** M | **Files:** `src/parser/mod.rs`
 **Spec Lines:** §3 (Grammar)
 **Priority:** P0 - Blocker
@@ -2841,7 +2841,7 @@ assert(parse_expr(deep_expr).is_err());
 
 ---
 
-### - [ ] MTP-207: Add Depth Limits to Type Checker Recursion
+### - [x] MTP-207: Add Depth Limits to Type Checker Recursion
 **Effort:** M | **Files:** `src/types/checker.rs`
 **Spec Lines:** §4 (Type System)
 **Priority:** P0 - Blocker
@@ -2862,7 +2862,7 @@ assert(check_type(deep_type).is_err());
 
 ---
 
-### - [ ] MTP-208: Add Timeouts and Resource Quotas to Interpreter
+### - [x] MTP-208: Add Timeouts and Resource Quotas to Interpreter
 **Effort:** L | **Files:** `src/runtime/interpreter.rs`
 **Spec Lines:** §27 (Interpreter Runtime)
 **Priority:** P0 - Blocker
@@ -2903,7 +2903,7 @@ assert(crypto_audit_passed());
 
 ---
 
-### - [ ] MTP-210: Add Comprehensive Input Validation to API Handlers
+### - [x] MTP-210: Add Comprehensive Input Validation to API Handlers
 **Effort:** M | **Files:** `src/api/handler.rs`
 **Spec Lines:** §8 (API System)
 **Priority:** P0 - Blocker
@@ -2924,7 +2924,7 @@ assert(validate_input(xss_input).is_err());
 
 ---
 
-### - [ ] MTP-211: Implement Constant-Time Operations for Values
+### - [x] MTP-211: Implement Constant-Time Operations for Values
 **Effort:** M | **Files:** `src/runtime/value.rs`
 **Spec Lines:** § (Security)
 **Priority:** P0 - Blocker
@@ -3032,7 +3032,7 @@ assert(result.is_err() && !crashed());
 
 ---
 
-### - [ ] MTP-216: Add Additional Memory Safety Checks
+### - [x] MTP-216: Add Additional Memory Safety Checks
 **Effort:** M | **Files:** `src/runtime/`
 **Spec Lines:** § (Safety)
 **Priority:** P0 - Blocker
@@ -3138,7 +3138,7 @@ assert(rate_limited());
 
 ---
 
-### - [ ] MTP-221: Implement Strict State Isolation
+### - [x] MTP-221: Implement Strict State Isolation
 **Effort:** M | **Files:** `src/runtime/`
 **Spec Lines:** §27 (Interpreter Runtime)
 **Priority:** P0 - Blocker
@@ -3160,7 +3160,7 @@ assert(states_isolated(interp1, interp2));
 
 ---
 
-### - [ ] MTP-222: Add Checksums and Validation for Critical Structures
+### - [x] MTP-222: Add Checksums and Validation for Critical Structures
 **Effort:** M | **Files:** `src/`
 **Spec Lines:** § (Integrity)
 **Priority:** P0 - Blocker
@@ -3223,7 +3223,7 @@ assert(no_privacy_leaks(private_data));
 
 ---
 
-### - [ ] MTP-225: Implement RAII Patterns and Resource Tracking
+### - [x] MTP-225: Implement RAII Patterns and Resource Tracking
 **Effort:** M | **Files:** `src/runtime/`
 **Spec Lines:** § (Resource Management)
 **Priority:** P0 - Blocker
@@ -3331,7 +3331,7 @@ assert(response_effective());
 
 ---
 
-### - [ ] MTP-230: Implement Full JS Subset Interpreter
+### - [x] MTP-230: Implement Full JS Subset Interpreter
 **Effort:** L | **Files:** `src/runtime/interpreter.rs:180`
 **Spec Lines:** §27.1 (Interpreter Runtime)
 **Priority:** P0 - Blocker

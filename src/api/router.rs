@@ -19,7 +19,11 @@ impl Router {
         self.routes.push(route);
     }
 
-    pub fn match_route(&self, method: &str, path: &str) -> Option<(&Route, std::collections::HashMap<String, String>)> {
+    pub fn match_route(
+        &self,
+        method: &str,
+        path: &str,
+    ) -> Option<(&Route, std::collections::HashMap<String, String>)> {
         for route in &self.routes {
             if route.method == method {
                 if let Some(params) = Self::match_path(&route.path, path) {
@@ -30,9 +34,13 @@ impl Router {
         None
     }
 
-    fn match_path(route_path: &str, request_path: &str) -> Option<std::collections::HashMap<String, String>> {
+    fn match_path(
+        route_path: &str,
+        request_path: &str,
+    ) -> Option<std::collections::HashMap<String, String>> {
         let route_segments: Vec<&str> = route_path.split('/').filter(|s| !s.is_empty()).collect();
-        let request_segments: Vec<&str> = request_path.split('/').filter(|s| !s.is_empty()).collect();
+        let request_segments: Vec<&str> =
+            request_path.split('/').filter(|s| !s.is_empty()).collect();
 
         if route_segments.len() != request_segments.len() {
             return None;

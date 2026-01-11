@@ -63,19 +63,25 @@ pub fn generate_openapi(routes: Vec<Route>) -> OpenApi {
         let operation = Operation {
             responses: {
                 let mut responses = HashMap::new();
-                responses.insert("200".to_string(), Response {
-                    description: "Successful response".to_string(),
-                    content: {
-                        let mut content = HashMap::new();
-                        content.insert("application/json".to_string(), MediaType {
-                            schema: Schema {
-                                type_: Some("object".to_string()),
-                                properties: None,
-                            },
-                        });
-                        content
+                responses.insert(
+                    "200".to_string(),
+                    Response {
+                        description: "Successful response".to_string(),
+                        content: {
+                            let mut content = HashMap::new();
+                            content.insert(
+                                "application/json".to_string(),
+                                MediaType {
+                                    schema: Schema {
+                                        type_: Some("object".to_string()),
+                                        properties: None,
+                                    },
+                                },
+                            );
+                            content
+                        },
                     },
-                });
+                );
                 responses
             },
         };
