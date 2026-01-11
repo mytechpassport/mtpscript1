@@ -153,6 +153,12 @@ impl LambdaError {
                 MtpError::Build { .. } => "BuildError",
                 MtpError::Io { .. } => "IoError",
                 MtpError::GasLimitOutOfRange { .. } => "GasLimitOutOfRange",
+                MtpError::IntegrityError { .. } => "IntegrityError",
+                MtpError::RateLimitError { .. } => "RateLimitError",
+                MtpError::ValidationError { .. } => "ValidationError",
+                MtpError::ModuleError { .. } => "ModuleError",
+                MtpError::TypeError { .. } => "TypeError",
+                MtpError::ParseError { .. } => "ParseError",
             }
             .to_string(),
             stack_trace: None, // MTPScript doesn't expose stack traces in production

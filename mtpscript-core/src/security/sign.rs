@@ -14,12 +14,18 @@ pub fn sign_ecdsa_p256(data: &[u8], private_key_pem: &str) -> Result<Vec<u8>, Mt
 
     // Create key pair
     let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &private_key_der)
-        .map_err(|_| MtpError::Security("Invalid private key".to_string()))?;
+        .map_err(|_| MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid private key".to_string(),
+        })?;
 
     // Sign the data
     let signature = key_pair
         .sign(&ring::rand::SystemRandom::new(), data)
-        .map_err(|_| MtpError::Security("Signing failed".to_string()))?;
+        .map_err(|_| MtpError::Security {
+            error: "Security".to_string(),
+            message: "Signing failed".to_string(),
+        })?;
 
     Ok(signature.as_ref().to_vec())
 }
@@ -37,7 +43,10 @@ pub fn verify_ecdsa_p256(
     // Verify signature
     public_key
         .verify(data, signature)
-        .map_err(|_| MtpError::Security("Signature verification failed".to_string()))
+        .map_err(|_| MtpError::Security {
+            error: "Security".to_string(),
+            message: "Signature verification failed".to_string(),
+        })
 }
 
 /// Parse PEM private key (ECDSA-P256 PKCS#8)
@@ -49,7 +58,10 @@ fn parse_pem_private_key(pem: &str) -> Result<Vec<u8>, MtpError> {
         .collect();
 
     let der = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &lines.join(""))
-        .map_err(|_| MtpError::Security("Invalid PEM format".to_string()))?;
+        .map_err(|_| MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid PEM format".to_string(),
+        })?;
 
     // For ECDSA-P256, we expect PKCS#8 format
     // Ring can handle this directly
@@ -65,7 +77,10 @@ fn parse_pem_public_key(pem: &str) -> Result<Vec<u8>, MtpError> {
         .collect();
 
     let der = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &lines.join(""))
-        .map_err(|_| MtpError::Security("Invalid PEM format".to_string()))?;
+        .map_err(|_| MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid PEM format".to_string(),
+        })?;
 
     // For ECDSA-P256, we expect SPKI format
     // Ring can handle this directly
@@ -74,27 +89,37 @@ fn parse_pem_public_key(pem: &str) -> Result<Vec<u8>, MtpError> {
 
 /// Load signing key from file
 pub fn load_signing_key(path: &str) -> Result<String, MtpError> {
-    fs::read_to_string(path).map_err(|e| MtpError::Io(e.to_string()))
+    fs::read_to_string(path).map_err(|e| MtpError::Io {
+        error: "Io".to_string(),
+        message: e.to_string(),
+    })
 }
 
 /// Load certificate from file
 pub fn load_certificate(path: &str) -> Result<String, MtpError> {
-    fs::read_to_string(path).map_err(|e| MtpError::Io(e.to_string()))
+    fs::read_to_string(path).map_err(|e| MtpError::Io {
+        error: "Io".to_string(),
+        message: e.to_string(),
+    })
 }
 
 /// Validate private key strength and format
 fn validate_private_key(private_key_pem: &str) -> Result<(), MtpError> {
     // Check PEM format
     if !private_key_pem.contains("-----BEGIN") || !private_key_pem.contains("-----END") {
-        return Err(MtpError::Security("Invalid PEM format".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid PEM format".to_string(),
+        });
     }
 
     // For ECDSA-P256, we require FIPS-compliant key
     // Check if it's ECDSA-P256 specifically
     if !private_key_pem.contains("EC PRIVATE KEY") {
-        return Err(MtpError::Security(
-            "Only ECDSA-P256 private keys are supported".to_string(),
-        ));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Only ECDSA-P256 private keys are supported".to_string(),
+        });
     }
 
     // Parse to check validity
@@ -110,11 +135,17 @@ fn validate_private_key(private_key_pem: &str) -> Result<(), MtpError> {
 pub fn validate_public_key(public_key_pem: &str) -> Result<(), MtpError> {
     // Check PEM format
     if !public_key_pem.contains("-----BEGIN") || !public_key_pem.contains("-----END") {
-        return Err(MtpError::Security("Invalid PEM format".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid PEM format".to_string(),
+        });
     }
 
     if !public_key_pem.contains("PUBLIC KEY") {
-        return Err(MtpError::Security("Invalid public key format".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid public key format".to_string(),
+        });
     }
 
     // Parse to check validity

@@ -76,7 +76,10 @@ impl ModuleResolver {
         }
 
         let path = Path::new(module_path);
-        let content = std::fs::read_to_string(path).map_err(|e| MtpError::Io(e.to_string()))?;
+        let content = std::fs::read_to_string(path).map_err(|e| MtpError::Io {
+            error: "Io".to_string(),
+            message: e.to_string(),
+        })?;
 
         // Parse imports from content
         let imports = self.extract_imports(&content)?;
@@ -93,7 +96,10 @@ impl ModuleResolver {
         let module = ResolvedModule {
             name: path
                 .file_stem()
-                .ok_or_else(|| MtpError::Build("Invalid module path".to_string()))?
+                .ok_or_else(|| MtpError::Build {
+                    error: "Build".to_string(),
+                    message: "Invalid module path".to_string(),
+                })?
                 .to_string_lossy()
                 .to_string(),
             path: module_path.to_string(),
@@ -150,10 +156,10 @@ impl ModuleResolver {
             for dep in deps {
                 if !visited.contains(dep) {
                     if visiting.contains(dep) {
-                        return Err(MtpError::Build(format!(
-                            "Circular dependency detected: {} -> {}",
-                            node, dep
-                        )));
+                        return Err(MtpError::Build {
+                            error: "Build".to_string(),
+                            message: format!("Circular dependency detected: {} -> {}", node, dep),
+                        });
                     }
                     self.dfs_cycle_detect(graph, dep, visiting, visited)?;
                 }
@@ -206,10 +212,13 @@ impl ModuleResolver {
             for dep in deps {
                 if !visited.contains(dep) {
                     if visiting.contains(dep) {
-                        return Err(MtpError::Build(format!(
-                            "Circular dependency in topological sort: {} -> {}",
-                            node, dep
-                        )));
+                        return Err(MtpError::Build {
+                            error: "Build".to_string(),
+                            message: format!(
+                                "Circular dependency in topological sort: {} -> {}",
+                                node, dep
+                            ),
+                        });
                     }
                     self.topological_sort(graph, dep, order, visited, visiting)?;
                 }

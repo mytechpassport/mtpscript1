@@ -97,20 +97,32 @@ impl ReproducibleBuild {
         let output = Command::new("docker")
             .args(&["pull", &self.container_spec.image])
             .output()
-            .map_err(|e| MtpError::Build(format!("Failed to pull container: {}", e)))?;
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Failed to pull container: {}", e),
+            })?;
 
         if !output.status.success() {
-            return Err(MtpError::Build("Container pull failed".to_string()));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: "Container pull failed".to_string(),
+            });
         }
 
         // Verify image hash (this is a simplified check)
         let inspect_output = Command::new("docker")
             .args(&["inspect", &self.container_spec.image])
             .output()
-            .map_err(|e| MtpError::Build(format!("Failed to inspect container: {}", e)))?;
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Failed to inspect container: {}", e),
+            })?;
 
         if !inspect_output.status.success() {
-            return Err(MtpError::Build("Container inspect failed".to_string()));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: "Container inspect failed".to_string(),
+            });
         }
 
         // In a real implementation, you'd verify the image digest matches the hash
@@ -132,7 +144,10 @@ impl ReproducibleBuild {
 
     /// Recursively hash directory contents
     fn hash_directory(&self, dir: &Path, hasher: &mut Sha256) -> Result<(), MtpError> {
-        let entries = fs::read_dir(dir).map_err(|e| MtpError::Io(e.to_string()))?;
+        let entries = fs::read_dir(dir).map_err(|e| MtpError::Io {
+            error: "Io".to_string(),
+            message: e.to_string(),
+        })?;
 
         let mut entries: Vec<_> = entries.collect();
         entries.sort_by_key(|e| e.as_ref().unwrap().file_name());
@@ -142,7 +157,10 @@ impl ReproducibleBuild {
             let path = entry.path();
             let file_name = path
                 .file_name()
-                .ok_or_else(|| MtpError::Build("Invalid file name".to_string()))?;
+                .ok_or_else(|| MtpError::Build {
+                    error: "Build".to_string(),
+                    message: "Invalid file name".to_string(),
+                })?;
 
             // Skip certain files
             if file_name == ".git" || file_name == "target" || file_name == ".DS_Store" {
@@ -152,7 +170,10 @@ impl ReproducibleBuild {
             if path.is_dir() {
                 self.hash_directory(&path, hasher)?;
             } else {
-                let content = fs::read(&path).map_err(|e| MtpError::Io(e.to_string()))?;
+                let content = fs::read(&path).map_err(|e| MtpError::Io {
+                    error: "Io".to_string(),
+                    message: e.to_string(),
+                })?;
                 hasher.update(&content);
             }
         }
@@ -162,7 +183,10 @@ impl ReproducibleBuild {
 
     /// Compute SHA-256 hash of a file
     fn compute_file_hash(&self, file_path: &Path) -> Result<String, MtpError> {
-        let content = fs::read(file_path).map_err(|e| MtpError::Io(e.to_string()))?;
+        let content = fs::read(file_path).map_err(|e| MtpError::Io {
+            error: "Io".to_string(),
+            message: e.to_string(),
+        })?;
 
         let hash = Sha256::new().chain_update(&content).finalize();
 
@@ -174,7 +198,10 @@ impl ReproducibleBuild {
         let source_mount = format!("{}:/src", source_path.display());
         let output_dir = output_path
             .parent()
-            .ok_or_else(|| MtpError::Build("Invalid output path".to_string()))?;
+            .ok_or_else(|| MtpError::Build {
+                error: "Build".to_string(),
+                message: "Invalid output path".to_string(),
+            })?;
         let output_mount = format!("{}:/output", output_dir.display());
 
         let output = Command::new("docker")
@@ -192,11 +219,17 @@ impl ReproducibleBuild {
                 "build",
             ])
             .output()
-            .map_err(|e| MtpError::Build(format!("Container build failed: {}", e)))?;
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Container build failed: {}", e),
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(MtpError::Build(format!("Build failed: {}", stderr)));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Build failed: {}", stderr),
+            });
         }
 
         Ok(())
@@ -207,14 +240,23 @@ impl ReproducibleBuild {
         let output = Command::new("git")
             .args(&["rev-parse", "HEAD"])
             .output()
-            .map_err(|e| MtpError::Build(format!("Git command failed: {}", e)))?;
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Git command failed: {}", e),
+            })?;
 
         if !output.status.success() {
-            return Err(MtpError::Build("Failed to get git commit".to_string()));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: "Failed to get git commit".to_string(),
+            });
         }
 
         let commit = String::from_utf8(output.stdout)
-            .map_err(|e| MtpError::Build(format!("Invalid git output: {}", e)))?
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Invalid git output: {}", e),
+            })?
             .trim()
             .to_string();
 
@@ -264,9 +306,10 @@ impl ReproducibleBuild {
         let expected_signature = Sha256::new().chain_update(&json).finalize();
 
         if signed.signature != expected_signature.as_slice() {
-            return Err(MtpError::Security(
-                "Build info signature verification failed".to_string(),
-            ));
+            return Err(MtpError::Security {
+                error: "Security".to_string(),
+                message: "Build info signature verification failed".to_string(),
+            });
         }
 
         Ok(())

@@ -91,6 +91,10 @@ impl Interpreter {
         interpreter
     }
 
+    fn inject_builtin_objects(&mut self) {
+        // TODO: Inject builtins
+    }
+
     pub fn set_gas_limit(&mut self, limit: u64) {
         self.gas_counter = GasCounter::new(limit);
     }
@@ -125,7 +129,7 @@ impl Interpreter {
                 .ok_or_else(|| RuntimeError::ValueError(format!("Function {} not found", name)))?
                 .clone();
 
-            call_function(self, &func_val, args)
+            self.call_function(&func_val, args)
         }
     }
 
@@ -204,12 +208,12 @@ impl Interpreter {
                 self.gas_counter.consume(2)?;
                 let left_val = self.eval_expr(left, local_scope)?;
                 let right_val = self.eval_expr(right, local_scope)?;
-                eval_binop(self, op, &left_val, &right_val)
+                self.eval_binop(op, &left_val, &right_val)
             }
             JsExpr::UnaryOp(op, expr) => {
                 self.gas_counter.consume(1)?;
                 let val = self.eval_expr(expr, local_scope)?;
-                eval_unaryop(self, op, &val)
+                self.eval_unaryop(op, &val)
             }
             JsExpr::Call(func_expr, args) => {
                 self.gas_counter.consume(5)?;
@@ -218,7 +222,7 @@ impl Interpreter {
                 for arg in args {
                     arg_vals.push(self.eval_expr(arg, local_scope)?);
                 }
-                call_function(self, &func_val, arg_vals)
+                self.call_function(&func_val, arg_vals)
             }
             JsExpr::Member(obj_expr, prop) => {
                 self.gas_counter.consume(1)?;
@@ -334,88 +338,81 @@ impl Interpreter {
 
             JsExpr::ExprStmt(expr) => Ok(Value::Null),
         }
+    }
 
-        fn eval_binop(
-            interp: &Interpreter,
-            op: &str,
-            left: &Value,
-            right: &Value,
-        ) -> Result<Value, RuntimeError> {
-            match op {
-                "+" => match (left, right) {
-                    (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
-                    (Value::String(a), Value::String(b)) => {
-                        Ok(Value::String(format!("{}{}", a, b)))
-                    }
-                    _ => Err(RuntimeError::TypeError(
-                        "Invalid operands for +".to_string(),
-                    )),
-                },
-                "-" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Number(a - b))
-                }
-                "*" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Number(a * b))
-                }
-                "/" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    if b == 0 {
-                        Err(RuntimeError::ValueError("Division by zero".to_string()))
-                    } else {
-                        Ok(Value::Number(a / b))
-                    }
-                }
-                "%" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Number(a % b))
-                }
-                "==" | "===" => Ok(Value::Boolean(left == right)),
-                "!=" | "!==" => Ok(Value::Boolean(left != right)),
-                "<" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Boolean(a < b))
-                }
-                ">" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Boolean(a > b))
-                }
-                "<=" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Boolean(a <= b))
-                }
-                ">=" => {
-                    let a = left.as_number()?;
-                    let b = right.as_number()?;
-                    Ok(Value::Boolean(a >= b))
-                }
-                "&&" => {
-                    let a = left.as_boolean()?;
-                    let b = right.as_boolean()?;
-                    Ok(Value::Boolean(a && b))
-                }
-                "||" => {
-                    let a = left.as_boolean()?;
-                    let b = right.as_boolean()?;
-                    Ok(Value::Boolean(a || b))
-                }
-                _ => Err(RuntimeError::ValueError(format!(
-                    "Unknown binary operator: {}",
-                    op
-                ))),
+    fn eval_binop(&self, op: &str, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+        match op {
+            "+" => match (left, right) {
+                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+                (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
+                _ => Err(RuntimeError::TypeError(
+                    "Invalid operands for +".to_string(),
+                )),
+            },
+            "-" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Number(a - b))
             }
+            "*" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Number(a * b))
+            }
+            "/" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                if b == 0 {
+                    Err(RuntimeError::ValueError("Division by zero".to_string()))
+                } else {
+                    Ok(Value::Number(a / b))
+                }
+            }
+            "%" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Number(a % b))
+            }
+            "==" | "===" => Ok(Value::Boolean(left == right)),
+            "!=" | "!==" => Ok(Value::Boolean(left != right)),
+            "<" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Boolean(a < b))
+            }
+            ">" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Boolean(a > b))
+            }
+            "<=" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Boolean(a <= b))
+            }
+            ">=" => {
+                let a = left.as_number()?;
+                let b = right.as_number()?;
+                Ok(Value::Boolean(a >= b))
+            }
+            "&&" => {
+                let a = left.as_boolean()?;
+                let b = right.as_boolean()?;
+                Ok(Value::Boolean(a && b))
+            }
+            "||" => {
+                let a = left.as_boolean()?;
+                let b = right.as_boolean()?;
+                Ok(Value::Boolean(a || b))
+            }
+            _ => Err(RuntimeError::ValueError(format!(
+                "Unknown binary operator: {}",
+                op
+            ))),
         }
     }
 
-    fn eval_unaryop(interp: &Interpreter, op: &str, val: &Value) -> Result<Value, RuntimeError> {
+    fn eval_unaryop(&self, op: &str, val: &Value) -> Result<Value, RuntimeError> {
         match op {
             "!" => Ok(Value::Boolean(!val.as_boolean()?)),
             "-" => Ok(Value::Number(-val.as_number()?)),
@@ -426,11 +423,7 @@ impl Interpreter {
         }
     }
 
-    fn call_function(
-        interp: &mut Interpreter,
-        func_val: &Value,
-        args: Vec<Value>,
-    ) -> Result<Value, RuntimeError> {
+    fn call_function(&mut self, func_val: &Value, args: Vec<Value>) -> Result<Value, RuntimeError> {
         match func_val {
             Value::Function(func) => {
                 // Get function name
@@ -439,7 +432,7 @@ impl Interpreter {
                 })?;
 
                 // Check if this is a builtin function first
-                if let Some(builtin) = interp.builtins.get(func_name).cloned() {
+                if let Some(builtin) = self.builtins.get(func_name).cloned() {
                     // Builtins take single argument for now
                     if args.len() != 1 {
                         return Err(RuntimeError::ValueError(format!(

@@ -70,19 +70,24 @@ impl LambdaRuntime {
     /// Get next invocation from Lambda runtime API
     fn get_next_invocation(&self) -> Result<LambdaPayload, MtpError> {
         // Call Lambda Runtime API
-        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API")
-            .map_err(|_| MtpError::Runtime("AWS_LAMBDA_RUNTIME_API not set".to_string()))?;
+        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
+        })?;
 
         let client = reqwest::blocking::Client::new();
         let url = format!("http://{}/2018-06-01/runtime/invocation/next", runtime_api);
 
-        let response = client
-            .get(&url)
-            .send()
-            .map_err(|e| MtpError::Runtime(format!("Failed to get invocation: {}", e)))?;
+        let response = client.get(&url).send().map_err(|e| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: format!("Failed to get invocation: {}", e),
+        })?;
 
         if !response.status().is_success() {
-            return Err(MtpError::Runtime("Failed to get invocation".to_string()));
+            return Err(MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: "Failed to get invocation".to_string(),
+            });
         }
 
         let request_id = response
@@ -103,9 +108,10 @@ impl LambdaRuntime {
             .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_string())))
             .collect();
 
-        let body: serde_json::Value = response
-            .json()
-            .map_err(|e| MtpError::Runtime(format!("Failed to parse invocation body: {}", e)))?;
+        let body: serde_json::Value = response.json().map_err(|e| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: format!("Failed to parse invocation body: {}", e),
+        })?;
 
         Ok(LambdaPayload {
             request_id,
@@ -212,8 +218,10 @@ impl LambdaRuntime {
 
     /// Send response to Lambda runtime API
     fn send_response(&self, response: &LambdaResponse) -> Result<(), MtpError> {
-        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API")
-            .map_err(|_| MtpError::Runtime("AWS_LAMBDA_RUNTIME_API not set".to_string()))?;
+        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
+        })?;
 
         let request_id = env::var("_X_AMZN_TRACE_ID").unwrap_or_else(|_| "unknown".to_string());
 
@@ -225,14 +233,21 @@ impl LambdaRuntime {
 
         let response_body = serde_json::to_string(response)?;
 
-        let lambda_response = client
-            .post(&url)
-            .body(response_body)
-            .send()
-            .map_err(|e| MtpError::Runtime(format!("Failed to send response: {}", e)))?;
+        let lambda_response =
+            client
+                .post(&url)
+                .body(response_body)
+                .send()
+                .map_err(|e| MtpError::Runtime {
+                    error: "Runtime".to_string(),
+                    message: format!("Failed to send response: {}", e),
+                })?;
 
         if !lambda_response.status().is_success() {
-            return Err(MtpError::Runtime("Failed to send response".to_string()));
+            return Err(MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: "Failed to send response".to_string(),
+            });
         }
 
         Ok(())
@@ -240,8 +255,10 @@ impl LambdaRuntime {
 
     /// Send initialization error (for cold start failures)
     pub fn send_init_error(&self, error: &MtpError) -> Result<(), MtpError> {
-        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API")
-            .map_err(|_| MtpError::Runtime("AWS_LAMBDA_RUNTIME_API not set".to_string()))?;
+        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
+        })?;
 
         let client = reqwest::blocking::Client::new();
         let url = format!("http://{}/2018-06-01/runtime/init/error", runtime_api);
@@ -255,7 +272,10 @@ impl LambdaRuntime {
             .post(&url)
             .json(&error_body)
             .send()
-            .map_err(|e| MtpError::Runtime(format!("Failed to send init error: {}", e)))?;
+            .map_err(|e| MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: format!("Failed to send init error: {}", e),
+            })?;
 
         Ok(())
     }

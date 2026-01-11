@@ -53,39 +53,54 @@ pub fn create_snapshot(js_code: &str, signing_key_path: &str) -> Result<Vec<u8>,
 
 /// Save snapshot to file
 pub fn save_snapshot(snapshot: &[u8], path: &str) -> Result<(), MtpError> {
-    fs::write(path, snapshot).map_err(|e| MtpError::Io(e.to_string()))
+    fs::write(path, snapshot).map_err(|e| MtpError::Io {
+        error: "Io".to_string(),
+        message: e.to_string(),
+    })
 }
 
 /// Load snapshot from file
 pub fn load_snapshot(path: &str) -> Result<Vec<u8>, MtpError> {
-    fs::read(path).map_err(|e| MtpError::Io(e.to_string()))
+    fs::read(path).map_err(|e| MtpError::Io {
+        error: "Io".to_string(),
+        message: e.to_string(),
+    })
 }
 
 /// Extract JS code from snapshot
 pub fn extract_js_code(snapshot: &[u8]) -> Result<String, MtpError> {
     // Verify basic integrity
     if snapshot.len() < 132 {
-        return Err(MtpError::Security("Snapshot too small".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Snapshot too small".to_string(),
+        });
     }
 
     // Check magic bytes
     if &snapshot[0..8] != b"MTPJS\x00\x00\x00" {
-        return Err(MtpError::Security("Invalid magic bytes".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid magic bytes".to_string(),
+        });
     }
 
     // Check version
     let version = u32::from_le_bytes(snapshot[8..12].try_into().unwrap());
     if version != 51 {
-        return Err(MtpError::Security(format!(
-            "Unsupported version: {}",
-            version
-        )));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: format!("Unsupported version: {}", version),
+        });
     }
 
     // Get declared size
     let declared_size = u64::from_le_bytes(snapshot[12..20].try_into().unwrap()) as usize;
     if declared_size != snapshot.len() {
-        return Err(MtpError::Security("Size mismatch".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Size mismatch".to_string(),
+        });
     }
 
     // Extract JS content (from byte 52 to size-68, before signature)
@@ -94,7 +109,10 @@ pub fn extract_js_code(snapshot: &[u8]) -> Result<String, MtpError> {
     let js_bytes = &snapshot[js_start..js_end];
 
     String::from_utf8(js_bytes.to_vec())
-        .map_err(|_| MtpError::Security("Invalid UTF-8 in JS content".to_string()))
+        .map_err(|_| MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid UTF-8 in JS content".to_string(),
+        })
 }
 
 /// Create a test snapshot for testing purposes (without signing)

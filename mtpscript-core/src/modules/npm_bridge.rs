@@ -82,10 +82,10 @@ impl NpmBridge {
         let mut dependencies = serde_json::Map::new();
         for (name, version) in packages {
             if !self.config.allowed_packages.contains(&name.to_string()) {
-                return Err(MtpError::Security(format!(
-                    "Package {} not in allowed list",
-                    name
-                )));
+                return Err(MtpError::Security {
+                    error: "Security".to_string(),
+                    message: format!("Package {} not in allowed list", name),
+                });
             }
             dependencies.insert(
                 name.to_string(),
@@ -110,11 +110,17 @@ impl NpmBridge {
             .current_dir(dir)
             .args(&["install", "--production"])
             .output()
-            .map_err(|e| MtpError::Build(format!("npm install failed: {}", e)))?;
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("npm install failed: {}", e),
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(MtpError::Build(format!("npm install failed: {}", stderr)));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("npm install failed: {}", stderr),
+            });
         }
 
         Ok(())
@@ -162,10 +168,10 @@ impl NpmBridge {
         let package_dir = dir.join("node_modules").join(name);
 
         if !package_dir.exists() {
-            return Err(MtpError::Build(format!(
-                "Package {} not found after install",
-                name
-            )));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Package {} not found after install", name),
+            });
         }
 
         // Compute content hash
@@ -177,10 +183,13 @@ impl NpmBridge {
         // Check package size
         let size_kb = self.get_package_size_kb(&package_dir)?;
         if size_kb > self.config.max_package_size_kb {
-            return Err(MtpError::Security(format!(
-                "Package {} too large: {}KB > {}KB",
-                name, size_kb, self.config.max_package_size_kb
-            )));
+            return Err(MtpError::Security {
+                error: "Security".to_string(),
+                message: format!(
+                    "Package {} too large: {}KB > {}KB",
+                    name, size_kb, self.config.max_package_size_kb
+                ),
+            });
         }
 
         // Read package.json for metadata
@@ -251,7 +260,10 @@ impl NpmBridge {
         let lockfile_path = dir.join("package-lock.json");
 
         if !lockfile_path.exists() {
-            return Err(MtpError::Build("package-lock.json not found".to_string()));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: "package-lock.json not found".to_string(),
+            });
         }
 
         let content = fs::read_to_string(&lockfile_path)?;
@@ -270,10 +282,10 @@ impl NpmBridge {
             }
         }
 
-        Err(MtpError::Build(format!(
-            "Could not find source hash for {}",
-            name
-        )))
+        Err(MtpError::Build {
+            error: "Build".to_string(),
+            message: format!("Could not find source hash for {}", name),
+        })
     }
 
     /// Get package size in KB
@@ -281,10 +293,16 @@ impl NpmBridge {
         let output = Command::new("du")
             .args(&["-sk", &package_dir.to_string_lossy()])
             .output()
-            .map_err(|e| MtpError::Io(e.to_string()))?;
+            .map_err(|e| MtpError::Io {
+                error: "Io".to_string(),
+                message: e.to_string(),
+            })?;
 
         if !output.status.success() {
-            return Err(MtpError::Build("Failed to get package size".to_string()));
+            return Err(MtpError::Build {
+                error: "Build".to_string(),
+                message: "Failed to get package size".to_string(),
+            });
         }
 
         let stdout = String::from_utf8(output.stdout)?;
@@ -307,7 +325,10 @@ impl NpmBridge {
                 &format!("{}@{}", name, version),
             ])
             .output()
-            .map_err(|e| MtpError::Build(format!("npm audit failed: {}", e)))?;
+            .map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("npm audit failed: {}", e),
+            })?;
 
         if !output.status.success() {
             // Parse audit results
@@ -372,23 +393,31 @@ pub fn create_standard_bridge() -> NpmBridge {
 pub fn validate_adapter_signature(function_text: &str) -> Result<(), MtpError> {
     // Check that the function has the correct signature
     if !function_text.contains("function") {
-        return Err(MtpError::Security("Not a function".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Not a function".to_string(),
+        });
     }
 
     if !function_text.contains("seed: Uint8Array") {
-        return Err(MtpError::Security("Missing seed parameter".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Missing seed parameter".to_string(),
+        });
     }
 
     if !function_text.contains("JsonValue[]") {
-        return Err(MtpError::Security(
-            "Missing JsonValue[] parameter".to_string(),
-        ));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Missing JsonValue[] parameter".to_string(),
+        });
     }
 
     if !function_text.contains("JsonValue") {
-        return Err(MtpError::Security(
-            "Missing JsonValue return type".to_string(),
-        ));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Missing JsonValue return type".to_string(),
+        });
     }
 
     Ok(())

@@ -199,13 +199,17 @@ impl SandboxedInterpreter {
     pub fn execute(&mut self, code: &str) -> Result<String, MtpError> {
         // Check for forbidden operations
         if code.contains("require(") && !self.config.allow_fs {
-            return Err(MtpError::Security(
-                "Filesystem access not allowed".to_string(),
-            ));
+            return Err(MtpError::Security {
+                error: "Security".to_string(),
+                message: "Filesystem access not allowed".to_string(),
+            });
         }
 
         if code.contains("fetch(") && !self.config.allow_network {
-            return Err(MtpError::Security("Network access not allowed".to_string()));
+            return Err(MtpError::Security {
+                error: "Security".to_string(),
+                message: "Network access not allowed".to_string(),
+            });
         }
 
         // Execute in the sandboxed interpreter and return JSON string

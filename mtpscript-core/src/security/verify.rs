@@ -5,14 +5,20 @@ use std::fs;
 /// Verify snapshot signature
 pub fn verify_snapshot(snapshot_path: &str, cert_path: &str) -> Result<(), MtpError> {
     // Read snapshot
-    let snapshot = fs::read(snapshot_path).map_err(|e| MtpError::Io(e.to_string()))?;
+    let snapshot = fs::read(snapshot_path).map_err(|e| MtpError::Io {
+        error: "Io".to_string(),
+        message: e.to_string(),
+    })?;
 
     // Read certificate
     let cert_pem = load_certificate(cert_path)?;
 
     // Extract signature from snapshot (last 64 bytes before CRC)
     if snapshot.len() < 132 {
-        return Err(MtpError::Security("Snapshot too small".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Snapshot too small".to_string(),
+        });
     }
 
     let sig_start = snapshot.len() - 132;
@@ -34,7 +40,10 @@ pub fn verify_snapshot(snapshot_path: &str, cert_path: &str) -> Result<(), MtpEr
 /// Verify CRC32 checksum
 fn verify_crc32(data: &[u8]) -> Result<(), MtpError> {
     if data.len() < 4 {
-        return Err(MtpError::Security("Data too small for CRC".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Data too small for CRC".to_string(),
+        });
     }
 
     let content = &data[..data.len() - 4];
@@ -44,7 +53,10 @@ fn verify_crc32(data: &[u8]) -> Result<(), MtpError> {
     let expected_crc_u32 = u32::from_le_bytes(expected_crc.try_into().unwrap());
 
     if computed_crc != expected_crc_u32 {
-        return Err(MtpError::Security("CRC32 verification failed".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "CRC32 verification failed".to_string(),
+        });
     }
 
     Ok(())
@@ -53,27 +65,36 @@ fn verify_crc32(data: &[u8]) -> Result<(), MtpError> {
 /// Verify snapshot data integrity
 pub fn verify_snapshot_integrity(data: &[u8]) -> Result<(), MtpError> {
     if data.len() < 52 {
-        return Err(MtpError::Security("Snapshot too small".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Snapshot too small".to_string(),
+        });
     }
 
     // Check magic bytes
     if &data[0..8] != b"MTPJS\x00\x00\x00" {
-        return Err(MtpError::Security("Invalid magic bytes".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Invalid magic bytes".to_string(),
+        });
     }
 
     // Check version
     let version = u32::from_le_bytes(data[8..12].try_into().unwrap());
     if version != 51 {
-        return Err(MtpError::Security(format!(
-            "Unsupported version: {}",
-            version
-        )));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: format!("Unsupported version: {}", version),
+        });
     }
 
     // Verify size
     let declared_size = u64::from_le_bytes(data[12..20].try_into().unwrap()) as usize;
     if declared_size != data.len() {
-        return Err(MtpError::Security("Size mismatch".to_string()));
+        return Err(MtpError::Security {
+            error: "Security".to_string(),
+            message: "Size mismatch".to_string(),
+        });
     }
 
     Ok(())
