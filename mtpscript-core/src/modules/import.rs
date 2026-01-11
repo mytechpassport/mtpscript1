@@ -93,19 +93,17 @@ impl ImportResolver {
         }
 
         // Load signature
-        let signature_pem = fs::read_to_string(&signature_path)
-            .map_err(|e| MtpError::Io {
-                error: "Io".to_string(),
-                message: format!("Failed to read signature: {}", e),
-            })?;
+        let signature_pem = fs::read_to_string(&signature_path).map_err(|e| MtpError::Io {
+            error: "Io".to_string(),
+            message: format!("Failed to read signature: {}", e),
+        })?;
 
         // Compute content hash
         let repo_path = PathBuf::from(module_path);
-        let content = fs::read_to_string(&repo_path)
-            .map_err(|e| MtpError::Io {
-                error: "Io".to_string(),
-                message: format!("Failed to read module content: {}", e),
-            })?;
+        let content = fs::read_to_string(&repo_path).map_err(|e| MtpError::Io {
+            error: "Io".to_string(),
+            message: format!("Failed to read module content: {}", e),
+        })?;
         let content_hash = Sha256::digest(content.as_bytes());
 
         // Verify signature (placeholder - would use actual public key)
@@ -168,34 +166,29 @@ impl ImportResolver {
         let repo_path = vendor_dir.join(&import.module_name);
         let repo = if repo_path.exists() {
             // Repository already exists, fetch updates
-            Repository::open(&repo_path)
-                .map_err(|e| MtpError::Build {
-                    error: "Build".to_string(),
-                    message: format!("Failed to open repo: {}", e),
-                })?
+            Repository::open(&repo_path).map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Failed to open repo: {}", e),
+            })?
         } else {
             // Clone the repository
             let url = format!("https://{}", import.git_url);
-            Repository::clone(&url, &repo_path)
-                .map_err(|e| MtpError::Build {
-                    error: "Build".to_string(),
-                    message: format!("Failed to clone repo: {}", e),
-                })?
+            Repository::clone(&url, &repo_path).map_err(|e| MtpError::Build {
+                error: "Build".to_string(),
+                message: format!("Failed to clone repo: {}", e),
+            })?
         };
 
         // Verify the commit hash exists
-        let oid = Oid::from_str(&import.git_hash)
-            .map_err(|_| MtpError::Build {
-                error: "Build".to_string(),
-                message: "Invalid git hash".to_string(),
-            })?;
+        let oid = Oid::from_str(&import.git_hash).map_err(|_| MtpError::Build {
+            error: "Build".to_string(),
+            message: "Invalid git hash".to_string(),
+        })?;
 
-        let commit = repo
-            .find_commit(oid)
-            .map_err(|_| MtpError::Build {
-                error: "Build".to_string(),
-                message: "Commit hash not found in repository".to_string(),
-            })?;
+        let commit = repo.find_commit(oid).map_err(|_| MtpError::Build {
+            error: "Build".to_string(),
+            message: "Commit hash not found in repository".to_string(),
+        })?;
 
         // Verify tag if specified
         if let Some(tag_name) = &import.tag {
@@ -209,11 +202,10 @@ impl ImportResolver {
                 message: format!("Failed to checkout commit: {}", e),
             })?;
 
-        repo.set_head_detached(oid)
-            .map_err(|e| MtpError::Build {
-                error: "Build".to_string(),
-                message: format!("Failed to set HEAD: {}", e),
-            })?;
+        repo.set_head_detached(oid).map_err(|e| MtpError::Build {
+            error: "Build".to_string(),
+            message: format!("Failed to set HEAD: {}", e),
+        })?;
 
         // Verify repository content hash
         let content_hash = self.compute_repo_content_hash(&repo_path)?;
@@ -244,12 +236,10 @@ impl ImportResolver {
             })?;
 
         // Get the tag target
-        let tag_oid = tag_obj
-            .target()
-            .ok_or_else(|| MtpError::Build {
-                error: "Build".to_string(),
-                message: "Tag has no target".to_string(),
-            })?;
+        let tag_oid = tag_obj.target().ok_or_else(|| MtpError::Build {
+            error: "Build".to_string(),
+            message: "Tag has no target".to_string(),
+        })?;
 
         if tag_oid != expected_oid {
             return Err(MtpError::Build {
@@ -338,8 +328,8 @@ impl ImportResolver {
 
     /// Save audit manifest to file
     pub fn save_audit_manifest(&self, path: &str) -> Result<(), MtpError> {
-        let json = serde_json::to_string_pretty(&self.audit_manifest)
-            .map_err(|e| MtpError::Io {
+        let json =
+            serde_json::to_string_pretty(&self.audit_manifest).map_err(|e| MtpError::Io {
                 error: "Io".to_string(),
                 message: e.to_string(),
             })?;
@@ -376,12 +366,10 @@ pub fn parse_import_decl(source: &str) -> Result<ImportDecl, MtpError> {
     let alias_part = &after_import[as_pos + as_keyword.len()..];
 
     // Parse URL part: github.com/user/repo@v1.0.0#abc123
-    let hash_sep = url_part
-        .rfind('#')
-        .ok_or_else(|| MtpError::Build {
-            error: "Build".to_string(),
-            message: "Missing git hash".to_string(),
-        })?;
+    let hash_sep = url_part.rfind('#').ok_or_else(|| MtpError::Build {
+        error: "Build".to_string(),
+        message: "Missing git hash".to_string(),
+    })?;
     let (url_and_tag, git_hash) = url_part.split_at(hash_sep);
 
     let git_hash = &git_hash[1..]; // Remove '#'

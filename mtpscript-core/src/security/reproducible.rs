@@ -155,12 +155,10 @@ impl ReproducibleBuild {
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            let file_name = path
-                .file_name()
-                .ok_or_else(|| MtpError::Build {
-                    error: "Build".to_string(),
-                    message: "Invalid file name".to_string(),
-                })?;
+            let file_name = path.file_name().ok_or_else(|| MtpError::Build {
+                error: "Build".to_string(),
+                message: "Invalid file name".to_string(),
+            })?;
 
             // Skip certain files
             if file_name == ".git" || file_name == "target" || file_name == ".DS_Store" {
@@ -196,12 +194,10 @@ impl ReproducibleBuild {
     /// Run build inside container
     fn run_container_build(&self, source_path: &Path, output_path: &Path) -> Result<(), MtpError> {
         let source_mount = format!("{}:/src", source_path.display());
-        let output_dir = output_path
-            .parent()
-            .ok_or_else(|| MtpError::Build {
-                error: "Build".to_string(),
-                message: "Invalid output path".to_string(),
-            })?;
+        let output_dir = output_path.parent().ok_or_else(|| MtpError::Build {
+            error: "Build".to_string(),
+            message: "Invalid output path".to_string(),
+        })?;
         let output_mount = format!("{}:/output", output_dir.display());
 
         let output = Command::new("docker")

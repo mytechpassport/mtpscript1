@@ -108,11 +108,10 @@ pub fn extract_js_code(snapshot: &[u8]) -> Result<String, MtpError> {
     let js_end = snapshot.len() - 68; // 64 bytes signature + 4 bytes CRC
     let js_bytes = &snapshot[js_start..js_end];
 
-    String::from_utf8(js_bytes.to_vec())
-        .map_err(|_| MtpError::Security {
-            error: "Security".to_string(),
-            message: "Invalid UTF-8 in JS content".to_string(),
-        })
+    String::from_utf8(js_bytes.to_vec()).map_err(|_| MtpError::Security {
+        error: "Security".to_string(),
+        message: "Invalid UTF-8 in JS content".to_string(),
+    })
 }
 
 /// Create a test snapshot for testing purposes (without signing)

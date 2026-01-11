@@ -59,9 +59,9 @@ fn parse_pem_private_key(pem: &str) -> Result<Vec<u8>, MtpError> {
 
     let der = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &lines.join(""))
         .map_err(|_| MtpError::Security {
-            error: "Security".to_string(),
-            message: "Invalid PEM format".to_string(),
-        })?;
+        error: "Security".to_string(),
+        message: "Invalid PEM format".to_string(),
+    })?;
 
     // For ECDSA-P256, we expect PKCS#8 format
     // Ring can handle this directly
@@ -78,9 +78,9 @@ fn parse_pem_public_key(pem: &str) -> Result<Vec<u8>, MtpError> {
 
     let der = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &lines.join(""))
         .map_err(|_| MtpError::Security {
-            error: "Security".to_string(),
-            message: "Invalid PEM format".to_string(),
-        })?;
+        error: "Security".to_string(),
+        message: "Invalid PEM format".to_string(),
+    })?;
 
     // For ECDSA-P256, we expect SPKI format
     // Ring can handle this directly

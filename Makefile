@@ -39,15 +39,15 @@ ALL_OBJECTS = $(CORE_OBJECTS) $(RUNTIME_OBJECTS)
 all: compile
 
 # Compile all
-compile: $(BUILD_DIR)/mtpjs_repl $(BUILD_DIR)/mtpsc
+compile: $(BUILD_DIR)/mtpjs $(BUILD_DIR)/mtpc
 
-# Compile and run REPL
-run: $(BUILD_DIR)/mtpjs_repl
-	./$(BUILD_DIR)/mtpjs_repl
+# Compile and run runtime
+run: $(BUILD_DIR)/mtpjs
+	./$(BUILD_DIR)/mtpjs
 
 # Compile and run compiler
-compile-run: $(BUILD_DIR)/mtpsc
-	./$(BUILD_DIR)/mtpsc examples/test.mtp examples/test.msqs
+compile-run: $(BUILD_DIR)/mtpc
+	./$(BUILD_DIR)/mtpc examples/test.mtp examples/test.msqs
 
 # Run tests
 test: compile
@@ -55,7 +55,7 @@ test: compile
 	@mkdir -p $(BUILD_DIR)/tests
 	@echo "1" > $(BUILD_DIR)/tests/basic.passed
 	@if [ -f examples/test.mtp ]; then \
-		./$(BUILD_DIR)/mtpsc examples/test.mtp $(BUILD_DIR)/tests/test.msqs && \
+		./$(BUILD_DIR)/mtpc examples/test.mtp $(BUILD_DIR)/tests/test.msqs && \
 		echo "Compiler test: PASSED" && \
 		echo "2" > $(BUILD_DIR)/tests/basic.passed; \
 	else \
@@ -63,13 +63,13 @@ test: compile
 	fi
 	@echo "Basic test suite completed"
 
-# REPL executable
-$(BUILD_DIR)/mtpjs_repl: $(MAIN_OBJECTS) $(ALL_OBJECTS)
+# Runtime executable
+$(BUILD_DIR)/mtpjs: $(MAIN_OBJECTS) $(ALL_OBJECTS)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
-# Compiler executable  
-$(BUILD_DIR)/mtpsc: $(CLI_OBJECTS) $(ALL_OBJECTS)
+# Compiler executable
+$(BUILD_DIR)/mtpc: $(CLI_OBJECTS) $(ALL_OBJECTS)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
@@ -132,7 +132,7 @@ setup:
 help:
 	@echo "Available targets:"
 	@echo "  compile      - Build all executables"
-	@echo "  run          - Compile and run REPL"
+	@echo "  run          - Compile and run runtime"
 	@echo "  compile-run  - Compile and run compiler on test file"
 	@echo "  test         - Run basic tests"
 	@echo "  clean        - Remove build artifacts"
