@@ -8,6 +8,7 @@ pub enum CompileError {
     EffectNotDeclared { effect: String },
     AwaitWithoutAsync,
     RespondOutsideApi,
+    CodeGenError(String),
 }
 
 impl From<CompileError> for MtpError {
@@ -25,6 +26,7 @@ impl From<CompileError> for MtpError {
             CompileError::RespondOutsideApi => {
                 MtpError::new("CompileEffect", "respond json used outside API declaration")
             }
+            CompileError::CodeGenError(msg) => MtpError::new("CompileCodeGen", &msg),
         }
     }
 }

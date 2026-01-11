@@ -759,7 +759,7 @@ Pseudo-test:
 
 ## Section 7: Compiler (JS Codegen)
 
-### - [ ] MTP-060: Implement JS Code Generator
+### - [x] MTP-060: Implement JS Code Generator
 **Effort:** L | **Files:** `src/compiler/mod.rs`, `src/compiler/codegen.rs`
 **Spec Lines:** 481-493 (§12), 491 (Forbidden JS)
 **Priority:** P0 - Blocker
@@ -787,7 +787,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-061: Implement Pattern Match Compilation
+### - [x] MTP-061: Implement Pattern Match Compilation
 **Effort:** L | **Files:** `src/compiler/pattern.rs`
 **Spec Lines:** 207-222 (match expressions)
 **Priority:** P0 - Blocker
