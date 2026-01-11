@@ -39,3 +39,6 @@ temp/
 .DS_Store
 Thumbs.db
 Cargo.lock
+ecdsa_key.pem
+ec_key.pem
+test_key.pem
