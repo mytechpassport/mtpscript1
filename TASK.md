@@ -578,7 +578,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-041: Implement Effect Checker
+### - [x] MTP-041: Implement Effect Checker
 **Effort:** L | **Files:** `src/effects/checker.rs`
 **Spec Lines:** 342-357, 396-409 (§7, §7-b)
 **Priority:** P0 - Blocker
@@ -606,7 +606,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-042: Implement Async Effect
+### - [x] MTP-042: Implement Async Effect
 **Effort:** L | **Files:** `src/effects/async_effect.rs`
 **Spec Lines:** 359-395 (§7-a Async Effect)
 **Priority:** P1
@@ -703,7 +703,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-051: Implement AST to IR Lowering
+### - [x] MTP-051: Implement AST to IR Lowering
 **Effort:** L | **Files:** `src/ir/lower.rs`
 **Spec Lines:** 481-493 (§12), 609-614 (§25 Pipeline)
 **Priority:** P0 - Blocker

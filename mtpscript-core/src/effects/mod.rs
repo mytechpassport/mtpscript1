@@ -1,10 +1,13 @@
 pub mod checker;
+pub mod async_effect;
 
 use crate::errors::compile::CompileError;
 use crate::parser::ast::Program;
 
-pub fn check_effects(_program: &Program) -> Result<(), CompileError> {
-    // Placeholder implementation - for now, always succeeds
-    // Real implementation would check effect declarations and usage
-    Ok(())
+pub fn check_effects(program: &Program) -> Result<(), CompileError> {
+    checker::check_program_effects(program)
+}
+
+pub fn desugar_async_effects(program: &mut Program) -> Result<(), CompileError> {
+    async_effect::desugar_async_effects(program)
 }

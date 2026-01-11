@@ -23,13 +23,11 @@ fn test_declared_effects() {
 
 #[test]
 fn test_undeclared_effects() {
-    // This would test that undeclared effects cause errors
-    // For now, placeholder - effects checking not fully implemented
+    // Test that undeclared effects cause errors
     let source = r#"api POST "/users" uses { DbWrite } { DbRead("query") }"#;
     let result = parse_and_check_effects(source);
-    // Should fail once effects checking is implemented (DbRead not declared)
-    // For now, it passes because checking is not implemented
-    assert!(result.is_ok());
+    // Should fail because DbRead is not declared
+    assert!(result.is_err());
 }
 
 #[test]
