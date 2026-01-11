@@ -19,6 +19,7 @@
 - [ ] `mtpscript-core/src/json/parse.rs` – JSON parsing lacks fuzzing for malicious inputs, missing edge cases like invalid UTF-8 or control characters; integrate fuzz testing.
 - [ ] `mtpscript-core/src/json/serialize.rs` – Canonical JSON serialization lacks determinism verification across runs, potentially breaking signatures; add multi-run determinism tests.
 - [ ] `mtpscript-core/src/json/mod.rs` – CBOR encoder lacks validation and size limits, allowing invalid output or DoS; add CBOR spec compliance checks and limits.
+
 - [x] `mtpscript-core/src/runtime/value.rs` – Value type lacks Hash implementation, violating spec requirements for hashing; implement secure Hash trait (e.g., SHA-256 for large values).
 - [x] `mtpscript-core/src/api/handler.rs` – API request handler lacks input validation and rate limiting, vulnerable to injection and DoS attacks; add sanitization and rate limiting.
 - [x] `mtpscript-core/src/security/sign.rs` – ECDSA signing lacks key strength validation and management policies, allowing weak keys; add FIPS-compliant key validation.

@@ -41,10 +41,12 @@ pub fn verify_and_import_module(
 
     // Check if module is in trusted keys
     if !context.trusted_keys.contains_key(&repo_url) {
-        return Err(MtpError::SecurityError(format!(
-            "Module {} not in trusted keys",
-            repo_url
-        )));
+        return Err(MtpError {
+            error: "SecurityError".to_string(),
+            message: Some(format!("Module {} not in trusted keys", repo_url)),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     // Create signature record
@@ -67,9 +69,12 @@ fn parse_module_spec(spec: &str) -> Result<(String, String, String), MtpError> {
     // Expected format: "github.com/user/repo@v1.2.3#abc123"
     let parts: Vec<&str> = spec.split('@').collect();
     if parts.len() != 2 {
-        return Err(MtpError::ModuleError(
-            "Invalid module specification format".into(),
-        ));
+        return Err(MtpError {
+            error: "ModuleError".to_string(),
+            message: Some("Invalid module specification format".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     let repo_url = parts[0].to_string();
@@ -77,9 +82,12 @@ fn parse_module_spec(spec: &str) -> Result<(String, String, String), MtpError> {
 
     let version_commit_parts: Vec<&str> = version_commit.split('#').collect();
     if version_commit_parts.len() != 2 {
-        return Err(MtpError::ModuleError(
-            "Invalid version/commit format".into(),
-        ));
+        return Err(MtpError {
+            error: "ModuleError".to_string(),
+            message: Some("Invalid version/commit format".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     let version = version_commit_parts[0].to_string();
@@ -87,7 +95,12 @@ fn parse_module_spec(spec: &str) -> Result<(String, String, String), MtpError> {
 
     // Validate commit hash format (should be hex)
     if !commit_hash.chars().all(|c| c.is_ascii_hexdigit()) || commit_hash.len() != 40 {
-        return Err(MtpError::ModuleError("Invalid commit hash format".into()));
+        return Err(MtpError {
+            error: "ModuleError".to_string(),
+            message: Some("Invalid commit hash format".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     Ok((repo_url, version, commit_hash))
@@ -123,20 +136,33 @@ fn verify_module_signature(
 
     // Placeholder validation - check that content is not obviously malicious
     if content.contains(&b"<script>"[..]) {
-        return Err(MtpError::SecurityError(
-            "Module contains potentially malicious script tags".into(),
-        ));
+        return Err(MtpError {
+            error: "SecurityError".to_string(),
+            message: Some("Module contains potentially malicious script tags".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     if content.len() > 10 * 1024 * 1024 {
         // 10MB limit
-        return Err(MtpError::SecurityError("Module too large".into()));
+        return Err(MtpError {
+            error: "SecurityError".to_string(),
+            message: Some("Module too large".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     // Verify content hash matches expected
     let computed_hash = Sha256::digest(content);
     if computed_hash.as_slice() != content_hash {
-        return Err(MtpError::SecurityError("Content hash mismatch".into()));
+        return Err(MtpError {
+            error: "SecurityError".to_string(),
+            message: Some("Content hash mismatch".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     Ok(())
@@ -163,7 +189,12 @@ pub fn add_trusted_key(
 ) -> Result<(), MtpError> {
     // Validate public key format (basic check)
     if public_key.len() < 32 {
-        return Err(MtpError::SecurityError("Public key too short".into()));
+        return Err(MtpError {
+            error: "SecurityError".to_string(),
+            message: Some("Public key too short".to_string()),
+            gasLimit: None,
+            gasUsed: None,
+        });
     }
 
     context.trusted_keys.insert(module_name, public_key);

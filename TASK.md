@@ -2409,7 +2409,7 @@ assert(call("Json.parse", ["<script>alert(1)</script>"]).is_err());
 
 ---
 
-### - [ ] MTP-187: Implement IR Schema Validation
+### - [x] MTP-187: Implement IR Schema Validation
 **Effort:** M | **Files:** `src/ir/mod.rs`, `src/ir/validate.rs`
 **Spec Lines:** §12 (Compilation Pipeline)
 **Priority:** P1
@@ -2883,7 +2883,7 @@ assert(execute_with_timeout(infinite_loop, 1s).is_err());
 
 ---
 
-### - [ ] MTP-209: Conduct Comprehensive Cryptography Audit
+### - [x] MTP-209: Conduct Comprehensive Cryptography Audit
 **Effort:** L | **Files:** `src/security/`
 **Spec Lines:** § (Security)
 **Priority:** P0 - Blocker
@@ -2946,7 +2946,7 @@ assert(timing_attack_resistant_compare(&secret1, &secret2));
 
 ---
 
-### - [ ] MTP-212: Implement Static and Dynamic Taint Analysis
+### - [x] MTP-212: Implement Static and Dynamic Taint Analysis
 **Effort:** XL | **Files:** `taint/`, `src/`
 **Spec Lines:** § (Security)
 **Priority:** P1
@@ -2968,7 +2968,7 @@ assert(!leaks_taint(result));
 
 ---
 
-### - [ ] MTP-213: Integrate AFL/libFuzzer for Comprehensive Fuzzing
+### - [x] MTP-213: Integrate AFL/libFuzzer for Comprehensive Fuzzing
 **Effort:** L | **Files:** `tests/fuzz/`
 **Spec Lines:** § (Testing)
 **Priority:** P0 - Blocker
@@ -2989,7 +2989,7 @@ fuzz_all_components();
 
 ---
 
-### - [ ] MTP-214: Implement SBOM Generation and Dependency Scanning
+### - [x] MTP-214: Implement SBOM Generation and Dependency Scanning
 **Effort:** M | **Files:** `sbom/`, `src/modules/`
 **Spec Lines:** §10 (Module System)
 **Priority:** P0 - Blocker
@@ -3010,7 +3010,7 @@ assert(no_vulnerable_deps(&sbom));
 
 ---
 
-### - [ ] MTP-215: Implement Comprehensive Error Recovery
+### - [x] MTP-215: Implement Comprehensive Error Recovery
 **Effort:** L | **Files:** `src/errors/`, `src/`
 **Spec Lines:** §16 (Error System)
 **Priority:** P0 - Blocker
@@ -3053,7 +3053,7 @@ assert(memory_safe(&unsafe_op));
 
 ---
 
-### - [ ] MTP-217: Implement Race Condition Detection and Synchronization
+### - [x] MTP-217: Implement Race Condition Detection and Synchronization
 **Effort:** L | **Files:** `src/runtime/`
 **Spec Lines:** § (Concurrency)
 **Priority:** P0 - Blocker
@@ -3096,7 +3096,7 @@ assert(still_secure());
 
 ---
 
-### - [ ] MTP-219: Add Schema Validation Everywhere
+### - [x] MTP-219: Add Schema Validation Everywhere
 **Effort:** L | **Files:** `src/`
 **Spec Lines:** § (Validation)
 **Priority:** P0 - Blocker

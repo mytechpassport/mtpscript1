@@ -1,5 +1,6 @@
 use crate::errors::MtpError;
 use crate::runtime::value::Value;
+use crate::taint::{DynamicTaintTracker, TaintLevel, TaintSource};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -28,6 +29,7 @@ pub struct Interpreter {
     gas_used: u64,
     memory_used: usize,
     globals: HashMap<String, Value>,
+    taint_tracker: DynamicTaintTracker,
 }
 
 impl Interpreter {
@@ -46,6 +48,7 @@ impl Interpreter {
             gas_used: 0,
             memory_used: 0,
             globals,
+            taint_tracker: DynamicTaintTracker::new(),
         }
     }
 
@@ -211,6 +214,39 @@ impl Interpreter {
     /// Inject built-in objects
     pub fn inject_builtin_objects(&mut self) {
         // Already done in constructor
+    }
+
+    /// Mark external input as tainted
+    pub fn mark_input_tainted(&mut self, key: &str, level: TaintLevel, source_desc: &str) {
+        let source = TaintSource {
+            id: format!("input_{}", key),
+            description: source_desc.to_string(),
+        };
+        self.taint_tracker.mark_tainted(key, level, source);
+    }
+
+    /// Check if data is tainted before dangerous operations
+    pub fn check_taint_before_operation(
+        &self,
+        operation: &str,
+        data_key: &str,
+    ) -> Result<(), MtpError> {
+        self.taint_tracker
+            .check_dangerous_operation(operation, data_key)
+    }
+
+    /// Propagate taint through operations
+    pub fn propagate_taint(&mut self, result_key: &str, input_keys: &[&str]) {
+        self.taint_tracker.propagate(result_key, input_keys);
+    }
+
+    /// Get taint report
+    pub fn get_taint_report(&self) -> String {
+        // Simple report for now
+        format!(
+            "Taint tracking active. Call stack depth: {}",
+            self.taint_tracker.get_call_stack().len()
+        )
     }
 }
 

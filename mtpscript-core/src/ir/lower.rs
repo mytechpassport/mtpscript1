@@ -471,4 +471,285 @@ mod tests {
             _ => panic!("Both should be Call expressions"),
         }
     }
+
+    #[test]
+    fn test_lower_literals() {
+        let string_ir = lower_expr(&Expr::String("hello".to_string()), &Type::String).unwrap();
+        assert!(matches!(string_ir, IrExpr::String(ref s, _) if s == "hello"));
+
+        let number_ir = lower_expr(&Expr::Number(42), &Type::Number).unwrap();
+        assert!(matches!(number_ir, IrExpr::Number(42, _)));
+
+        let decimal_ir = lower_expr(&Expr::Decimal("3.14".to_string()), &Type::Decimal).unwrap();
+        assert!(matches!(decimal_ir, IrExpr::Decimal(ref d, _) if d == "3.14"));
+
+        let bool_ir = lower_expr(&Expr::Boolean(true), &Type::Boolean).unwrap();
+        assert!(matches!(bool_ir, IrExpr::Boolean(true, _)));
+    }
+
+    #[test]
+    fn test_lower_ident() {
+        let ir = lower_expr(&Expr::Ident("x".to_string()), &Type::Number).unwrap();
+        assert!(
+            matches!(ir, IrExpr::Var(ref name, ref typ) if name == "x" && *typ == Type::Number)
+        );
+    }
+
+    #[test]
+    fn test_lower_array() {
+        let ast = Expr::Array(vec![Expr::Number(1), Expr::Number(2)]);
+        let ir = lower_expr(&ast, &Type::Var("array".to_string())).unwrap();
+        match ir {
+            IrExpr::Array(elements, _) => {
+                assert_eq!(elements.len(), 2);
+                assert!(matches!(elements[0], IrExpr::Number(1, _)));
+                assert!(matches!(elements[1], IrExpr::Number(2, _)));
+            }
+            _ => panic!("Expected Array"),
+        }
+    }
+
+    #[test]
+    fn test_lower_object() {
+        let ast = Expr::Object(vec![
+            ("key1".to_string(), Expr::String("value1".to_string())),
+            ("key2".to_string(), Expr::Number(42)),
+        ]);
+        let ir = lower_expr(&ast, &Type::Var("object".to_string())).unwrap();
+        match ir {
+            IrExpr::Object(fields, _) => {
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].0, "key1");
+                assert!(matches!(fields[0].1, IrExpr::String(ref s, _) if s == "value1"));
+                assert_eq!(fields[1].0, "key2");
+                assert!(matches!(fields[1].1, IrExpr::Number(42, _)));
+            }
+            _ => panic!("Expected Object"),
+        }
+    }
+
+    #[test]
+    fn test_lower_dot() {
+        let ast = Expr::Dot(
+            Box::new(Expr::Ident("obj".to_string())),
+            "field".to_string(),
+        );
+        let ir = lower_expr(&ast, &Type::String).unwrap();
+        match ir {
+            IrExpr::Dot(expr, field, _) => {
+                assert!(matches!(*expr, IrExpr::Var(ref name, _) if name == "obj"));
+                assert_eq!(field, "field");
+            }
+            _ => panic!("Expected Dot"),
+        }
+    }
+
+    #[test]
+    fn test_lower_index() {
+        let ast = Expr::Index(
+            Box::new(Expr::Ident("arr".to_string())),
+            Box::new(Expr::Number(0)),
+        );
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+        match ir {
+            IrExpr::Index(array, index, _) => {
+                assert!(matches!(*array, IrExpr::Var(ref name, _) if name == "arr"));
+                assert!(matches!(*index, IrExpr::Number(0, _)));
+            }
+            _ => panic!("Expected Index"),
+        }
+    }
+
+    #[test]
+    fn test_lower_call() {
+        let ast = Expr::Call {
+            func: Box::new(Expr::Ident("add".to_string())),
+            args: vec![Expr::Number(1), Expr::Number(2)],
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+        match ir {
+            IrExpr::Call { func, args, .. } => {
+                assert!(matches!(*func, IrExpr::Var(ref name, _) if name == "add"));
+                assert_eq!(args.len(), 2);
+                assert!(matches!(args[0], IrExpr::Number(1, _)));
+                assert!(matches!(args[1], IrExpr::Number(2, _)));
+            }
+            _ => panic!("Expected Call"),
+        }
+    }
+
+    #[test]
+    fn test_lower_effect_call() {
+        let ast = Expr::Call {
+            func: Box::new(Expr::Ident("DbRead".to_string())),
+            args: vec![Expr::String("key".to_string())],
+        };
+        let ir = lower_expr(&ast, &Type::Var("result".to_string())).unwrap();
+        match ir {
+            IrExpr::EffectCall(name, args, _) => {
+                assert_eq!(name, "DbRead");
+                assert_eq!(args.len(), 1);
+                assert!(matches!(args[0], IrExpr::String(ref s, _) if s == "key"));
+            }
+            _ => panic!("Expected EffectCall"),
+        }
+    }
+
+    #[test]
+    fn test_lower_unary() {
+        let ast = Expr::Unary(BinOp::Not, Box::new(Expr::Boolean(false)));
+        let ir = lower_expr(&ast, &Type::Boolean).unwrap();
+        match ir {
+            IrExpr::Unary(op, expr, _) => {
+                assert_eq!(op, BinOp::Not);
+                assert!(matches!(*expr, IrExpr::Boolean(false, _)));
+            }
+            _ => panic!("Expected Unary"),
+        }
+    }
+
+    #[test]
+    fn test_lower_if() {
+        let ast = Expr::If {
+            condition: Box::new(Expr::Boolean(true)),
+            then_branch: Box::new(Expr::Number(1)),
+            else_branch: Box::new(Expr::Number(2)),
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+        match ir {
+            IrExpr::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                assert!(matches!(*condition, IrExpr::Boolean(true, _)));
+                assert!(matches!(*then_branch, IrExpr::Number(1, _)));
+                assert!(matches!(*else_branch, IrExpr::Number(2, _)));
+            }
+            _ => panic!("Expected If"),
+        }
+    }
+
+    #[test]
+    fn test_lower_match() {
+        let ast = Expr::Match {
+            expr: Box::new(Expr::Number(42)),
+            cases: vec![
+                (
+                    AstPattern::Literal(Expr::Number(42)),
+                    Expr::String("matched".to_string()),
+                ),
+                (AstPattern::Wildcard, Expr::String("default".to_string())),
+            ],
+        };
+        let ir = lower_expr(&ast, &Type::String).unwrap();
+        match ir {
+            IrExpr::Match { expr, cases, .. } => {
+                assert!(matches!(*expr, IrExpr::Number(42, _)));
+                assert_eq!(cases.len(), 2);
+                // Further checks can be added for patterns
+            }
+            _ => panic!("Expected Match"),
+        }
+    }
+
+    #[test]
+    fn test_lower_const() {
+        let ast = Expr::Const {
+            name: "x".to_string(),
+            value: Box::new(Expr::Number(10)),
+            body: Box::new(Expr::Ident("x".to_string())),
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+        match ir {
+            IrExpr::Let {
+                name, value, body, ..
+            } => {
+                assert_eq!(name, "x");
+                assert!(matches!(*value, IrExpr::Number(10, _)));
+                assert!(matches!(*body, IrExpr::Var(ref n, _) if n == "x"));
+            }
+            _ => panic!("Expected Let"),
+        }
+    }
+
+    #[test]
+    fn test_lower_lambda() {
+        let ast = Expr::Lambda {
+            params: vec![("x".to_string(), TypeExpr::Ident("number".to_string()))],
+            body: Box::new(Expr::Ident("x".to_string())),
+        };
+        let ir = lower_expr(&ast, &Type::Var("func".to_string())).unwrap();
+        match ir {
+            IrExpr::Lambda { params, body, .. } => {
+                assert_eq!(params, vec!["x"]);
+                assert!(matches!(*body, IrExpr::Var(ref n, _) if n == "x"));
+            }
+            _ => panic!("Expected Lambda"),
+        }
+    }
+
+    #[test]
+    fn test_lower_respond_json() {
+        let ast = Expr::RespondJson(Box::new(Expr::String("data".to_string())));
+        let ir = lower_expr(&ast, &Type::Var("response".to_string())).unwrap();
+        match ir {
+            IrExpr::RespondJson(expr, _) => {
+                assert!(matches!(*expr, IrExpr::String(ref s, _) if s == "data"));
+            }
+            _ => panic!("Expected RespondJson"),
+        }
+    }
+
+    #[test]
+    fn test_resolve_type_expr() {
+        assert_eq!(
+            resolve_type_expr(&TypeExpr::Ident("number".to_string())),
+            Type::Number
+        );
+        assert_eq!(
+            resolve_type_expr(&TypeExpr::Ident("boolean".to_string())),
+            Type::Boolean
+        );
+        assert_eq!(
+            resolve_type_expr(&TypeExpr::Ident("string".to_string())),
+            Type::String
+        );
+        assert_eq!(
+            resolve_type_expr(&TypeExpr::Ident("Decimal".to_string())),
+            Type::Decimal
+        );
+        assert_eq!(
+            resolve_type_expr(&TypeExpr::Ident("Json".to_string())),
+            Type::Json
+        );
+        assert_eq!(
+            resolve_type_expr(&TypeExpr::Ident("Custom".to_string())),
+            Type::Var("Custom".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_tail_calls() {
+        let tail_call = IrExpr::TailCall {
+            func: Box::new(IrExpr::Var(
+                "factorial".to_string(),
+                Type::Var("func".to_string()),
+            )),
+            args: vec![IrExpr::Number(5, Type::Number)],
+            result_type: Type::Number,
+        };
+        assert!(detect_tail_calls(&tail_call, "factorial"));
+
+        let non_tail = IrExpr::Call {
+            func: Box::new(IrExpr::Var(
+                "factorial".to_string(),
+                Type::Var("func".to_string()),
+            )),
+            args: vec![IrExpr::Number(5, Type::Number)],
+            result_type: Type::Number,
+        };
+        assert!(!detect_tail_calls(&non_tail, "factorial"));
+    }
 }

@@ -1,54 +1,87 @@
 use crate::errors::MtpError;
 use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_FIXED_SIGNING};
 
+pub mod crypto_audit;
+
 /// Sign data with ECDSA-P256
 pub fn sign_ecdsa_p256(data: &[u8], key_pair: &EcdsaKeyPair) -> Result<Vec<u8>, MtpError> {
+    crypto_audit::audit_crypto_operation(
+        "sign_ecdsa_p256",
+        "ECDSA-P256",
+        Some(256),
+        "Digital signature",
+    );
+
     let rng = ring::rand::SystemRandom::new();
     key_pair
         .sign(&rng, data)
         .map(|sig| sig.as_ref().to_vec())
-        .map_err(|_| MtpError::SecurityError {
+        .map_err(|_| MtpError {
             error: "SecurityError".to_string(),
-            message: "Failed to sign data".to_string(),
+            message: Some("Failed to sign data".to_string()),
+            gasLimit: None,
+            gasUsed: None,
         })
 }
 
 /// Verify ECDSA-P256 signature
 pub fn verify_ecdsa_p256(data: &[u8], signature: &[u8], public_key: &[u8]) -> Result<(), MtpError> {
+    crypto_audit::audit_crypto_operation(
+        "verify_ecdsa_p256",
+        "ECDSA-P256",
+        Some(256),
+        "Signature verification",
+    );
+
     let public_key =
         ring::signature::UnparsedPublicKey::new(&ECDSA_P256_SHA256_FIXED_SIGNING, public_key);
 
-    public_key
-        .verify(data, signature)
-        .map_err(|_| MtpError::SecurityError {
-            error: "SecurityError".to_string(),
-            message: "Signature verification failed".to_string(),
-        })
+    public_key.verify(data, signature).map_err(|_| MtpError {
+        error: "SecurityError".to_string(),
+        message: Some("Signature verification failed".to_string()),
+        gasLimit: None,
+        gasUsed: None,
+    })
 }
 
 /// Generate a new ECDSA-P256 key pair
 pub fn generate_ecdsa_keypair() -> Result<EcdsaKeyPair, MtpError> {
+    crypto_audit::audit_crypto_operation(
+        "generate_ecdsa_keypair",
+        "ECDSA-P256",
+        Some(256),
+        "Key pair generation",
+    );
+
     let rng = ring::rand::SystemRandom::new();
     let pkcs8 =
         EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng).map_err(|_| {
-            MtpError::SecurityError {
+            MtpError {
                 error: "SecurityError".to_string(),
-                message: "Failed to generate key pair".to_string(),
+                message: Some("Failed to generate key pair".to_string()),
+                gasLimit: None,
+                gasUsed: None,
             }
         })?;
 
     EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, pkcs8.as_ref()).map_err(|_| {
-        MtpError::SecurityError {
+        MtpError {
             error: "SecurityError".to_string(),
-            message: "Failed to parse generated key pair".to_string(),
+            message: Some("Failed to parse generated key pair".to_string()),
+            gasLimit: None,
+            gasUsed: None,
         }
     })
 }
 
 /// Load ECDSA key pair from PKCS#8 bytes
 pub fn load_ecdsa_keypair(pkcs8_bytes: &[u8]) -> Result<EcdsaKeyPair, MtpError> {
-    EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, pkcs8_bytes)
-        .map_err(|_| MtpError::SecurityError("Failed to load key pair".into()))
+    EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, pkcs8_bytes).map_err(|_| MtpError {
+        error: "SecurityError".to_string(),
+        message: Some("Failed to load key pair".to_string()),
+        gasLimit: None,
+        gasUsed: None,
+    })
 }
 
 /// Get public key bytes from key pair

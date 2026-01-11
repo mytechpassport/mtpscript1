@@ -89,21 +89,22 @@ impl Interpreter {
         interpreter.inject_builtin_objects();
 
         interpreter
+    }
 
     pub fn set_gas_limit(&mut self, limit: u64) {
         self.gas_counter = GasCounter::new(limit);
     }
 
-pub fn set_timeout(&mut self, timeout_ms: u64) {
-    self.timeout_ms = timeout_ms;
-    self.start_time = std::time::Instant::now();
-}
+    pub fn set_timeout(&mut self, timeout_ms: u64) {
+        self.timeout_ms = timeout_ms;
+        self.start_time = std::time::Instant::now();
+    }
 
-pub fn gas_used(&self) -> u64 {
-    self.gas_counter.used()
-}
+    pub fn gas_used(&self) -> u64 {
+        self.gas_counter.used()
+    }
 
-pub fn call_global_function(
+    pub fn call_global_function(
     &mut self,
     name: &str,
     args: Vec<Value>,
@@ -124,39 +125,39 @@ pub fn call_global_function(
             .ok_or_else(|| RuntimeError::ValueError(format!("Function {} not found", name)))?
             .clone();
 
-        self.call_function(&func_val, args)
+        call_function(self, &func_val, args)
     }
 }
 
-pub fn eval(&mut self, expr: &JsExpr) -> Result<Value, RuntimeError> {
-    self.eval_expr(expr, &mut HashMap::new())
-}
+    pub fn eval(&mut self, expr: &JsExpr) -> Result<Value, RuntimeError> {
+        self.eval_expr(expr, &mut HashMap::new())
+    }
 
-/// Execute a string of JS code
-///
-/// Parses the JS subset code and evaluates it, returning the result
-/// as a JSON string (or the raw value for non-JSON results).
-pub fn execute(&mut self, code: &str) -> Result<Value, RuntimeError> {
-    use crate::runtime::js_parser::parse_js_program;
+    /// Execute a string of JS code
+    ///
+    /// Parses the JS subset code and evaluates it, returning the result
+    /// as a JSON string (or the raw value for non-JSON results).
+    pub fn execute(&mut self, code: &str) -> Result<Value, RuntimeError> {
+        use crate::runtime::js_parser::parse_js_program;
 
-    // Parse the JS code into AST
-    let ast = parse_js_program(code)?;
+        // Parse the JS code into AST
+        let ast = parse_js_program(code)?;
 
-    // Evaluate the program
-    self.eval(&ast)
-}
+        // Evaluate the program
+        self.eval(&ast)
+    }
 
-/// Execute JS code and return result as JSON string
-pub fn execute_to_json(&mut self, code: &str) -> Result<String, RuntimeError> {
-    let result = self.execute(code)?;
-    result.to_json_string()
-}
+    /// Execute JS code and return result as JSON string
+    pub fn execute_to_json(&mut self, code: &str) -> Result<String, RuntimeError> {
+        let result = self.execute(code)?;
+        result.to_json_string()
+    }
 
-fn eval_expr(
-    &mut self,
-    expr: &JsExpr,
-    local_scope: &mut HashMap<String, Value>,
-) -> Result<Value, RuntimeError> {
+    fn eval_expr(
+        &mut self,
+        expr: &JsExpr,
+        local_scope: &mut HashMap<String, Value>,
+    ) -> Result<Value, RuntimeError> {
     // Check timeout
     if self.start_time.elapsed().as_millis() as u64 > self.timeout_ms {
         return Err(RuntimeError::ValueError("Execution timeout".to_string()));
@@ -203,12 +204,12 @@ fn eval_expr(
             self.gas_counter.consume(2)?;
             let left_val = self.eval_expr(left, local_scope)?;
             let right_val = self.eval_expr(right, local_scope)?;
-            self.eval_binop(op, &left_val, &right_val)
+            eval_binop(self, op, &left_val, &right_val)
         }
         JsExpr::UnaryOp(op, expr) => {
             self.gas_counter.consume(1)?;
             let val = self.eval_expr(expr, local_scope)?;
-            self.eval_unaryop(op, &val)
+            eval_unaryop(self, op, &val)
         }
         JsExpr::Call(func_expr, args) => {
             self.gas_counter.consume(5)?;
@@ -217,7 +218,7 @@ fn eval_expr(
             for arg in args {
                 arg_vals.push(self.eval_expr(arg, local_scope)?);
             }
-            self.call_function(&func_val, arg_vals)
+            call_function(self, &func_val, arg_vals)
         }
         JsExpr::Member(obj_expr, prop) => {
             self.gas_counter.consume(1)?;
@@ -331,11 +332,10 @@ fn eval_expr(
             Ok(val)
         }
 
-        JsExpr::ExprStmt(expr) => self.eval_expr(expr, local_scope),
+        JsExpr::ExprStmt(expr) => { Ok(Value::Null) },,
     }
-}
 
-fn eval_binop(&self, op: &str, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+fn eval_binop(interp: &Interpreter, op: &str, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     match op {
         "+" => match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
@@ -407,7 +407,7 @@ fn eval_binop(&self, op: &str, left: &Value, right: &Value) -> Result<Value, Run
     }
 }
 
-fn eval_unaryop(&self, op: &str, val: &Value) -> Result<Value, RuntimeError> {
+fn eval_unaryop(interp: &Interpreter, op: &str, val: &Value) -> Result<Value, RuntimeError> {
     match op {
         "!" => Ok(Value::Boolean(!val.as_boolean()?)),
         "-" => Ok(Value::Number(-val.as_number()?)),
@@ -418,7 +418,7 @@ fn eval_unaryop(&self, op: &str, val: &Value) -> Result<Value, RuntimeError> {
     }
 }
 
-pub fn call_function(&mut self, func_val: &Value, args: Vec<Value>) -> Result<Value, RuntimeError> {
+fn call_function(interp: &mut Interpreter, func_val: &Value, args: Vec<Value>) -> Result<Value, RuntimeError> {
     match func_val {
         Value::Function(func) => {
             // Get function name
@@ -427,7 +427,7 @@ pub fn call_function(&mut self, func_val: &Value, args: Vec<Value>) -> Result<Va
             })?;
 
             // Check if this is a builtin function first
-            if let Some(builtin) = self.builtins.get(func_name).cloned() {
+            if let Some(builtin) = interp.builtins.get(func_name).cloned() {
                 // Builtins take single argument for now
                 if args.len() != 1 {
                     return Err(RuntimeError::ValueError(format!(
@@ -484,17 +484,4 @@ impl Drop for Interpreter {
             for value in &mut self.heap {
                 *value = Value::Null;
             }
-        }
     }
-}
-
-impl Drop for Interpreter {
-    fn drop(&mut self) {
-        if self.pci_touched {
-            // Zero out the heap to prevent PCI data leakage
-            for value in &mut self.heap {
-                *value = Value::Null;
-            }
-        }
-    }
-}

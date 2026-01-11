@@ -4,6 +4,15 @@ use std::fs;
 use std::process;
 
 fn main() {
+    // Initialize crypto audit
+    mtpscript_core::security::crypto_audit::init_crypto_audit();
+
+    // Initialize dynamic taint tracking
+    mtpscript_core::taint::init_dynamic_taint_tracking();
+
+    // Initialize schema registry
+    mtpscript_core::validation::init_schema_registry();
+
     let matches = Command::new("mtpscript")
         .version("0.1.0")
         .author("MTPScript Team")

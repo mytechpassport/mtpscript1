@@ -31,10 +31,11 @@ impl GasCounter {
     pub fn consume(&mut self, amount: u64) -> Result<(), MtpError> {
         self.used = self.used.saturating_add(amount);
         if self.used > self.limit {
-            return Err(MtpError::GasExhausted {
+            return Err(MtpError {
                 error: "GasExhausted".to_string(),
-                gasLimit: self.limit,
-                gasUsed: self.used,
+                message: None,
+                gasLimit: Some(self.limit),
+                gasUsed: Some(self.used),
             });
         }
         Ok(())
@@ -57,10 +58,11 @@ impl GasCounter {
 
     /// Get error for gas exhaustion
     pub fn error(&self) -> MtpError {
-        MtpError::GasExhausted {
+        MtpError {
             error: "GasExhausted".to_string(),
-            gasLimit: self.limit,
-            gasUsed: self.used,
+            message: None,
+            gasLimit: Some(self.limit),
+            gasUsed: Some(self.used),
         }
     }
 }
