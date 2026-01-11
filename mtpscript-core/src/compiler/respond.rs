@@ -16,9 +16,11 @@ fn compile_expr_to_js(expr: &Expr) -> String {
         Expr::Number(n) => n.to_string(),
         Expr::Boolean(b) => b.to_string(),
         Expr::Call { func, args } => {
+            let func_js = compile_expr_to_js(func);
             let args_js: Vec<String> = args.iter().map(compile_expr_to_js).collect();
-            format!("{}({})", func, args_js.join(", "))
+            format!("{}({})", func_js, args_js.join(", "))
         }
         Expr::RespondJson(inner) => compile_expr_to_js(inner),
+        _ => unimplemented!("Expression type not yet supported in compiler"),
     }
 }

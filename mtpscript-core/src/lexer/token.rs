@@ -59,6 +59,9 @@ pub enum Token {
 
     // Other
     Arrow, // =>
+    Equal, // =
+    Pipe, // |
+    Underscore, // _
 
     // End of file
     Eof,

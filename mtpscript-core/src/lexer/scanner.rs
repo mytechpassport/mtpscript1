@@ -81,7 +81,7 @@ impl<'a> Scanner<'a> {
                 } else if self.match_char('>') {
                     Ok(Some(self.make_token(Token::Arrow)))
                 } else {
-                    Err(CompileError::LexerError("Unexpected '='".to_string()))
+                    Ok(Some(self.make_token(Token::Equal)))
                 }
             }
             '<' => {
@@ -113,7 +113,7 @@ impl<'a> Scanner<'a> {
                 } else if self.match_char('>') {
                     Ok(Some(self.make_token(Token::PipeGreater)))
                 } else {
-                    Err(CompileError::LexerError("Unexpected '|'".to_string()))
+                    Ok(Some(self.make_token(Token::Pipe)))
                 }
             }
             '"' => self.string(),
@@ -240,6 +240,7 @@ impl<'a> Scanner<'a> {
             "PATCH" => Token::Patch,
             "true" => Token::Boolean(true),
             "false" => Token::Boolean(false),
+            "_" => Token::Underscore,
             _ => Token::Ident(text.to_string()),
         };
 

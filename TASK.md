@@ -211,7 +211,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-021: Implement Recursive Descent Parser
+### - [x] MTP-021: Implement Recursive Descent Parser
 **Effort:** L | **Files:** `src/parser/mod.rs`, `src/parser/parser.rs`
 **Spec Lines:** 159-236 (Full EBNF Grammar)
 **Priority:** P0 - Blocker
@@ -430,7 +430,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-033: Implement Algebraic Data Types (ADTs)
+### - [x] MTP-033: Implement Algebraic Data Types (ADTs)
 **Effort:** L | **Files:** `src/types/adt.rs`
 **Spec Lines:** 273-285 (ADTs in §4.2), 600-606 (§24 Union Exhaustiveness)
 **Priority:** P0 - Blocker

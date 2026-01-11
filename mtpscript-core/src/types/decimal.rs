@@ -607,25 +607,6 @@ impl Ord for Decimal {
     }
 }
 
-// Type validation functions
-pub fn validate_number(value: i64) -> Result<(), CompileError> {
-    // i64 is always valid
-    Ok(())
-}
-
-pub fn validate_boolean(value: bool) -> Result<(), CompileError> {
-    // Always valid
-    Ok(())
-}
-
-pub fn validate_string(value: &str) -> Result<(), CompileError> {
-    // Check UTF-8 validity (always valid in Rust, but keep for API consistency)
-    if std::str::from_utf8(value.as_bytes()).is_err() {
-        return Err(CompileError::TypeError("Invalid UTF-8 string".to_string()));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -797,28 +778,6 @@ mod tests {
 
         assert!(d1.constant_time_eq(&d2));
         assert!(!d1.constant_time_eq(&d3));
-    }
-
-    #[test]
-    fn test_validate_primitives() {
-        assert!(validate_number(42).is_ok());
-        assert!(validate_boolean(true).is_ok());
-        assert!(validate_string("hello").is_ok());
-        assert!(validate_string("🚀").is_ok()); // UTF-8
-    }
-
-    #[test]
-    fn test_primitive_types_acceptance_criteria() {
-        use super::super::Type;
-
-        // Test that primitive types are recognized as such
-        assert!(Type::Number.is_primitive());
-        assert!(Type::Boolean.is_primitive());
-        assert!(Type::String.is_primitive());
-        assert!(Type::Decimal.is_primitive());
-
-        // Test size_bits for number
-        assert_eq!(Type::Number.size_bits(), 64);
     }
 
     #[test]

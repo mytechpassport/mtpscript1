@@ -21,12 +21,13 @@ fn test_api_decl() {
     assert_eq!(program.decls.len(), 1);
 
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.method, HttpMethod::Post);
             assert_eq!(api.path, "/users");
             assert_eq!(api.effects, vec!["DbWrite".to_string(), "Log".to_string()]);
             // The body parsing is tested in expressions
         }
+        _ => panic!("Expected API declaration"),
     }
 }
 
@@ -36,63 +37,69 @@ fn test_expressions() {
     let source = r#"api GET "/test" { true }"#;
     let program = parse_source(source).unwrap();
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.body, Expr::Boolean(true));
         }
+        _ => panic!("Expected API declaration"),
     }
 
     // Test string expression
     let source = r#"api GET "/test" { "hello" }"#;
     let program = parse_source(source).unwrap();
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.body, Expr::String("hello".to_string()));
         }
+        _ => panic!("Expected API declaration"),
     }
 
     // Test number expression
     let source = r#"api GET "/test" { 42 }"#;
     let program = parse_source(source).unwrap();
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.body, Expr::Number(42));
         }
+        _ => panic!("Expected API declaration"),
     }
 
     // Test identifier expression
     let source = r#"api GET "/test" { result }"#;
     let program = parse_source(source).unwrap();
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.body, Expr::Ident("result".to_string()));
         }
+        _ => panic!("Expected API declaration"),
     }
 
     // Test function call
     let source = r#"api GET "/test" { add(a, b) }"#;
     let program = parse_source(source).unwrap();
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => match &api.body {
+        ModuleDecl::Api(api) => match &api.body {
             Expr::Call { func, args } => {
-                assert_eq!(func, "add");
+                assert_eq!(**func, Expr::Ident("add".to_string()));
                 assert_eq!(args.len(), 2);
                 assert_eq!(args[0], Expr::Ident("a".to_string()));
                 assert_eq!(args[1], Expr::Ident("b".to_string()));
             }
             _ => panic!("Expected function call"),
         },
+        _ => panic!("Expected API declaration"),
     }
 
     // Test respond json expression
     let source = r#"api GET "/test" { respond json(true) }"#;
     let program = parse_source(source).unwrap();
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => match &api.body {
+        ModuleDecl::Api(api) => match &api.body {
             Expr::RespondJson(inner) => {
                 assert_eq!(**inner, Expr::Boolean(true));
             }
             _ => panic!("Expected RespondJson"),
         },
+        _ => panic!("Expected API declaration"),
     }
 }
 
@@ -107,11 +114,12 @@ fn test_api_decl_without_effects() {
     assert_eq!(program.decls.len(), 1);
 
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.method, HttpMethod::Get);
             assert_eq!(api.path, "/status");
             assert_eq!(api.effects.len(), 0); // No effects specified
         }
+        _ => panic!("Expected API declaration"),
     }
 }
 
@@ -129,17 +137,19 @@ fn test_multiple_api_decls() {
     assert_eq!(program.decls.len(), 2);
 
     match &program.decls[0] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.method, HttpMethod::Get);
             assert_eq!(api.path, "/users");
         }
+        _ => panic!("Expected API declaration"),
     }
 
     match &program.decls[1] {
-        ModuleDecl::ApiDecl(api) => {
+        ModuleDecl::Api(api) => {
             assert_eq!(api.method, HttpMethod::Post);
             assert_eq!(api.path, "/users");
             assert_eq!(api.effects, vec!["DbWrite".to_string()]);
         }
+        _ => panic!("Expected API declaration"),
     }
 }

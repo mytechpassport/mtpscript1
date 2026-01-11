@@ -130,7 +130,5 @@ fn test_error_cases() {
     assert!(lex_tokens("@").is_err());
 
     // Invalid operators
-    assert!(lex_tokens("=").is_err());
     assert!(lex_tokens("&").is_err());
-    assert!(lex_tokens("|").is_err());
 }

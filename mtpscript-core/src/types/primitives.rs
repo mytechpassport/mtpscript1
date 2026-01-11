@@ -19,8 +19,8 @@ pub fn validate_string(value: &str) -> Result<(), CompileError> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{Type, TypeContext};
     use super::*;
-    use crate::types::{Type, TypeContext};
 
     #[test]
     fn test_validate_primitives() {
