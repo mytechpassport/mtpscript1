@@ -1,0 +1,7 @@
+import "test_import_math" as math
+
+api GET "/import-test" uses {} {
+  const sum = math.add(5, 3);
+  const product = math.multiply(sum, 2);
+  respond json({ "sum": sum, "product": product })
+}

@@ -1,0 +1,3 @@
+function add(x, y) { x + y }
+
+function multiply(x, y) { x * y }

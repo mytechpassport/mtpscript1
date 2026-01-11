@@ -13,7 +13,7 @@ fn main() {
     // Initialize schema registry
     mtpscript_core::validation::init_schema_registry();
 
-    let matches = Command::new("mtp")
+    let matches = Command::new("mtpscript")
         .version("0.1.0")
         .author("MTPScript Team")
         .about("MTPScript compiler and runtime")

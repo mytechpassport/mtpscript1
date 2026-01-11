@@ -1,0 +1,9 @@
+import "test_import_math" as math
+import "test_import_helpers" as helpers
+
+api GET "/import-chain" uses {} {
+  const sum = math.add(10, 5);
+  const doubled = helpers.double(sum);
+  const final = math.multiply(doubled, 3);
+  respond json({ "sum": sum, "doubled": doubled, "final": final })
+}
