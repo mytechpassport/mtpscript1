@@ -1,6 +1,5 @@
-api GET /sum
-uses {} {
-  const a = 1
-  const b = 2
-  respond json({ sum: a + b })
+api GET "/sum" uses {} {
+  const a = 1;
+  const b = 2;
+  respond json({ "sum": a + b })
 }

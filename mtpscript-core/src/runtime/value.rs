@@ -1,8 +1,10 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 
 use crate::errors::runtime::RuntimeError;
 use crate::types::decimal::Decimal;
+use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -158,6 +160,17 @@ impl Value {
                 "Cannot serialize function".to_string(),
             )),
             Value::Null => Ok("null".to_string()),
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Value::Number(a), Value::Number(b)) => a.partial_cmp(b),
+            (Value::String(a), Value::String(b)) => Some(a.cmp(b)),
+            (Value::Decimal(a), Value::Decimal(b)) => a.partial_cmp(b),
+            _ => None, // Other types are not ordered per spec
         }
     }
 }

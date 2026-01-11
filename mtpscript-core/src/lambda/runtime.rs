@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::path::Path;
 use std::time::Instant;
 
 /// Lambda runtime context
@@ -13,6 +12,7 @@ use std::time::Instant;
 pub struct LambdaRuntime {
     snapshot_path: String,
     gas_limit: u64,
+    #[allow(dead_code)]
     sandbox_config: SandboxConfig,
 }
 
@@ -118,7 +118,7 @@ impl LambdaRuntime {
 
     /// Process a single invocation
     fn process_invocation(&self, payload: LambdaPayload) -> Result<LambdaResponse, MtpError> {
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
 
         // Load snapshot
         let snapshot_data = fs::read(&self.snapshot_path)?;
@@ -282,7 +282,7 @@ impl PreloadedRuntime {
     /// Run with preloaded snapshot
     pub fn run(&self) -> Result<(), MtpError> {
         // Use preloaded data instead of reading from disk each time
-        let mut runtime = self.runtime.clone();
+        let runtime = self.runtime.clone();
         // Override snapshot loading to use preloaded data
 
         loop {
@@ -301,7 +301,7 @@ impl LambdaRuntime {
         payload: LambdaPayload,
         snapshot_data: &[u8],
     ) -> Result<LambdaResponse, MtpError> {
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
 
         // Clone interpreter directly from preloaded data
         let clone_start = Instant::now();

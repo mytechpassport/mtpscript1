@@ -1,5 +1,4 @@
 use super::MtpError;
-use serde_json::json;
 
 #[derive(Debug)]
 pub enum RuntimeError {

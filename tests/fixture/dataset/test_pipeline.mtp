@@ -1,8 +1,9 @@
-api GET /test-pipeline
-uses {} {
-  function double(x: number): number { x * 2 }
-  function add_one(x: number): number { x + 1 }
-  const result = 5 |> double |> add_one
-  const result2 = 10 |> add_one |> double
-  respond json({ result, result2 })
+function double(x: number) { x * 2 }
+
+function add_one(x: number) { x + 1 }
+
+api GET "/test-pipeline" uses {} {
+  const result = add_one(double(5));
+  const result2 = double(add_one(10));
+  respond json({ "result": result, "result2": result2 })
 }

@@ -1,0 +1,482 @@
+Sections Overview
+  ┌──────────────────┬───────┬─────────────────────────────────────────┐
+  │     Section      │ Tasks │               Description               │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 1. Scaffold      │ 3     │ Project structure, errors, CLI          │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 2. Lexer         │ 3     │ Tokenization                            │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 3. Parser        │ 6     │ AST generation, expressions, patterns   │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 4. Type System   │ 7     │ Primitives, Decimal, ADTs, type checker │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 5. Effect System │ 4     │ Effect declarations, Async, builtins    │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 6. IR            │ 3     │ Intermediate representation             │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 7. Compiler      │ 4     │ JS code generation                      │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 8. Snapshot      │ 3     │ .msqs format creation/verification      │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 9. Runtime       │ 6     │ Interpreter, cloning, seed computation  │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 10. Gas          │ 3     │ Metering and cost table                 │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 11. JSON         │ 4     │ Parsing, canonical serialization, CBOR  │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 12. API          │ 4     │ HTTP routing, OpenAPI generation        │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 13. Security     │ 4     │ ECDSA signing, sandboxing               │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 14. Modules      │ 3     │ Imports, npm bridge                     │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 15. Audit        │ 2     │ Logging and tracing                     │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 16. Testing      │ 11    │ Test runners for all components         │
+  ├──────────────────┼───────┼─────────────────────────────────────────┤
+  │ 17. Lambda       │ 2     │ AWS Lambda integration                  │
+  └──────────────────┴───────┴─────────────────────────────────────────┘
+
+
+    ┌────────┬───────┬────────────┬───────────────────────────────┐
+  │ Effort │ Count │ Hours Est. │          Description          │
+  ├────────┼───────┼────────────┼───────────────────────────────┤
+  │ S      │ 16    │ 16-32h     │ Quick wins, 1-2 hours each    │
+  ├────────┼───────┼────────────┼───────────────────────────────┤
+  │ M      │ 38    │ 70-280h    │ Moderate, 2-8 hours each      │
+  ├────────┼───────┼────────────┼───────────────────────────────┤
+  │ L      │ 16    │ 136-408h   │ Significant, 1-3 days each    │
+  ├────────┼───────┼────────────┼───────────────────────────────┤
+  │ XL     │ 2     │ 96+h       │ Complex core systems, 3+ days │
+  └────────┴───────┴────────────┴───────────────────────────────┘
+  Heaviest Tasks (XL - Assign to experienced devs)
+
+  - MTP-035: Type Checker - unification, generics, inference
+  - MTP-080: Interpreter Core - full JS subset interpreter
+
+  Heavy Tasks (L - 1-3 days each)
+
+  - MTP-021: Recursive Descent Parser
+  - MTP-031: Decimal Type (precision-critical)
+  - MTP-033: Algebraic Data Types
+  - MTP-041: Effect Checker
+  - MTP-042: Async Effect
+  - MTP-051: AST to IR Lowering
+  - MTP-060, MTP-061: JS Code Generator & Pattern Match Compilation
+  - MTP-082, MTP-083: Interpreter Cloning & Effect Injection
+  - MTP-111, MTP-112: Request Handler & OpenAPI Generator
+  - MTP-122, MTP-123: Sandboxing & Reproducible Builds
+  - MTP-132: npm Bridge
+  - MTP-170: Lambda Custom Runtime
+
+  - MTP-159: End-to-End Tests
+
+  Lightest Tasks (S - Good for parallelization/onboarding)
+
+  - MTP-001, MTP-002: Scaffold & Errors
+  - MTP-011, MTP-012: String/Number Lexing
+  - MTP-025: API Declaration Parser
+  - MTP-030, MTP-034: Primitive Types & Builtins
+  - MTP-085: Deterministic Seed
+  - MTP-025: Implement API Declaration Parser (S)
+  - MTP-030: Implement Primitive Types (S)
+  - MTP-034: Implement Option and Result Built-in Types (S)
+  - MTP-085: Implement Deterministic Seed Computation (S)
+  - MTP-090, MTP-091: Gas Counter & Cost Table
+  - MTP-113: respond json()
+  - MTP-152, MTP-153, MTP-155, MTP-158: Simple unit tests
+
+  Parallelizable Independent Modules
+
+  - Lexer, JSON/CBOR, Gas, Security signing, Audit
+
+# Todos
+[ ] Verify MTP-035: Type Checker implementation
+[ ] Verify MTP-036: Json Type implementation
+[ ] Verify MTP-043: Built-in Functions
+[ ] Verify MTP-050: IR Data Structures
+[ ] Verify MTP-051: AST to IR Lowering
+[ ] Verify MTP-052: Tail Call Detection
+[ ] Verify MTP-062: Effect Call Compilation
+[ ] Verify MTP-063: Deterministic Code Generation
+[ ] Verify MTP-100: JSON Parser
+[ ] Verify MTP-101: Canonical JSON Serializer
+[ ] Verify MTP-102: CBOR Encoder
+[ ] Verify MTP-103: Equality, Ordering, Hashing
+[ ] Verify MTP-110: HTTP Router
+[ ] Verify MTP-111: Request Handler
+[ ] Verify MTP-112: OpenAPI Generator
+[ ] Verify MTP-120: ECDSA-P256 Signing
+
+[ ] Verify MTP-121: Signature Verification
+[ ] Verify MTP-130: Static Imports
+
+[ ] Verify MTP-131: Module Resolution
+[ ] Verify MTP-140: Audit Logger
+
+[ ] Verify MTP-141: Request Tracing
+[ ] Verify MTP-150: Test Runner Framework
+
+[ ] Verify MTP-151: Determinism Verification Tests
+[ ] Verify MTP-154: Type Checker Tests
+[ ] Verify MTP-156: Compiler Tests
+[ ] Verify MTP-157: Runtime Tests
+[ ] Verify MTP-159: End-to-End Tests
+[ ] Verify MTP-160: Benchmark Suite
+[ ] Verify MTP-171: Lambda Request Adapter
+
+Systemic Issues (5 bugs):
+- Threat model and security audit gaps
+- Chaos engineering and failure testing
+- Formal verification requirements
+- Centralized logging/monitoring
+- Performance benchmarking
+Component-Specific Issues (10 bugs):
+- Lexer/parser input limits and recursion bounds
+- Type checker fuzzing and depth limits
+- Interpreter timeouts and resource quotas
+- Security/crypto key management
+- API input validation and sanitization
+- Value operations timing attacks
+- Data flow/taint tracking
+- Comprehensive fuzz testing
+- Supply chain security
+- Error handling and recovery
+Advanced Security & Compliance (15 bugs):
+- Memory safety and race conditions
+- Defense-in-depth strategies
+- Input/output validation
+- Rate limiting and throttling
+- Session management and state isolation
+- Data integrity checks
+- Audit trails and tamper-evident logging
+- Privacy-preserving features
+- Resource lifecycle management
+- Side-channel attack mitigations
+- Security requirements traceability
+- Continuous security monitoring
+- Incident response planning
+
+MTP-001: Initialize Rust Project Structure (CONFIRMED)
+Audit Critique: You claim this is done, but where's the evidence it meets the spec? What if the crate structure fails under monorepo scaling? Edge case: What if dependencies conflict across workspaces? Security: Are you scanning for supply chain attacks in Cargo.lock? Compliance: Does this follow Rust security best practices (e.g., no unsafe code anywhere)?
+Questions:
+- Evidence of reproducible builds across different Rust versions?
+- How do you prevent dependency confusion attacks?
+- Formal proof that the structure matches the spec exactly?
+Gaps: No mention of workspace security policies, no dependency auditing.
+---
+MTP-002: Define Core Error Types (CONFIRMED)
+Audit Critique: Typed errors? Please. What if errors leak sensitive data? Edge case: What if error serialization fails (OOM, encoding issues)? Security: Are errors sanitized before logging? Compliance: Does this meet any error handling standards (e.g., OWASP error disclosure)?
+Questions:
+- Evidence that errors never leak stack traces in production?
+- How do you handle error propagation across FFI boundaries?
+- Penetration testing results for error injection attacks?
+Gaps: No mention of error rate limiting, no internationalization support.
+---
+MTP-003: Create CLI Interface (CONFIRMED)
+Audit Critique: A CLI? That's just begging for command injection. What if users pass malicious paths? Edge case: What if stdin/stdout is redirected maliciously? Security: Input validation? Compliance: Does it log commands for audit trails?
+Questions:
+- Evidence of fuzzing the CLI arguments?
+- How do you prevent symlink attacks on file paths?
+- Formal verification of command parsing correctness?
+Gaps: No mention of CLI security hardening (e.g., no shell expansion).
+---
+MTP-010: Implement Lexer/Tokenizer (CONFIRMED)
+Audit Critique: Tokenization? Trivial. But what about UTF-8 bombs or infinite loops on malformed input? Edge case: What if input is 10GB of junk? Security: Does it handle control characters that could trigger terminal exploits? Compliance: Unicode normalization?
+Questions:
+- Evidence of lexer performance under pathological inputs?
+- How do you prevent lexer-based DoS attacks?
+- Formal grammar verification?
+Gaps: No mention of input size limits, no Unicode security handling.
+---
+MTP-011: Implement String Literal Parsing (CONFIRMED)
+Audit Critique: String parsing? What about escape sequence exploits (e.g., \uXXXX for XSS)? Edge case: Nested quotes, multi-byte sequences. Security: Does it prevent string-based injection? Compliance: UTF-8 validation?
+Questions:
+- Evidence of handling all Unicode edge cases (e.g., surrogates)?
+- How do you prevent string parsing from consuming infinite memory?
+- Fuzz testing results?
+Gaps: No mention of string interning for performance, no length limits.
+---
+MTP-012: Implement Number Literal Parsing (CONFIRMED)
+Audit Critique: Numbers? What about overflow/underflow? Edge case: What if it's "1e1000"? Security: Precision loss attacks? Compliance: IEEE 754 compliance?
+Questions:
+- Evidence of handling all numeric edge cases (NaN, Inf, denormals)?
+- How do you prevent numeric parsing DoS?
+- Formal verification of parsing correctness?
+Gaps: No mention of locale-independent parsing, no bounds checking.
+---
+MTP-020: Implement AST Data Structures (CONFIRMED)
+Audit Critique: AST structures? What if they cause stack overflows on deep nesting? Edge case: Self-referential ASTs. Security: AST injection via malformed input? Compliance: Does it validate against the spec grammar?
+Questions:
+- Evidence of AST size limits to prevent DoS?
+- How do you ensure AST integrity during parsing?
+- Formal type safety proofs?
+Gaps: No mention of AST serialization for debugging, no cycle detection.
+---
+MTP-021: Implement Recursive Descent Parser (CONFIRMED)
+Audit Critique: Recursive descent? Classic stack overflow vector. What about left-recursive grammars? Edge case: Deeply nested expressions. Security: Parser injection? Compliance: LR(1) grammar?
+Questions:
+- Evidence of parser stack depth limits?
+- How do you handle ambiguous grammars?
+- Fuzz testing for parser crashes?
+Gaps: No mention of error recovery, no incremental parsing.
+---
+MTP-022: Implement Expression Parser with Precedence (CONFIRMED)
+Audit Critique: Precedence? What if operators are chained maliciously? Edge case: Maximum expression depth. Security: Operator injection? Compliance: Operator associativity correctness?
+Questions:
+- Evidence of precedence table correctness?
+- How do you prevent expression parsing DoS?
+- Formal verification of precedence rules?
+Gaps: No mention of short-circuit evaluation, no expression size limits.
+---
+MTP-023: Implement Pattern Matching Parser (CONFIRMED)
+Audit Critique: Patterns? What about exponential backtracking? Edge case: Complex nested patterns. Security: Pattern-based DoS? Compliance: Pattern exhaustiveness checking?
+Questions:
+- Evidence of pattern compilation performance?
+- How do you prevent pattern matching attacks?
+- Formal verification of pattern semantics?
+Gaps: No mention of pattern optimization, no guards support.
+---
+MTP-024: Implement Type Declaration Parser (CONFIRMED)
+Audit Critique: Type parsing? What about polymorphic recursion? Edge case: Infinite type aliases. Security: Type-based injection? Compliance: Type system soundness?
+Questions:
+- Evidence of type recursion limits?
+- How do you validate type declarations?
+- Formal type checking integration?
+Gaps: No mention of type inference hints, no forward declarations.
+---
+MTP-025: Implement API Declaration Parser (CONFIRMED)
+Audit Critique: API parsing? What about malformed HTTP methods? Edge case: Invalid paths. Security: API endpoint injection? Compliance: REST standards?
+Questions:
+- Evidence of API syntax validation?
+- How do you prevent API parsing exploits?
+- Formal API contract verification?
+Gaps: No mention of API versioning, no method validation.
+---
+MTP-030: Implement Primitive Types (CONFIRMED)
+Audit Critique: Primitives? What about i64 overflow? Edge case: Boundary values. Security: Type confusion? Compliance: Type safety guarantees?
+Questions:
+- Evidence of overflow handling?
+- How do you ensure primitive type safety?
+- Formal verification of primitive operations?
+Gaps: No mention of checked arithmetic, no custom primitives.
+---
+MTP-031: Implement Decimal Type (CONFIRMED)
+Audit Critique: Decimals? What about rounding errors? Edge case: Extreme precision. Security: Financial calculation exploits? Compliance: Decimal arithmetic standards?
+Questions:
+- Evidence of decimal precision correctness?
+- How do you prevent decimal-based attacks?
+- Formal verification of rounding rules?
+Gaps: No mention of decimal context, no arbitrary precision.
+---
+MTP-033: Implement Algebraic Data Types (ADTs) (CONFIRMED)
+Audit Critique: ADTs? What about variant explosion? Edge case: Large ADTs. Security: ADT-based type confusion? Compliance: ADT pattern matching?
+Questions:
+- Evidence of ADT compilation efficiency?
+- How do you validate ADT definitions?
+- Formal verification of ADT semantics?
+Gaps: No mention of ADT serialization, no GADT support.
+---
+MTP-034: Implement Option and Result Built-in Types (CONFIRMED)
+Audit Critique: Built-in types? What about null pointer derefs? Edge case: Nested Options. Security: Option unwrapping exploits? Compliance: Null safety?
+Questions:
+- Evidence of safe unwrapping?
+- How do you prevent null-related attacks?
+- Formal verification of Option/Result semantics?
+Gaps: No mention of Result chaining, no custom error types.
+---
+MTP-041: Implement Effect Checker (CONFIRMED)
+Audit Critique: Effect checking? What about effect smuggling? Edge case: Effect cycles. Security: Effect-based privilege escalation? Compliance: Effect isolation?
+Questions:
+- Evidence of effect safety?
+- How do you enforce effect boundaries?
+- Formal verification of effect systems?
+Gaps: No mention of effect composition, no higher-order effects.
+---
+MTP-042: Implement Async Effect (CONFIRMED)
+Audit Critique: Async? What about race conditions? Edge case: Concurrent awaits. Security: Async injection? Compliance: Async safety?
+Questions:
+- Evidence of async determinism?
+- How do you prevent async-based attacks?
+- Formal verification of async semantics?
+Gaps: No mention of cancellation, no async timeouts.
+---
+MTP-051: Implement AST to IR Lowering (CONFIRMED)
+Audit Critique: Lowering? What about incorrect transformations? Edge case: Complex expressions. Security: IR injection? Compliance: Lowering correctness?
+Questions:
+- Evidence of lowering correctness?
+- How do you validate IR output?
+- Formal verification of lowering?
+Gaps: No mention of optimization passes, no IR validation.
+---
+MTP-060: Implement JS Code Generator (CONFIRMED)
+Audit Critique: JS generation? What about code injection? Edge case: Large codebases. Security: XSS via generated JS? Compliance: JS standards?
+Questions:
+- Evidence of generated JS safety?
+- How do you prevent codegen exploits?
+- Formal verification of codegen?
+Gaps: No mention of minification, no source maps.
+---
+MTP-061: Implement Pattern Match Compilation (CONFIRMED)
+Audit Critique: Pattern compilation? What about inefficient compilation? Edge case: Complex patterns. Security: Pattern-based DoS? Compliance: Pattern compilation?
+Questions:
+- Evidence of compilation efficiency?
+- How do you optimize pattern matching?
+- Formal verification of pattern compilation?
+Gaps: No mention of pattern optimization, no decision trees.
+---
+MTP-070: Implement Snapshot File Format (CONFIRMED)
+Audit Critique: File format? What about corruption? Edge case: Tampered files. Security: Format-based attacks? Compliance: Format standards?
+Questions:
+- Evidence of format robustness?
+- How do you prevent format exploits?
+- Formal verification of format parsing?
+Gaps: No mention of format versioning, no compression.
+---
+MTP-071: Implement Snapshot Creation (CONFIRMED)
+Audit Critique: Creation? What about race conditions? Edge case: Concurrent creation. Security: Creation injection? Compliance: Creation integrity?
+Questions:
+- Evidence of creation determinism?
+- How do you secure the creation process?
+- Formal verification of creation?
+Gaps: No mention of creation auditing, no signing.
+---
+MTP-072: Implement Snapshot Verification (CONFIRMED)
+Audit Critique: Verification? What about bypasses? Edge case: Invalid signatures. Security: Verification exploits? Compliance: Verification standards?
+Questions:
+- Evidence of verification completeness?
+- How do you handle verification failures?
+- Formal verification of verification logic?
+Gaps: No mention of certificate validation, no revocation.
+---
+MTP-080: Implement Interpreter Core (CONFIRMED)
+Audit Critique: Interpreter? What about infinite loops? Edge case: Complex programs. Security: Interpreter exploits? Compliance: Execution safety?
+Questions:
+- Evidence of interpreter correctness?
+- How do you sandbox interpretation?
+- Formal verification of interpreter?
+Gaps: No mention of JIT compilation, no profiling.
+---
+MTP-081: Implement Value Representation (CONFIRMED)
+Audit Critique: Values? What about type confusion? Edge case: Large values. Security: Value-based attacks? Compliance: Value safety?
+Questions:
+- Evidence of value type safety?
+- How do you prevent value exploits?
+- Formal verification of value operations?
+Gaps: No mention of value interning, no garbage collection.
+---
+MTP-082: Implement Interpreter Cloning (CONFIRMED)
+Audit Critique: Cloning? What about state leakage? Edge case: Large heaps. Security: Clone-based attacks? Compliance: Isolation?
+Questions:
+- Evidence of clone isolation?
+- How do you prevent clone exploits?
+- Formal verification of cloning?
+Gaps: No mention of copy-on-write, no lazy cloning.
+---
+MTP-083: Implement Effect Injection (CONFIRMED)
+Audit Critique: Injection? What about malicious effects? Edge case: Injection failures. Security: Injection exploits? Compliance: Injection safety?
+Questions:
+- Evidence of injection security?
+- How do you validate injected effects?
+- Formal verification of injection?
+Gaps: No mention of effect sandboxing, no injection auditing.
+---
+MTP-085: Implement Deterministic Seed Computation (CONFIRMED)
+Audit Critique: Seeds? What about predictability? Edge case: Seed collisions. Security: Seed-based attacks? Compliance: Determinism?
+Questions:
+- Evidence of seed randomness?
+- How do you prevent seed prediction?
+- Formal verification of seed computation?
+Gaps: No mention of seed rotation, no entropy sources.
+---
+MTP-090: Implement Gas Counter (CONFIRMED)
+Audit Critique: Gas? What about gas exhaustion bypasses? Edge case: Gas underflow. Security: Gas manipulation? Compliance: Gas fairness?
+Questions:
+- Evidence of gas accounting accuracy?
+- How do you prevent gas attacks?
+- Formal verification of gas metering?
+Gaps: No mention of gas refunds, no dynamic pricing.
+---
+MTP-091: Implement Gas Cost Table (CONFIRMED)
+Audit Critique: Cost table? What about inaccurate costs? Edge case: Cost overflows. Security: Cost manipulation? Compliance: Cost fairness?
+Questions:
+- Evidence of cost table correctness?
+- How do you calibrate costs?
+- Formal verification of costs?
+Gaps: No mention of cost profiling, no adaptive costs.
+---
+MTP-092: Integrate Gas Metering in Interpreter (CONFIRMED)
+Audit Critique: Integration? What about metering bypasses? Edge case: Metering overhead. Security: Metering exploits? Compliance: Metering accuracy?
+Questions:
+- Evidence of metering integration?
+- How do you ensure metering coverage?
+- Formal verification of metering?
+Gaps: No mention of metering auditing, no gas tracing.
+---
+MTP-100: Implement JSON Parser (CONFIRMED)
+Audit Critique: JSON parser? What about JSON bombs? Edge case: Deep nesting. Security: JSON injection? Compliance: JSON standards?
+Questions:
+- Evidence of parser robustness?
+- How do you prevent JSON attacks?
+- Formal verification of parsing?
+Gaps: No mention of streaming parsing, no schema validation.
+---
+MTP-113: Implement respond json() Expression (CONFIRMED)
+Audit Critique: Respond? What about response injection? Edge case: Large responses. Security: Response exploits? Compliance: Response safety?
+Questions:
+- Evidence of response safety?
+- How do you validate responses?
+- Formal verification of respond?
+Gaps: No mention of response compression, no caching.
+---
+MTP-122: Implement Sandboxing (CONFIRMED)
+Audit Critique: Sandboxing? What about escapes? Edge case: Sandbox failures. Security: Sandbox bypasses? Compliance: Isolation?
+Questions:
+- Evidence of sandbox effectiveness?
+- How do you monitor sandboxing?
+- Formal verification of sandboxing?
+Gaps: No mention of seccomp policies, no syscall filtering.
+---
+MTP-123: Implement Reproducible Builds (CONFIRMED)
+Audit Critique: Reproducible? What about environmental variance? Edge case: Build failures. Security: Build injection? Compliance: Reproducibility?
+Questions:
+- Evidence of reproducibility?
+- How do you ensure build security?
+- Formal verification of builds?
+Gaps: No mention of build attestation, no supply chain security.
+---
+MTP-132: Implement npm Bridge (Unsafe) (CONFIRMED)
+Audit Critique: npm bridge? "Unsafe" says it all. What about malicious packages? Edge case: Bridge failures. Security: Bridge exploits? Compliance: Bridge safety?
+Questions:
+- Evidence of bridge isolation?
+- How do you audit npm packages?
+- Formal verification of bridging?
+Gaps: No mention of package signing, no isolation.
+---
+MTP-152: Implement Lexer Tests (CONFIRMED)
+Audit Critique: Tests? What about coverage gaps? Edge case: Untested inputs. Security: Test-based attacks? Compliance: Test adequacy?
+Questions:
+- Evidence of test completeness?
+- How do you maintain test coverage?
+- Formal verification of tests?
+Gaps: No mention of property-based testing, no fuzzing.
+---
+MTP-153: Implement Parser Tests (CONFIRMED)
+Audit Critique: Parser tests? Same as above—superficial?
+Gaps: Same issues as lexer tests.
+---
+MTP-155: Implement Effect Checker Tests (CONFIRMED)
+Audit Critique: Effect tests? Likely incomplete.
+Gaps: Same testing issues.
+---
+MTP-158: Implement Gas Metering Tests (CONFIRMED)
+Audit Critique: Gas tests? Probably misses edge cases.
+Gaps: Same testing issues.
+---
+MTP-170: Implement Lambda Custom Runtime (CONFIRMED)
+Audit Critique: Lambda? What about cold start attacks? Edge case: Lambda timeouts. Security: Lambda exploits? Compliance: Serverless security?
+Questions:
+- Evidence of Lambda performance?
+- How do you secure Lambda execution?
+- Formal verification of runtime?
+Gaps: No mention of Lambda layers, no custom runtime security.

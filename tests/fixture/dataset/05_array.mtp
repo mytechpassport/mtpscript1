@@ -1,5 +1,4 @@
-api GET /array
-uses {} {
-  const arr = [1, 2, 3]
-  respond json({ array: arr })
+api GET "/array" uses {} {
+  const arr = [1, 2, 3];
+  respond json({ "array": arr })
 }

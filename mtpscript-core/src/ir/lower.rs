@@ -1,9 +1,34 @@
 use super::nodes::{IrApi, IrDecl, IrExpr, IrFunction, IrPattern, IrProgram};
 use crate::errors::compile::CompileError;
 use crate::parser::ast::{
-    ApiDecl, Expr as AstExpr, FuncDecl, ModuleDecl, Pattern as AstPattern, Program,
+    ApiDecl, BinOp, Expr as AstExpr, FuncDecl, ModuleDecl, Pattern as AstPattern, Program, TypeExpr,
 };
 use crate::types::Type;
+
+fn resolve_type_expr(type_expr: &TypeExpr) -> Type {
+    match type_expr {
+        TypeExpr::Ident(name) => match name.as_str() {
+            "number" => Type::Number,
+            "boolean" => Type::Boolean,
+            "string" => Type::String,
+            "Decimal" => Type::Decimal,
+            "Json" => Type::Json,
+            _ => Type::Var(name.clone()), // User-defined types
+        },
+        TypeExpr::Generic(base, args) => {
+            if base == "Option" && args.len() == 1 {
+                let inner = resolve_type_expr(&args[0]);
+                Type::option(inner)
+            } else if base == "Result" && args.len() == 2 {
+                let ok = resolve_type_expr(&args[0]);
+                let err = resolve_type_expr(&args[1]);
+                Type::result(ok, err)
+            } else {
+                Type::Var(format!("{}<...>", base))
+            }
+        }
+    }
+}
 
 /// Lower AST to IR. Assumes type checking has been performed.
 /// In a real implementation, this would take typed AST.
@@ -30,13 +55,13 @@ pub fn lower_ast_to_ir(ast: &Program) -> Result<IrProgram, CompileError> {
 }
 
 fn lower_func(func: &FuncDecl) -> Result<IrFunction, CompileError> {
-    // Placeholder types - in real implementation, these would come from type checker
     let params: Vec<(String, Type)> = func
         .params
         .iter()
-        .map(|(name, _)| (name.clone(), Type::Var("unknown".to_string())))
+        .map(|(name, type_expr)| (name.clone(), resolve_type_expr(type_expr)))
         .collect();
-    let return_type = Type::Var("unknown".to_string());
+    // Infer return type from body, but since body not lowered, use placeholder
+    let return_type = Type::Var("return".to_string());
 
     let body = lower_expr_with_tail(&func.body, &return_type, true)?;
     let is_tail_recursive = detect_tail_calls(&body, &func.name);
@@ -155,22 +180,37 @@ fn lower_expr_with_tail(
         }
 
         AstExpr::Unary(op, expr) => {
-            let ir_expr = lower_expr_with_tail(expr, &Type::Var("unary".to_string()), false)?;
-            Ok(IrExpr::Unary(
-                op.clone(),
-                Box::new(ir_expr),
-                expected_type.clone(),
-            ))
+            let expr_expected = match op {
+                BinOp::Add | BinOp::Sub => Type::Number, // + and - unary
+                _ => Type::Var("unary".to_string()),     // Not is boolean?
+            };
+            let result_type = match op {
+                BinOp::Add | BinOp::Sub => Type::Number,
+                _ => expected_type.clone(),
+            };
+            let ir_expr = lower_expr_with_tail(expr, &expr_expected, false)?;
+            Ok(IrExpr::Unary(op.clone(), Box::new(ir_expr), result_type))
         }
 
         AstExpr::Binary(op, left, right) => {
-            let ir_left = lower_expr_with_tail(left, &Type::Var("binary".to_string()), false)?;
-            let ir_right = lower_expr_with_tail(right, &Type::Var("binary".to_string()), false)?;
+            let (left_expected, right_expected, result_type) = match op {
+                BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div => {
+                    (Type::Number, Type::Number, Type::Number)
+                }
+                BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge => {
+                    // Assume same type for comparison
+                    let t = Type::Var("comparable".to_string());
+                    (t.clone(), t.clone(), Type::Boolean)
+                }
+                BinOp::And | BinOp::Or => (Type::Boolean, Type::Boolean, Type::Boolean),
+            };
+            let ir_left = lower_expr_with_tail(left, &left_expected, false)?;
+            let ir_right = lower_expr_with_tail(right, &right_expected, false)?;
             Ok(IrExpr::Binary(
                 op.clone(),
                 Box::new(ir_left),
                 Box::new(ir_right),
-                expected_type.clone(),
+                result_type,
             ))
         }
 
@@ -239,7 +279,10 @@ fn lower_expr_with_tail(
             })
         }
 
-        AstExpr::Lambda { params, body } => {
+        AstExpr::Lambda {
+            params: _params,
+            body,
+        } => {
             // Lambdas become function calls to anonymous functions
             // For simplicity, treat as call to lambda
             let ir_body = lower_expr_with_tail(body, expected_type, false)?;

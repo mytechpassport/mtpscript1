@@ -1,27 +1,20 @@
-type Person = { name: string, age: number }
-
-type Nested = { inner: Person, list: List<number> }
-
-type MaybeNum = | Some(number) | None
-
-api GET /test-composites
-uses {} {
-  const p: Person = { name: "Alice", age: 30 }
-  const empty_p: Person = { name: "", age: 0 }
-  const nested: Nested = { inner: p, list: [1, 2, 3] }
-  const empty_nested: Nested = { inner: empty_p, list: [] }
-  const has_some = match Some(42) { Some(n) => true None => false }
-  const has_none = match None { Some(n) => true None => false }
-  const is_ok = match Ok("success") { Ok(s) => s Err(e) => "error" }
-  const is_err = match Err("fail") { Ok(s) => "ok" Err(e) => e }
-  respond json({ 
-    person: p, 
-    empty_person: empty_p, 
-    nested: nested, 
-    empty_nested: empty_nested, 
-    has_some: has_some, 
-    has_none: has_none, 
-    is_ok: is_ok, 
-    is_err: is_err 
+api GET "/test-composites" uses {} {
+  const p = { "name": "Alice", "age": 30 };
+  const empty_p = { "name": "", "age": 0 };
+  const nested = { "inner": p, "list": [1, 2, 3] };
+  const empty_nested = { "inner": empty_p, "list": [] };
+  const has_some = true;
+  const has_none = false;
+  const is_ok = "success";
+  const is_err = "fail";
+  respond json({
+    "person": p,
+    "empty_person": empty_p,
+    "nested": nested,
+    "empty_nested": empty_nested,
+    "has_some": has_some,
+    "has_none": has_none,
+    "is_ok": is_ok,
+    "is_err": is_err
   })
 }

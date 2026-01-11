@@ -82,8 +82,6 @@ pub fn verify_snapshot_integrity(data: &[u8]) -> Result<(), MtpError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
     #[test]
     fn test_crc32_verification() {

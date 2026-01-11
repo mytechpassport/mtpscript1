@@ -226,8 +226,9 @@ impl<'a> Parser<'a> {
     fn parse_path(&mut self) -> Result<String, CompileError> {
         match &self.advance().token {
             Token::String(s) => Ok(s.clone()),
+            Token::Ident(s) => Ok(s.clone()),
             _ => Err(CompileError::ParserError(
-                "Expected string literal for path".to_string(),
+                "Expected string literal or identifier for path".to_string(),
             )),
         }
     }
@@ -635,6 +636,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(dead_code)]
     fn check_next(&self, token: Token) -> bool {
         self.current + 1 < self.tokens.len() && self.tokens[self.current + 1].token == token
     }

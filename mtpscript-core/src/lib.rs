@@ -1,13 +1,16 @@
 pub mod api;
+pub mod audit;
 pub mod compiler;
 pub mod effects;
 pub mod errors;
 pub mod gas;
 pub mod ir;
+pub mod json;
 pub mod lambda;
 pub mod lexer;
 pub mod modules;
 pub mod parser;
 pub mod runtime;
 pub mod security;
+pub mod snapshot;
 pub mod types;

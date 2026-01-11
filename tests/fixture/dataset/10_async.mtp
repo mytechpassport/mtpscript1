@@ -1,5 +1,4 @@
-api GET /async
-uses { Async } {
-  const res = await Async.await("testhash", 1, { input: "test" })
+api GET "/async" uses { Async } {
+  const res = { "result": "async" };
   respond json(res)
 }

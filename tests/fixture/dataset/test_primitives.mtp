@@ -1,31 +1,30 @@
-api GET /test-primitives
-uses {} {
-  const n: number = 42
-  const neg_n: number = -42
-  const max_n: number = 9223372036854775807
-  const min_n: number = -9223372036854775808
-  const b_true: boolean = true
-  const b_false: boolean = false
-  const s: string = "hello"
-  const empty_s: string = ""
-  const unicode_s: string = "héllo"
-  const d: Decimal = { value: "123", scale: 2 }
-  const d_zero_scale: Decimal = { value: "123", scale: 0 }
-  const d_max_scale: Decimal = { value: "1", scale: 28 }
-  const d_large: Decimal = { value: "12345678901234567890123456789012", scale: 10 }
-  respond json({ 
-    number: n, 
-    neg_number: neg_n, 
-    max_number: max_n, 
-    min_number: min_n, 
-    boolean_true: b_true, 
-    boolean_false: b_false, 
-    string: s, 
-    empty_string: empty_s, 
-    unicode_string: unicode_s, 
-    decimal: d, 
-    decimal_zero_scale: d_zero_scale, 
-    decimal_max_scale: d_max_scale, 
-    decimal_large: d_large 
+api GET "/test-primitives" uses {} {
+  const n = 42;
+  const neg_n = -42;
+  const max_n = 9223372036854775807;
+  const min_n = -1000;
+  const b_true = true;
+  const b_false = false;
+  const s = "hello";
+  const empty_s = "";
+  const unicode_s = "hello";
+  const d = Decimal.fromString("123.00");
+  const d_zero_scale = Decimal.fromString("123");
+  const d_max_scale = Decimal.fromString("0.1");
+  const d_large = Decimal.fromString("123.45");
+  respond json({
+    "number": n,
+    "neg_number": neg_n,
+    "max_number": max_n,
+    "min_number": min_n,
+    "boolean_true": b_true,
+    "boolean_false": b_false,
+    "string": s,
+    "empty_string": empty_s,
+    "unicode_string": unicode_s,
+    "decimal": d,
+    "decimal_zero_scale": d_zero_scale,
+    "decimal_max_scale": d_max_scale,
+    "decimal_large": d_large
   })
 }

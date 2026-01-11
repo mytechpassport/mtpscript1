@@ -64,7 +64,7 @@ impl ReproducibleBuild {
         let source_hash = self.compute_source_hash(source_path)?;
 
         // Run build in container
-        let build_result = self.run_container_build(source_path, output_path)?;
+        let _build_result = self.run_container_build(source_path, output_path)?;
 
         // Compute snapshot hash
         let snapshot_hash = self.compute_file_hash(output_path)?;
@@ -285,7 +285,6 @@ pub fn create_standard_build() -> ReproducibleBuild {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[test]

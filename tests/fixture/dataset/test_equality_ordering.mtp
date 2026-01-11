@@ -1,20 +1,19 @@
-api GET /test-equality-ordering
-uses {} {
-  const eq_num_true = 1 == 1
-  const eq_num_false = 1 == 2
-  const eq_str_true = "hello" == "hello"
-  const eq_str_false = "hello" == "world"
-  const eq_rec_true = {x: 1, y: 2} == {x: 1, y: 2}
-  const eq_rec_false = {x: 1, y: 2} == {x: 1, y: 3}
-  const ord_num_gt = 3 > 2
-  const ord_num_lt = 2 < 3
-  const ord_num_eq = 2 == 2
-  const ord_str_gt = "b" > "a"
-  const ord_str_lt = "a" < "b"
-  const ord_str_eq = "a" == "a"
-  respond json({ 
-    eq_num_true, eq_num_false, eq_str_true, eq_str_false, 
-    eq_rec_true, eq_rec_false, ord_num_gt, ord_num_lt, ord_num_eq, 
-    ord_str_gt, ord_str_lt, ord_str_eq 
+api GET "/test-equality-ordering" uses {} {
+  const eq_num_true = 1 == 1;
+  const eq_num_false = 1 == 2;
+  const eq_str_true = "hello" == "hello";
+  const eq_str_false = "hello" == "world";
+  const eq_rec_true = { "x": 1, "y": 2 } == { "x": 1, "y": 2 };
+  const eq_rec_false = { "x": 1, "y": 2 } == { "x": 1, "y": 3 };
+  const ord_num_gt = 3 > 2;
+  const ord_num_lt = 2 < 3;
+  const ord_num_eq = 2 == 2;
+  const ord_str_gt = "b" > "a";
+  const ord_str_lt = "a" < "b";
+  const ord_str_eq = "a" == "a";
+  respond json({
+    "eq_num_true": eq_num_true, "eq_num_false": eq_num_false, "eq_str_true": eq_str_true, "eq_str_false": eq_str_false,
+    "eq_rec_true": eq_rec_true, "eq_rec_false": eq_rec_false, "ord_num_gt": ord_num_gt, "ord_num_lt": ord_num_lt, "ord_num_eq": ord_num_eq,
+    "ord_str_gt": ord_str_gt, "ord_str_lt": ord_str_lt, "ord_str_eq": ord_str_eq
   })
 }

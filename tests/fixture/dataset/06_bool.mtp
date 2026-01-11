@@ -1,6 +1,5 @@
-api GET /bool
-uses {} {
-  const t = true
-  const f = false
-  respond json({ true: t, false: f })
+api GET "/bool" uses {} {
+  const t = true;
+  const f = false;
+  respond json({ "true": t, "false": f })
 }

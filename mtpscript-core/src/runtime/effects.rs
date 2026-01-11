@@ -27,6 +27,7 @@ impl EffectRegistry {
 }
 
 // Placeholder implementations for built-in effects
+#[allow(dead_code)]
 fn db_read_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     if args.len() != 2 {
         return Err(RuntimeError::ValueError(
@@ -34,7 +35,7 @@ fn db_read_effect(args: &[Value]) -> Result<Value, RuntimeError> {
         ));
     }
 
-    let sql = args[0].as_string()?;
+    let _sql = args[0].as_string()?;
     let _params = args[1].as_object()?; // JSON object
 
     // Placeholder: would execute SQL with deterministic seed-based behavior
@@ -45,6 +46,7 @@ fn db_read_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     ]))]))
 }
 
+#[allow(dead_code)]
 fn db_write_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     if args.len() != 2 {
         return Err(RuntimeError::ValueError(
@@ -52,13 +54,14 @@ fn db_write_effect(args: &[Value]) -> Result<Value, RuntimeError> {
         ));
     }
 
-    let sql = args[0].as_string()?;
+    let _sql = args[0].as_string()?;
     let _params = args[1].as_object()?; // JSON object
 
     // Placeholder: would execute SQL
     Ok(Value::Number(1)) // Rows affected
 }
 
+#[allow(dead_code)]
 fn http_out_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     if args.len() != 2 {
         return Err(RuntimeError::ValueError(
@@ -80,6 +83,7 @@ fn http_out_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     ])))
 }
 
+#[allow(dead_code)]
 fn log_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     if args.len() != 1 {
         return Err(RuntimeError::ValueError(
@@ -93,6 +97,7 @@ fn log_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     Ok(Value::Null)
 }
 
+#[allow(dead_code)]
 fn async_await_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     if args.len() != 3 {
         return Err(RuntimeError::ValueError(
@@ -112,7 +117,7 @@ fn async_await_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     )))
 }
 
-pub fn inject_effects(interp: &mut Interpreter, seed: &[u8; 32]) -> Result<(), RuntimeError> {
+pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), RuntimeError> {
     // Inject effect functions directly into global scope
     // In real implementation, these would be proper function objects that call the effects
 

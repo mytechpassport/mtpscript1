@@ -49,7 +49,7 @@ pub fn clone_interpreter(snapshot: &[u8]) -> Result<Interpreter, RuntimeError> {
     let _ast = parse_js_to_ast(&js_code)?;
 
     // Create fresh interpreter
-    let mut interp = Interpreter::new();
+    let interp = Interpreter::new();
 
     // Initialize with parsed AST (placeholder)
     // In real implementation, would set up global functions, etc.
@@ -58,10 +58,38 @@ pub fn clone_interpreter(snapshot: &[u8]) -> Result<Interpreter, RuntimeError> {
 }
 
 // Placeholder for JS parsing - would implement a real JS subset parser
-fn parse_js_to_ast(_js: &str) -> Result<(), RuntimeError> {
-    // TODO: Implement JS subset parser
-    // For now, return error
-    Err(RuntimeError::ValueError(
-        "JS parser not implemented".to_string(),
-    ))
+fn parse_js_to_ast(js: &str) -> Result<(), RuntimeError> {
+    // Forbidden constructs
+    let forbidden = ["class", "this", "eval", "try", "catch", "new", "prototype", "arguments"];
+    for word in forbidden {
+        if js.contains(word) {
+            return Err(RuntimeError::ValueError(format!("Forbidden JS construct: {}", word)));
+        }
+    }
+
+    // Must contain at least one function
+    if !js.contains("function") {
+        return Err(RuntimeError::ValueError("JS code must contain function declarations".to_string()));
+    }
+
+    // Basic structure check: ensure balanced braces and parens
+    let mut brace_count = 0;
+    let mut paren_count = 0;
+    for c in js.chars() {
+        match c {
+            '{' => brace_count += 1,
+            '}' => brace_count -= 1,
+            '(' => paren_count += 1,
+            ')' => paren_count -= 1,
+            _ => {}
+        }
+        if brace_count < 0 || paren_count < 0 {
+            return Err(RuntimeError::ValueError("Unbalanced braces or parentheses".to_string()));
+        }
+    }
+    if brace_count != 0 || paren_count != 0 {
+        return Err(RuntimeError::ValueError("Unbalanced braces or parentheses".to_string()));
+    }
+
+    Ok(())
 }

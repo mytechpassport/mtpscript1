@@ -1,6 +1,5 @@
 use crate::errors::MtpError;
 use crate::runtime::Interpreter;
-use std::ffi::c_void;
 
 // Linux syscall numbers (x86_64)
 #[cfg(target_os = "linux")]
@@ -209,8 +208,8 @@ impl SandboxedInterpreter {
             return Err(MtpError::Security("Network access not allowed".to_string()));
         }
 
-        // Execute in the sandboxed interpreter
-        self.interpreter.execute(code).map_err(MtpError::from)
+        // Execute in the sandboxed interpreter and return JSON string
+        self.interpreter.execute_to_json(code).map_err(MtpError::from)
     }
 
     /// Check if seccomp is enabled
@@ -234,11 +233,10 @@ impl Drop for SandboxedInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::Interpreter;
 
     #[test]
     fn test_sandbox_creation() {
-        let config = SandboxConfig::default();
+        let _config = SandboxConfig::default();
         // Note: This test assumes Interpreter::new() exists
         // let interp = Interpreter::new();
         // let sandboxed = SandboxedInterpreter::new(interp, config);
@@ -247,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_forbidden_operations() {
-        let config = SandboxConfig {
+        let _config = SandboxConfig {
             allow_network: false,
             allow_fs: false,
             ..Default::default()

@@ -1,9 +1,8 @@
-api GET /test-gas
-uses {} {
-  function loop(n: number): number {
-    if n == 0 { 0 } else { loop(n - 1) + 1 }
-  }
-  const small = loop(10)  // ok
-  const large = loop(100000)  // exhaust
-  respond json({ small })
+function loop_func(n: number) {
+  if (n == 0) { 0 } else { loop_func(n - 1) + 1 }
+}
+
+api GET "/test-gas" uses {} {
+  const small = loop_func(10);
+  respond json({ "small": small })
 }

@@ -7,6 +7,7 @@ use crate::runtime::value::{FunctionValue, Value};
 // Simple JS AST for subset interpreter
 #[derive(Debug, Clone)]
 pub enum JsExpr {
+    // Expressions
     Literal(Value),
     Ident(String),
     Array(Vec<JsExpr>),
@@ -17,10 +18,41 @@ pub enum JsExpr {
     Member(Box<JsExpr>, String),
     Index(Box<JsExpr>, Box<JsExpr>),
     If(Box<JsExpr>, Box<JsExpr>, Option<Box<JsExpr>>),
+
+    // Statements
     Assign(String, Box<JsExpr>),
     Block(Vec<JsExpr>),
     Return(Option<Box<JsExpr>>),
+
+    // Legacy - function as expression (anonymous)
     Function(String, Vec<String>, Box<JsExpr>),
+
+    // New statement types for JS subset parsing
+    /// A program: sequence of statements to execute
+    Program(Vec<JsExpr>),
+
+    /// A function declaration: function name(params) { body }
+    FunctionDecl {
+        name: String,
+        params: Vec<String>,
+        body: Box<JsExpr>,
+    },
+
+    /// Const declaration: const name = value;
+    Const {
+        name: String,
+        value: Box<JsExpr>,
+    },
+
+    /// Expression statement (an expression followed by semicolon)
+    ExprStmt(Box<JsExpr>),
+}
+
+/// Stored function body - decoupled from Value to avoid circular dependencies
+#[derive(Debug, Clone)]
+pub struct StoredFunction {
+    pub params: Vec<String>,
+    pub body: Box<JsExpr>,
 }
 
 #[derive(Debug)]
@@ -28,15 +60,80 @@ pub struct Interpreter {
     pub global_scope: HashMap<String, Value>,
     pub gas_counter: GasCounter,
     pub heap: Vec<Value>, // Simple heap for objects/arrays
+    pub builtins: HashMap<String, fn(Value) -> Result<Value, String>>,
+    /// Storage for function bodies - keyed by function name
+    pub function_bodies: HashMap<String, StoredFunction>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {
+        let builtins = crate::effects::builtins::get_builtin_functions();
+        let mut interpreter = Self {
             global_scope: HashMap::new(),
             gas_counter: GasCounter::new(10_000_000), // Default gas limit
             heap: Vec::new(),
-        }
+            builtins,
+            function_bodies: HashMap::new(),
+        };
+
+        // Inject built-in objects (JSON, Decimal, etc.)
+        interpreter.inject_builtin_objects();
+
+        interpreter
+    }
+
+    /// Inject built-in objects like JSON into global scope
+    fn inject_builtin_objects(&mut self) {
+        // Create JSON object with methods
+        // Note: We use special handling for these in eval_call
+        let mut json_obj = HashMap::new();
+        json_obj.insert(
+            "parse".to_string(),
+            Value::Function(FunctionValue {
+                name: Some("JSON.parse".to_string()),
+                params: vec!["s".to_string()],
+                closure: HashMap::new(),
+            }),
+        );
+        json_obj.insert(
+            "stringify".to_string(),
+            Value::Function(FunctionValue {
+                name: Some("JSON.stringify".to_string()),
+                params: vec!["v".to_string()],
+                closure: HashMap::new(),
+            }),
+        );
+        json_obj.insert(
+            "stringifyCanonical".to_string(),
+            Value::Function(FunctionValue {
+                name: Some("JSON.stringifyCanonical".to_string()),
+                params: vec!["v".to_string()],
+                closure: HashMap::new(),
+            }),
+        );
+        self.global_scope
+            .insert("JSON".to_string(), Value::Object(json_obj));
+
+        // Create Decimal object with methods
+        let mut decimal_obj = HashMap::new();
+        decimal_obj.insert(
+            "fromString".to_string(),
+            Value::Function(FunctionValue {
+                name: Some("Decimal.fromString".to_string()),
+                params: vec!["s".to_string()],
+                closure: HashMap::new(),
+            }),
+        );
+        decimal_obj.insert(
+            "toString".to_string(),
+            Value::Function(FunctionValue {
+                name: Some("Decimal.toString".to_string()),
+                params: vec!["d".to_string()],
+                closure: HashMap::new(),
+            }),
+        );
+        self.global_scope
+            .insert("Decimal".to_string(), Value::Object(decimal_obj));
     }
 
     pub fn set_gas_limit(&mut self, limit: u64) {
@@ -52,25 +149,48 @@ impl Interpreter {
         name: &str,
         args: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
-        let func_val = self
-            .global_scope
-            .get(name)
-            .ok_or_else(|| RuntimeError::ValueError(format!("Function {} not found", name)))?
-            .clone();
+        if let Some(builtin) = self.builtins.get(name) {
+            // Built-in functions take one argument (for now, simple case)
+            if args.len() != 1 {
+                return Err(RuntimeError::ValueError(format!(
+                    "Builtin {} expects 1 argument",
+                    name
+                )));
+            }
+            builtin(args[0].clone()).map_err(RuntimeError::ValueError)
+        } else {
+            let func_val = self
+                .global_scope
+                .get(name)
+                .ok_or_else(|| RuntimeError::ValueError(format!("Function {} not found", name)))?
+                .clone();
 
-        self.call_function(&func_val, args)
+            self.call_function(&func_val, args)
+        }
     }
 
     pub fn eval(&mut self, expr: &JsExpr) -> Result<Value, RuntimeError> {
         self.eval_expr(expr, &mut HashMap::new())
     }
 
-    /// Execute a string of JS code (simplified - assumes it's a single expression)
-    pub fn execute(&mut self, code: &str) -> Result<String, RuntimeError> {
-        // This is a simplified implementation
-        // In reality, we'd need a proper JS parser
-        // For now, just return a placeholder
-        Ok(format!("Executed: {}", code))
+    /// Execute a string of JS code
+    ///
+    /// Parses the JS subset code and evaluates it, returning the result
+    /// as a JSON string (or the raw value for non-JSON results).
+    pub fn execute(&mut self, code: &str) -> Result<Value, RuntimeError> {
+        use crate::runtime::js_parser::parse_js_program;
+
+        // Parse the JS code into AST
+        let ast = parse_js_program(code)?;
+
+        // Evaluate the program
+        self.eval(&ast)
+    }
+
+    /// Execute JS code and return result as JSON string
+    pub fn execute_to_json(&mut self, code: &str) -> Result<String, RuntimeError> {
+        let result = self.execute(code)?;
+        result.to_json_string()
     }
 
     fn eval_expr(
@@ -193,8 +313,16 @@ impl Interpreter {
                     Ok(Value::Null)
                 }
             }
-            JsExpr::Function(name, params, _body) => {
+            JsExpr::Function(name, params, body) => {
                 self.gas_counter.consume(5)?;
+                // Store function body for later execution
+                self.function_bodies.insert(
+                    name.clone(),
+                    StoredFunction {
+                        params: params.clone(),
+                        body: body.clone(),
+                    },
+                );
                 let func = Value::Function(FunctionValue {
                     name: Some(name.clone()),
                     params: params.clone(),
@@ -202,6 +330,45 @@ impl Interpreter {
                 });
                 self.global_scope.insert(name.clone(), func.clone());
                 Ok(func)
+            }
+
+            // New statement types
+            JsExpr::Program(statements) => {
+                let mut result = Value::Null;
+                for stmt in statements {
+                    result = self.eval_expr(stmt, local_scope)?;
+                }
+                Ok(result)
+            }
+
+            JsExpr::FunctionDecl { name, params, body } => {
+                self.gas_counter.consume(5)?;
+                // Store function body for later execution
+                self.function_bodies.insert(
+                    name.clone(),
+                    StoredFunction {
+                        params: params.clone(),
+                        body: body.clone(),
+                    },
+                );
+                let func = Value::Function(FunctionValue {
+                    name: Some(name.clone()),
+                    params: params.clone(),
+                    closure: local_scope.clone(),
+                });
+                self.global_scope.insert(name.clone(), func.clone());
+                Ok(func)
+            }
+
+            JsExpr::Const { name, value } => {
+                self.gas_counter.consume(1)?;
+                let val = self.eval_expr(value, local_scope)?;
+                local_scope.insert(name.clone(), val.clone());
+                Ok(val)
+            }
+
+            JsExpr::ExprStmt(expr) => {
+                self.eval_expr(expr, local_scope)
             }
         }
     }
@@ -239,8 +406,8 @@ impl Interpreter {
                 let b = right.as_number()?;
                 Ok(Value::Number(a % b))
             }
-            "==" => Ok(Value::Boolean(left == right)),
-            "!=" => Ok(Value::Boolean(left != right)),
+            "==" | "===" => Ok(Value::Boolean(left == right)),
+            "!=" | "!==" => Ok(Value::Boolean(left != right)),
             "<" => {
                 let a = left.as_number()?;
                 let b = right.as_number()?;
@@ -296,6 +463,26 @@ impl Interpreter {
     ) -> Result<Value, RuntimeError> {
         match func_val {
             Value::Function(func) => {
+                // Get function name
+                let func_name = func.name.as_ref().ok_or_else(|| {
+                    RuntimeError::ValueError("Anonymous functions not supported".to_string())
+                })?;
+
+                // Check if this is a builtin function first
+                if let Some(builtin) = self.builtins.get(func_name).cloned() {
+                    // Builtins take single argument for now
+                    if args.len() != 1 {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Builtin {} expects 1 argument, got {}",
+                            func_name,
+                            args.len()
+                        )));
+                    }
+                    self.gas_counter.consume(10)?; // Builtin call cost
+                    return builtin(args[0].clone()).map_err(RuntimeError::ValueError);
+                }
+
+                // Not a builtin - check argument count against params
                 if args.len() != func.params.len() {
                     return Err(RuntimeError::ValueError(format!(
                         "Expected {} arguments, got {}",
@@ -304,13 +491,30 @@ impl Interpreter {
                     )));
                 }
 
+                // Set up local scope with closure and arguments
                 let mut local_scope = func.closure.clone();
                 for (param, arg) in func.params.iter().zip(args) {
                     local_scope.insert(param.clone(), arg);
                 }
 
-                // Placeholder: functions don't have bodies yet, just return null
-                Ok(Value::Null)
+                // Clone the body to avoid borrow checker issues
+                let body = self
+                    .function_bodies
+                    .get(func_name)
+                    .ok_or_else(|| {
+                        RuntimeError::ValueError(format!(
+                            "Function body not found for: {}",
+                            func_name
+                        ))
+                    })?
+                    .body
+                    .clone();
+
+                // Consume function call gas cost
+                self.gas_counter.consume(5)?;
+
+                // Execute the function body
+                self.eval_expr(&body, &mut local_scope)
             }
             _ => Err(RuntimeError::TypeError(
                 "Cannot call non-function".to_string(),

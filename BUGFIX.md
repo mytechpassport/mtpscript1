@@ -8,4 +8,50 @@
 - [ ] `mtpscript-core/src/runtime/clone.rs:39-62` – `parse_js_to_ast` always errors out, so `clone_interpreter` can never complete and no interpreter instance is ever produced, defeating the MTP-082 requirements for snapshot cloning and initialization.
 - [ ] `mtpscript-core/src/runtime/effects.rs:101-141` – `inject_effects` ignores the supplied `seed` and merely injects stub `FunctionValue`s without tying them to deterministic effect implementations or caching, leaving MTP-083’s deterministic effect contract unfulfilled.
 - [ ] `mtpscript-core/src/api/handler.rs:85-92` – `execute_handler` always returns a hardcoded success object rather than the actual API implementation, so the request handler never executes user code (MTP-111).
-
+- [ ] `mtpscript-core/src/types/checker.rs` – Type checker lacks fuzz tests for adversarial inputs, potentially allowing type confusion attacks or DoS via deep nesting; add cargo-fuzz integration for AST type checking.
+- [ ] `mtpscript-core/src/json/parse.rs` – JSON parser has no depth or size limits, vulnerable to DoS attacks (e.g., billion laughs); add configurable limits to prevent resource exhaustion.
+- [ ] `mtpscript-core/src/effects/builtins.rs` – Built-in functions lack input validation and sanitization, allowing potential injection attacks; add bounds checking and sanitization for all builtin inputs.
+- [ ] `mtpscript-core/src/ir/nodes.rs` – IR data structures lack validation, allowing malformed IR to cause runtime failures or exploits; implement IR schema validation before lowering.
+- [ ] `mtpscript-core/src/ir/lower.rs` – AST to IR lowering has no dedicated unit tests, risking incorrect transformations; add equivalence tests for lowering correctness.
+- [ ] `mtpscript-core/src/ir/tail_call.rs` – Tail call detection lacks comprehensive tests for complex expressions, potentially missing optimization opportunities or allowing stack overflows; add property-based tests.
+- [ ] `mtpscript-core/src/compiler/effects.rs` – Effect call compilation lacks input validation, allowing malicious effect arguments; add whitelist validation for effect parameters.
+- [ ] `mtpscript-core/src/compiler/deterministic.rs` – Code generation lacks cross-platform determinism tests, risking non-reproducible builds; add tests across different environments.
+- [ ] `mtpscript-core/src/json/parse.rs` – JSON parsing lacks fuzzing for malicious inputs, missing edge cases like invalid UTF-8 or control characters; integrate fuzz testing.
+- [ ] `mtpscript-core/src/json/serialize.rs` – Canonical JSON serialization lacks determinism verification across runs, potentially breaking signatures; add multi-run determinism tests.
+- [ ] `mtpscript-core/src/json/mod.rs` – CBOR encoder lacks validation and size limits, allowing invalid output or DoS; add CBOR spec compliance checks and limits.
+- [ ] `mtpscript-core/src/runtime/value.rs` – Value type lacks Hash implementation, violating spec requirements for hashing; implement secure Hash trait (e.g., SHA-256 for large values).
+- [ ] `mtpscript-core/src/api/handler.rs` – API request handler lacks input validation and rate limiting, vulnerable to injection and DoS attacks; add sanitization and rate limiting.
+- [ ] `mtpscript-core/src/security/sign.rs` – ECDSA signing lacks key strength validation and management policies, allowing weak keys; add FIPS-compliant key validation.
+- [ ] `mtpscript-core/src/modules/import.rs` – Static imports lack code signing verification, enabling supply chain attacks; add cryptographic verification for imported modules.
+- [ ] `mtpscript-core/src/` – System lacks comprehensive threat model and security audit; conduct full external security assessment and implement findings before production deployment.
+- [ ] `mtpscript-core/src/` – No chaos engineering or failure injection testing, masking resilience issues under load or adversarial conditions; implement chaos monkey testing suite.
+- [ ] `mtpscript-core/src/` – Missing formal verification for critical components (parser, type checker, interpreter); apply model checking and theorem proving where feasible.
+- [ ] `mtpscript-core/src/` – No centralized logging and monitoring system, hindering incident response and compliance; implement security event detection and alerting.
+- [ ] `mtpscript-core/src/` – Performance benchmarking absent, allowing undetected bottlenecks and scalability issues; implement continuous profiling and optimization.
+- [ ] `mtpscript-core/src/` – Compliance gaps (GDPR, PCI-DSS, etc.) unaddressed, risking legal penalties; conduct full compliance audit and remediate violations.
+- [ ] `mtpscript-core/src/lexer/mod.rs` – Lexer lacks input size limits and Unicode security handling, vulnerable to DoS and encoding attacks; add configurable limits and proper UTF-8 validation.
+- [ ] `mtpscript-core/src/parser/mod.rs` – Parser has no stack depth limits, allowing recursive descent stack overflows; implement recursion limits and robust error recovery.
+- [ ] `mtpscript-core/src/types/checker.rs` – Type checker lacks bounds checking on type recursion depth, enabling DoS via deep type nesting; add depth limits and cycle detection.
+- [ ] `mtpscript-core/src/runtime/interpreter.rs` – Interpreter lacks execution timeouts and resource quotas, allowing infinite loops and resource exhaustion; add configurable timeouts and metering.
+- [ ] `mtpscript-core/src/security/mod.rs` – No comprehensive cryptography audit or key management policies, allowing weak signatures and key compromise; implement FIPS-compliant crypto and key rotation.
+- [ ] `mtpscript-core/src/api/handler.rs` – API handlers lack comprehensive input validation and sanitization, vulnerable to injection attacks; add strict validation and XSS prevention.
+- [ ] `mtpscript-core/src/runtime/value.rs` – Value operations lack constant-time implementations, enabling timing attacks on sensitive data; implement constant-time comparisons and operations.
+- [ ] `mtpscript-core/src/` – No data flow analysis or taint tracking, allowing information leaks through implicit channels; implement static and dynamic taint analysis.
+- [ ] `mtpscript-core/src/` – Missing comprehensive fuzz testing across all components, leaving edge cases untested; integrate AFL/libFuzzer for continuous fuzzing.
+- [ ] `mtpscript-core/src/` – No supply chain security measures, vulnerable to dependency injection attacks; implement SBOM generation and dependency scanning.
+- [ ] `mtpscript-core/src/` – Lack of proper error handling and propagation, allowing crashes and undefined behavior; implement comprehensive error recovery and graceful degradation.
+- [ ] `mtpscript-core/src/` – No memory safety guarantees beyond Rust's defaults, potentially allowing use-after-free in complex scenarios; add additional memory safety checks and bounds validation.
+- [ ] `mtpscript-core/src/` – Race condition vulnerabilities in concurrent operations (if any), risking data corruption; implement proper synchronization primitives and race detection.
+- [ ] `mtpscript-core/src/` – No defense-in-depth strategies, relying on single points of failure; implement multiple security layers and fail-safes.
+- [ ] `mtpscript-core/src/` – Missing input/output validation at all boundaries, allowing malformed data propagation; add schema validation and sanitization everywhere.
+- [ ] `mtpscript-core/src/` – No rate limiting or throttling mechanisms, vulnerable to DoS attacks; implement adaptive rate limiting across all interfaces.
+- [ ] `mtpscript-core/src/` – Lack of proper session management and state isolation, allowing cross-request contamination; implement strict state isolation and cleanup.
+- [ ] `mtpscript-core/src/` – No integrity checks on internal data structures, allowing memory corruption exploits; add checksums and validation for critical structures.
+- [ ] `mtpscript-core/src/` – Missing audit trails for all security-relevant operations, hindering forensic analysis; implement comprehensive audit logging with tamper-evident storage.
+- [ ] `mtpscript-core/src/` – No zero-knowledge or privacy-preserving features, risking data exposure; implement privacy-by-design principles where applicable.
+- [ ] `mtpscript-core/src/` – Lack of proper resource cleanup and lifecycle management, allowing resource leaks; implement RAII patterns and resource tracking.
+- [ ] `mtpscript-core/src/` – No defense against side-channel attacks (timing, power, etc.), allowing information leakage; implement constant-time algorithms and side-channel mitigations.
+- [ ] `mtpscript-core/src/` – Missing formal security requirements and acceptance criteria validation, allowing implementation gaps; create security requirements traceability matrix.
+- [ ] `mtpscript-core/src/` – No continuous security monitoring or vulnerability scanning in CI/CD, allowing regressions; implement automated security scanning and alerting.
+- [ ] `mtpscript-core/src/` – Lack of incident response plan and security operations procedures, risking ineffective breach response; develop and test incident response capabilities.
+- [ ] `mtpscript-core/src/runtime/interpreter.rs:83-88` – The `execute` method is a placeholder that only returns the input JS code as a string without parsing or running it, so compiled MTPScript programs cannot actually execute; implement a full JavaScript subset interpreter to evaluate the generated code and return the actual result (e.g., for the API handler, call the generated function and return its JSON output).

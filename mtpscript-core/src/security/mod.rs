@@ -1,3 +1,4 @@
+pub mod fuzz;
 pub mod reproducible;
 pub mod sandbox;
 pub mod sign;

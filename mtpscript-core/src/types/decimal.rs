@@ -5,7 +5,7 @@ use std::fmt;
 /// - value: canonical integer significand (1-34 digits, no leading zeros)
 /// - scale: 0 ≤ scale ≤ 28 (IEEE-754-2008 decimal128)
 /// - Rounding: round-half-even (banker's rounding) per IEEE-754-2008 clause 4.3.2
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Decimal {
     /// The significand as a string of digits (no leading zeros except for "0")
     significand: String,
@@ -639,6 +639,13 @@ impl Ord for Decimal {
                 }
             }
         }
+    }
+}
+
+impl std::hash::Hash for Decimal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash the canonical string representation for determinism
+        self.to_string().hash(state);
     }
 }
 

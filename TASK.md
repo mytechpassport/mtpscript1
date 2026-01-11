@@ -2,7 +2,7 @@
 
 **Based on:** TECHSPECV5.md (Version 5.1)
 **Generated:** 2026-01-10
-**Total Tasks:** 72
+**Total Tasks:** 80
 
 ---
 
@@ -81,7 +81,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-003: Create CLI Interface
+### - [x] MTP-003: Create CLI Interface
 **Effort:** M | **Files:** `src/main.rs`, `src/cli/mod.rs`, `src/cli/commands.rs`
 **Spec Lines:** 481-493 (§12 Compilation Pipeline)
 **Priority:** P1
@@ -105,7 +105,7 @@ Pseudo-test:
 
 ## Section 2: Lexer
 
-### - [ ] MTP-010: Implement Lexer/Tokenizer
+### - [x] MTP-010: Implement Lexer/Tokenizer
 **Effort:** M | **Files:** `src/lexer/mod.rs`, `src/lexer/token.rs`, `src/lexer/scanner.rs`
 **Spec Lines:** 153-237 (§3 Syntax & Grammar)
 **Priority:** P0 - Blocker
@@ -175,11 +175,23 @@ Pseudo-test:
   assert(lex(".5").is_err())
 ```
 
+### - [x] MTP-174: Implement String Escape Sequences
+**Effort:** S | **Files:** `src/lexer/scanner.rs:162`
+**Spec Lines:** 233 (string_literal definition)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+```
+GIVEN string literals with escape sequences like \n, \t, \\, \"
+WHEN lexing
+THEN they should be processed and stored as the escaped characters
+```
+
 ---
 
 ## Section 3: Parser
 
-### - [ ] MTP-020: Implement AST Data Structures
+### - [x] MTP-020: Implement AST Data Structures
 **Effort:** M | **Files:** `src/parser/ast.rs`
 **Spec Lines:** 159-236 (Full EBNF Grammar)
 **Priority:** P0 - Blocker
@@ -235,7 +247,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-022: Implement Expression Parser with Precedence
+### - [x] MTP-022: Implement Expression Parser with Precedence
 **Effort:** M | **Files:** `src/parser/expr.rs`
 **Spec Lines:** 199-227 (expr rules), 239-242 (Pipeline Associativity)
 **Priority:** P0 - Blocker
@@ -265,7 +277,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-023: Implement Pattern Matching Parser
+### - [x] MTP-023: Implement Pattern Matching Parser
 **Effort:** M | **Files:** `src/parser/pattern.rs`
 **Spec Lines:** 218-222 (case, pattern rules)
 **Priority:** P0 - Blocker
@@ -290,7 +302,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-024: Implement Type Declaration Parser
+### - [x] MTP-024: Implement Type Declaration Parser
 **Effort:** M | **Files:** `src/parser/type_decl.rs`
 **Spec Lines:** 167-180 (type_decl, field_decl, variant_decl, type_expr)
 **Priority:** P0 - Blocker
@@ -314,7 +326,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-025: Implement API Declaration Parser
+### - [x] MTP-025: Implement API Declaration Parser
 **Effort:** S | **Files:** `src/parser/api_decl.rs`
 **Spec Lines:** 192-197 (api_decl, http_method)
 **Priority:** P0 - Blocker
@@ -346,7 +358,7 @@ Pseudo-test:
 
 ## Section 4: Type System
 
-### - [ ] MTP-030: Implement Primitive Types
+### - [x] MTP-030: Implement Primitive Types
 **Effort:** S | **Files:** `src/types/primitives.rs`, `src/types/mod.rs`
 **Spec Lines:** 253-259 (§4.1 Primitive Types)
 **Priority:** P0 - Blocker
@@ -369,7 +381,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-031: Implement Decimal Type
+### - [x] MTP-031: Implement Decimal Type
 **Effort:** L | **Files:** `src/types/decimal.rs`
 **Spec Lines:** 292-305 (§4-a Decimal / Money)
 **Priority:** P0 - Blocker
@@ -404,7 +416,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-032: Implement Composite Types (Records)
+### - [x] MTP-032: Implement Composite Types (Records)
 **Effort:** M | **Files:** `src/types/record.rs`
 **Spec Lines:** 261-271 (Records in §4.2)
 **Priority:** P0 - Blocker
@@ -463,7 +475,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-034: Implement Option and Result Built-in Types
+### - [x] MTP-034: Implement Option and Result Built-in Types
 **Effort:** S | **Files:** `src/types/builtins.rs`
 **Spec Lines:** 275-277, 287-288 (Option/Result, No null/undefined)
 **Priority:** P0 - Blocker
@@ -488,7 +500,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-035: Implement Type Checker
+### - [x] MTP-035: Implement Type Checker
 **Effort:** XL | **Files:** `src/types/checker.rs`, `src/types/unify.rs`
 **Spec Lines:** 251-291 (§4 Type System)
 **Priority:** P0 - Blocker
@@ -517,7 +529,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-036: Implement Json Type
+### - [x] MTP-036: Implement Json Type
 **Effort:** M | **Files:** `src/types/json.rs`
 **Spec Lines:** 441-458 (§9 JSON Model)
 **Priority:** P0 - Blocker
@@ -543,11 +555,23 @@ Pseudo-test:
   assert(json.type_of() == Type::Json)
 ```
 
+### - [x] MTP-172: Implement Argument Type Checking in Built-ins
+**Effort:** S | **Files:** `src/types/builtins.rs:17`
+**Spec Lines:** 275-277 (Option/Result)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+```
+GIVEN built-in type constructors like Some(arg)
+WHEN checking types
+THEN arg should be validated as string if required
+```
+
 ---
 
 ## Section 5: Effect System
 
-### - [ ] MTP-040: Implement Effect Declarations
+### - [x] MTP-040: Implement Effect Declarations
 **Effort:** M | **Files:** `src/effects/mod.rs`, `src/effects/declaration.rs`
 **Spec Lines:** 342-357 (§7 Effect System)
 **Priority:** P0 - Blocker
@@ -638,7 +662,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-043: Implement Built-in Functions
+### - [x] MTP-043: Implement Built-in Functions
 **Effort:** M | **Files:** `src/effects/builtins.rs`
 **Spec Lines:** 410-422 (§7-c Built-in Functions)
 **Priority:** P1
@@ -661,11 +685,23 @@ Pseudo-test:
   assert(call("fnv1a64", ["hello"]) == 0x779a65e7023cd2e7)
 ```
 
+### - [x] MTP-173: Implement Generic Type Variable Handling
+**Effort:** M | **Files:** `src/types/checker.rs:8`
+**Spec Lines:** 251-291 (§4 Type System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+```
+GIVEN generic type variables in type checker
+WHEN processing generics
+THEN they should be handled correctly
+```
+
 ---
 
 ## Section 6: Intermediate Representation (IR)
 
-### - [ ] MTP-050: Define IR Data Structures
+### - [x] MTP-050: Define IR Data Structures
 **Effort:** M | **Files:** `src/ir/mod.rs`, `src/ir/nodes.rs`
 **Spec Lines:** 481-493 (§12 Compilation Pipeline)
 **Priority:** P0 - Blocker
@@ -730,7 +766,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-052: Implement Tail Call Detection
+### - [x] MTP-052: Implement Tail Call Detection
 **Effort:** M | **Files:** `src/ir/tail_call.rs`
 **Spec Lines:** 328-329 (tail calls in §6), 770-771 (Annex A gas costs)
 **Priority:** P1
@@ -817,7 +853,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-062: Implement Effect Call Compilation
+### - [x] MTP-062: Implement Effect Call Compilation
 **Effort:** M | **Files:** `src/compiler/effects.rs`
 **Spec Lines:** 396-409 (§7-b Effect Invocation)
 **Priority:** P0 - Blocker
@@ -843,7 +879,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-063: Implement Deterministic Code Generation
+### - [x] MTP-063: Implement Deterministic Code Generation
 **Effort:** M | **Files:** `src/compiler/deterministic.rs`
 **Spec Lines:** 613-614 (α-equivalent), 617-620 (§26 Formal Determinism)
 **Priority:** P1
@@ -868,12 +904,31 @@ Pseudo-test:
 
 ## Section 8: Snapshot System
 
-### - [ ] MTP-070: Implement Snapshot File Format
+### - [x] MTP-070: Implement Snapshot File Format
 **Effort:** M | **Files:** `src/snapshot/format.rs`, `src/snapshot/mod.rs`
 **Spec Lines:** 651-661 (§27.2 Interpreter Snapshot Format)
 **Priority:** P0 - Blocker
 
 **Acceptance Criteria:**
+```
+GIVEN .msqs format specification
+WHEN creating/reading snapshots
+THEN it should follow:
+  - Bytes 0-7: "MTPJS\x00\x00\x00" (magic)
+  - Bytes 8-11: u32 version (51 for v5.1)
+  - Bytes 12-19: u64 size
+  - Bytes 20-51: SHA-256 of JS content
+  - Bytes 52..size-132: UTF-8 JS text
+  - Bytes size-132..size-4: ECDSA-P256 signature
+  - Bytes size-4..size: CRC32
+
+Pseudo-test:
+  let js = "function main() { return 42; }";
+  let snapshot = create_snapshot(js, &signing_key)?;
+
+  assert(&snapshot[0..8] == b"MTPJS\x00\x00\x00")
+  assert(u32::from_le_bytes(snapshot[8..12]) == 51)
+  assert(&snapshot[20..52] == sha256(js))
 ```
 GIVEN the .msqs format specification
 WHEN creating/reading snapshots
@@ -897,7 +952,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-071: Implement Snapshot Creation
+### - [x] MTP-071: Implement Snapshot Creation
 **Effort:** M | **Files:** `src/snapshot/create.rs`
 **Spec Lines:** 571-578 (Build in §22)
 **Priority:** P0 - Blocker
@@ -923,7 +978,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-072: Implement Snapshot Verification
+### - [x] MTP-072: Implement Snapshot Verification
 **Effort:** M | **Files:** `src/snapshot/verify.rs`
 **Spec Lines:** 509-510 (signature verification), 579-586 (Runtime verify)
 **Priority:** P0 - Blocker
@@ -955,7 +1010,7 @@ Pseudo-test:
 
 ## Section 9: Runtime / Interpreter
 
-### - [ ] MTP-080: Implement Interpreter Core
+### - [x] MTP-080: Implement Interpreter Core
 **Effort:** XL | **Files:** `src/runtime/interpreter.rs`, `src/runtime/mod.rs`
 **Spec Lines:** 625-659 (§27.1-27.3)
 **Priority:** P0 - Blocker
@@ -982,7 +1037,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-081: Implement Value Representation
+### - [x] MTP-081: Implement Value Representation
 **Effort:** M | **Files:** `src/runtime/value.rs`
 **Spec Lines:** 253-259, 441-452 (Types and JSON)
 **Priority:** P0 - Blocker
@@ -1010,7 +1065,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-082: Implement Interpreter Cloning
+### - [x] MTP-082: Implement Interpreter Cloning
 **Effort:** L | **Files:** `src/runtime/clone.rs`
 **Spec Lines:** 663-688 (§27.3 Interpreter Cloning)
 **Priority:** P0 - Blocker
@@ -1037,7 +1092,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-083: Implement Effect Injection
+### - [x] MTP-083: Implement Effect Injection
 **Effort:** L | **Files:** `src/runtime/effects.rs`
 **Spec Lines:** 690-718 (§27.4 Effect Injection)
 **Priority:** P0 - Blocker
@@ -1064,7 +1119,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-084: Implement Secure Wipe
+### - [x] MTP-084: Implement Secure Wipe
 **Effort:** M | **Files:** `src/runtime/wipe.rs`
 **Spec Lines:** 27, 500, 585, 686-688 (secure wipe mentions)
 **Priority:** P1
@@ -1091,7 +1146,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-085: Implement Deterministic Seed Computation
+### - [x] MTP-085: Implement Deterministic Seed Computation
 **Effort:** S | **Files:** `src/runtime/seed.rs`
 **Spec Lines:** 34-67 (§0-b, §0-c Deterministic Seed)
 **Priority:** P0 - Blocker
@@ -1119,6 +1174,18 @@ Pseudo-test:
   // Same inputs = same seed
   let seed2 = compute_seed(/* same args */)?;
   assert(seed == seed2)
+```
+
+### - [x] MTP-175: Implement JS Subset Parser for Cloning
+**Effort:** M | **Files:** `src/runtime/clone.rs:62`
+**Spec Lines:** 663-688 (§27.3 Interpreter Cloning)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+```
+GIVEN the cloning process
+WHEN parsing JS subset
+THEN it should be implemented correctly
 ```
 
 ---
@@ -1186,7 +1253,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-092: Integrate Gas Metering in Interpreter
+### - [x] MTP-092: Integrate Gas Metering in Interpreter
 **Effort:** M | **Files:** `src/runtime/interpreter.rs` (update)
 **Spec Lines:** 723-728 (§27.5 Gas Metering)
 **Priority:** P0 - Blocker
@@ -1216,7 +1283,7 @@ Pseudo-test:
 
 ## Section 11: JSON / Serialization
 
-### - [ ] MTP-100: Implement JSON Parser
+### - [x] MTP-100: Implement JSON Parser
 **Effort:** M | **Files:** `src/json/parse.rs`, `src/json/mod.rs`
 **Spec Lines:** 441-458 (§9 JSON Model)
 **Priority:** P0 - Blocker
@@ -1243,7 +1310,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-101: Implement Canonical JSON Serializer
+### - [x] MTP-101: Implement Canonical JSON Serializer
 **Effort:** M | **Files:** `src/json/serialize.rs`
 **Spec Lines:** 591-598 (§23 Canonical JSON), 146 (RFC 8785)
 **Priority:** P0 - Blocker
@@ -1275,7 +1342,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-102: Implement CBOR Encoder
+### - [x] MTP-102: Implement CBOR Encoder
 **Effort:** M | **Files:** `src/json/cbor.rs`
 **Spec Lines:** 144, 312 (CBOR mentions), 419 (cborEncode)
 **Priority:** P1
@@ -1302,7 +1369,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-103: Implement Equality, Ordering, and Hashing
+### - [x] MTP-103: Implement Equality, Ordering, and Hashing
 **Effort:** M | **Files:** `src/json/equality.rs`, `src/json/hash.rs`
 **Spec Lines:** 308-320 (§5 Equality, Ordering & Hashing)
 **Priority:** P0 - Blocker
@@ -1329,11 +1396,23 @@ Pseudo-test:
   assert(hash(&a) == fnv1a64(cbor_encode(&a)))
 ```
 
+### - [x] MTP-176: Implement Unicode Escape Parsing in JSON
+**Effort:** S | **Files:** `src/json/parse.rs:75`
+**Spec Lines:** 441-458 (§9 JSON Model)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+```
+GIVEN JSON with unicode escapes
+WHEN parsing
+THEN they should be handled correctly
+```
+
 ---
 
 ## Section 12: API System
 
-### - [ ] MTP-110: Implement HTTP Router
+### - [x] MTP-110: Implement HTTP Router
 **Effort:** M | **Files:** `src/api/router.rs`, `src/api/mod.rs`
 **Spec Lines:** 425-438 (§8 API System), 515-520 (§15 Local Web Server)
 **Priority:** P1
@@ -1360,7 +1439,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-111: Implement Request Handler
+### - [x] MTP-111: Implement Request Handler
 **Effort:** L | **Files:** `src/api/handler.rs`
 **Spec Lines:** 637-649 (§27.1 Host Process Flow)
 **Priority:** P1
@@ -1392,7 +1471,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-112: Implement OpenAPI Generator
+### - [x] MTP-112: Implement OpenAPI Generator
 **Effort:** L | **Files:** `src/api/openapi.rs`
 **Spec Lines:** 436, 782-788 (§8, Annex B)
 **Priority:** P2
@@ -1447,11 +1526,23 @@ Pseudo-test:
   assert(resp.body == r#"{"ok":true}"#)
 ```
 
+### - [x] MTP-178: Implement Path Parameter Extraction
+**Effort:** S | **Files:** `src/api/router.rs:27`
+**Spec Lines:** 425-438 (§8 API System)
+**Priority:** P0 - Blocker
+
+**Acceptance Criteria:**
+```
+GIVEN routes with path parameters like /users/:id
+WHEN routing
+THEN parameters should be extracted correctly
+```
+
 ---
 
 ## Section 13: Security
 
-### - [ ] MTP-120: Implement ECDSA-P256 Signing
+### - [x] MTP-120: Implement ECDSA-P256 Signing
 **Effort:** M | **Files:** `src/security/sign.rs`, `src/security/mod.rs`
 **Spec Lines:** 488, 577, 659 (signature mentions)
 **Priority:** P0 - Blocker
@@ -1476,7 +1567,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-121: Implement Signature Verification
+### - [x] MTP-121: Implement Signature Verification
 **Effort:** M | **Files:** `src/security/verify.rs`
 **Spec Lines:** 509-510, 579-580 (verification)
 **Priority:** P0 - Blocker
@@ -1554,11 +1645,23 @@ Pseudo-test:
   assert(build1.build_info.container_hash == "sha256:abc123")
 ```
 
+### - [x] MTP-177: Implement OpenAPI Generation Based on Routes
+**Effort:** M | **Files:** `src/api/openapi.rs:56`
+**Spec Lines:** 436, 782-788 (§8, Annex B)
+**Priority:** P1
+
+**Acceptance Criteria:**
+```
+GIVEN API routes
+WHEN generating OpenAPI
+THEN it should be based on the routes implemented
+```
+
 ---
 
 ## Section 14: Module System
 
-### - [ ] MTP-130: Implement Static Imports
+### - [x] MTP-130: Implement Static Imports
 **Effort:** M | **Files:** `src/modules/import.rs`, `src/modules/mod.rs`
 **Spec Lines:** 460-465 (§10 Module System)
 **Priority:** P1
@@ -1586,7 +1689,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-131: Implement Module Resolution
+### - [x] MTP-131: Implement Module Resolution
 **Effort:** M | **Files:** `src/modules/resolve.rs`
 **Spec Lines:** 460-465, 466-477 (§10, §11)
 **Priority:** P1
@@ -1642,7 +1745,7 @@ Pseudo-test:
 
 ## Section 15: Audit & Logging
 
-### - [ ] MTP-140: Implement Audit Logger
+### - [x] MTP-140: Implement Audit Logger
 **Effort:** M | **Files:** `src/audit/logger.rs`, `src/audit/mod.rs`
 **Spec Lines:** 95-101 (audit schema), 635 (Audit Logger), 737-739 (§27.7)
 **Priority:** P1
@@ -1672,7 +1775,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-141: Implement Request Tracing
+### - [x] MTP-141: Implement Request Tracing
 **Effort:** M | **Files:** `src/audit/trace.rs`
 **Spec Lines:** 76 (gasLimit in log), 97-101 (audit schema)
 **Priority:** P2
@@ -1699,7 +1802,7 @@ Pseudo-test:
 
 ## Section 16: Testing Infrastructure
 
-### - [ ] MTP-150: Implement Test Runner Framework
+### - [x] MTP-150: Implement Test Runner Framework
 **Effort:** M | **Files:** `tests/runner.rs`, `tests/mod.rs`
 **Spec Lines:** 753-759 (§27.10 Testing)
 **Priority:** P0 - Blocker
@@ -1724,7 +1827,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-151: Implement Determinism Verification Tests
+### - [x] MTP-151: Implement Determinism Verification Tests
 **Effort:** M | **Files:** `tests/determinism.rs`
 **Spec Lines:** 617-620 (§26 Formal Determinism Claim)
 **Priority:** P0 - Blocker
@@ -1787,7 +1890,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-154: Implement Type Checker Tests
+### - [x] MTP-154: Implement Type Checker Tests
 **Effort:** M | **Files:** `tests/typecheck_tests.rs`
 **Spec Lines:** 251-320 (§4, §5)
 **Priority:** P0 - Blocker
@@ -1828,7 +1931,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-156: Implement Compiler Tests
+### - [x] MTP-156: Implement Compiler Tests
 **Effort:** M | **Files:** `tests/compiler_tests.rs`
 **Spec Lines:** 481-493 (§12)
 **Priority:** P0 - Blocker
@@ -1848,7 +1951,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-157: Implement Runtime Tests
+### - [x] MTP-157: Implement Runtime Tests
 **Effort:** M | **Files:** `tests/runtime_tests.rs`
 **Spec Lines:** 625-759 (§27)
 **Priority:** P0 - Blocker
@@ -1889,12 +1992,53 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-159: Implement End-to-End Tests
+### - [x] MTP-159: Implement End-to-End Tests
 **Effort:** L | **Files:** `tests/e2e_tests.rs`
 **Spec Lines:** All major sections
 **Priority:** P1
 
 **Acceptance Criteria:**
+
+---
+
+### - [x] MTP-179: Implement JS Subset Parser and Executor in Interpreter
+**Effort:** L | **Files:** `src/runtime/interpreter.rs`, `src/compiler/codegen.rs`
+**Spec Lines:** 625-659 (§27.1-27.3 Interpreter Runtime)
+**Priority:** P0 - Blocker
+
+**Description:**
+The current `execute` method is a placeholder that only returns the input JS code as a string. To actually run MTPScript programs, implement a JavaScript subset parser that converts the generated JS text into executable AST nodes, then evaluate those nodes to produce actual results. Extend the `JsExpr` enum to support statements (function declarations, expression statements) and program execution. Update codegen to append a call to the API handler function so execution produces the expected output.
+
+**Acceptance Criteria:**
+- `execute` parses and evaluates JS subset code, returning the actual result (e.g., `{"result":7}` for the 03_functions test)
+- Supports function declarations, expression statements, and function calls
+- Rejects forbidden JS constructs (class, this, eval, loops, etc.)
+- Handles the deterministic JS subset generated by the compiler
+- Test with 03_functions.js to verify it returns `{"result":7}` instead of the code string
+
+**Implementation Steps:**
+1. **Extend JsExpr enum** (S effort): Add variants for statements: `FunctionDecl { name: String, params: Vec<String>, body: Box<JsExpr> }`, `ExprStmt(Box<JsExpr>)`, `Program(Vec<JsExpr>)`.
+2. **Implement JS parser** (M effort): Create `parse_js_to_ast(js: &str) -> Result<JsExpr, RuntimeError>` that tokenizes and parses the JS subset into JsExpr. Handle function declarations, return statements, and expression statements.
+3. **Update execute method** (S effort): Replace placeholder with: parse JS to AST, evaluate the program (execute statements in order, add functions to global scope), return result of last expression statement.
+4. **Modify codegen** (S effort): In `codegen.rs`, for API declarations, append a call to the handler function at the end of the generated JS (e.g., `handle_get__echo()`).
+5. **Add evaluation logic** (M effort): Implement `eval_program` to execute a sequence of statements, handling function declarations and expression evaluation.
+6. **Error handling and validation** (S effort): Ensure parser rejects invalid JS and only accepts the allowed subset.
+
+**Dependencies:**
+- Relies on existing `JsExpr` and `Value` types
+- Assumes codegen produces simple JS without complex features
+
+**Risks:**
+- Parsing JS subset correctly without full tokenizer (might need to extend lexer)
+- Ensuring evaluation matches deterministic requirements
+- Performance impact on execution time
+
+**Pseudo-test:**
+```rust
+let js = "function handle_get__echo() { return JSON.stringifyCanonical({\"result\": 7}); }\nhandle_get__echo()";
+let result = interpreter.execute(js)?;
+assert_eq!(result, Value::String("{\"result\":7}".to_string()));
+```
 ```
 GIVEN complete MTPScript programs
 WHEN running full pipeline
@@ -1909,7 +2053,7 @@ Pseudo-tests:
 
 ---
 
-### - [ ] MTP-160: Implement Benchmark Suite
+### - [x] MTP-160: Implement Benchmark Suite
 **Effort:** M | **Files:** `benches/benchmarks.rs`
 **Spec Lines:** 26, 506-508 (performance requirements)
 **Priority:** P2
@@ -1956,7 +2100,7 @@ Pseudo-test:
 
 ---
 
-### - [ ] MTP-171: Implement Lambda Request Adapter
+### - [x] MTP-171: Implement Lambda Request Adapter
 **Effort:** M | **Files:** `src/lambda/adapter.rs`
 **Spec Lines:** 68-78 (Host Adapter Contract)
 **Priority:** P2

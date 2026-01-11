@@ -1,5 +1,5 @@
 use clap::{value_parser, Arg, Command};
-use crc32fast::hash;
+use crc32fast;
 use mtpscript_core::compiler::codegen;
 use mtpscript_core::errors::compile::CompileError;
 use mtpscript_core::errors::runtime::RuntimeError;
@@ -10,8 +10,8 @@ use mtpscript_core::parser::Parser;
 use mtpscript_core::runtime::Interpreter;
 use mtpscript_core::security::sign::sign_ecdsa_p256;
 use mtpscript_core::security::verify;
+use mtpscript_core::types::checker::TypeChecker;
 use sha2::{Digest, Sha256};
-use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::io;
@@ -26,7 +26,7 @@ pub enum CliError {
     Runtime(RuntimeError),
     Mtp(MtpError),
     Utf8(str::Utf8Error),
-    Server(tiny_http::Error),
+    TinyHttp(String),
     Snapshot(String),
 }
 
@@ -38,13 +38,11 @@ impl fmt::Display for CliError {
             CliError::Runtime(err) => write!(f, "Runtime error: {:?}", err),
             CliError::Mtp(err) => write!(f, "MTP error: {:?}", err),
             CliError::Utf8(err) => write!(f, "Invalid UTF-8 data: {}", err),
-            CliError::Server(err) => write!(f, "Server error: {}", err),
+            CliError::TinyHttp(err) => write!(f, "Server error: {}", err),
             CliError::Snapshot(msg) => write!(f, "Snapshot error: {}", msg),
         }
     }
 }
-
-impl Error for CliError {}
 
 impl From<io::Error> for CliError {
     fn from(err: io::Error) -> Self {
@@ -73,12 +71,6 @@ impl From<MtpError> for CliError {
 impl From<str::Utf8Error> for CliError {
     fn from(err: str::Utf8Error) -> Self {
         CliError::Utf8(err)
-    }
-}
-
-impl From<tiny_http::Error> for CliError {
-    fn from(err: tiny_http::Error) -> Self {
-        CliError::Server(err)
     }
 }
 
@@ -181,6 +173,8 @@ fn compile_command(input: &Path, output: &Path) -> Result<(), CliError> {
     let tokens = scanner.scan_tokens()?;
     let mut parser = Parser::new(&tokens);
     let program = parser.parse()?;
+    let mut type_checker = TypeChecker::new();
+    type_checker.typecheck_program(&program)?;
     let ir = lower::lower_ast_to_ir(&program)?;
     let js = codegen::compile_ir_to_js(&ir)?;
     fs::write(output, js)?;
@@ -215,7 +209,7 @@ fn snapshot_command(input: &Path, output: &Path, key: &Path) -> Result<(), CliEr
     let total_size = (snapshot.len() + 4) as u64;
     snapshot[12..20].copy_from_slice(&total_size.to_le_bytes());
 
-    let crc = hash(&snapshot);
+    let crc = crc32fast::hash(&snapshot);
     snapshot.extend_from_slice(&crc.to_le_bytes());
 
     fs::write(output, &snapshot)?;
@@ -255,14 +249,23 @@ fn run_command(snapshot_path: &Path, cert: Option<&Path>) -> Result<(), CliError
 }
 
 fn serve_command(port: u16) -> Result<(), CliError> {
-    let server = Server::http(("0.0.0.0", port))?;
+    let server = Server::http(("0.0.0.0", port)).map_err(|e| CliError::TinyHttp(e.to_string()))?;
     println!("Serving MTPScript runtime on http://0.0.0.0:{}", port);
 
     for request in server.incoming_requests() {
-        let header = Header::from_bytes(b"Content-Type", b"text/plain; charset=utf-8")?;
+        let header = Header::from_bytes(b"Content-Type", b"text/plain; charset=utf-8")
+            .map_err(|_| CliError::TinyHttp("Invalid header".to_string()))?;
         let response = Response::from_string("MTPScript runtime placeholder").with_header(header);
-        request.respond(response)?;
+        request
+            .respond(response)
+            .map_err(|e| CliError::TinyHttp(e.to_string()))?;
     }
 
     Ok(())
+}
+
+impl From<()> for CliError {
+    fn from(_: ()) -> Self {
+        CliError::Snapshot("Empty result".into())
+    }
 }

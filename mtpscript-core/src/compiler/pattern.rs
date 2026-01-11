@@ -205,7 +205,7 @@ impl PatternCompiler {
     }
 
     /// Compile expressions (simplified version for pattern compilation)
-    fn compile_expr(&mut self, expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
+    fn compile_expr(&mut self, expr: &IrExpr, _indent: usize) -> Result<String, CompileError> {
         // This is a simplified version - in practice, we'd reuse the main codegen
         match expr {
             IrExpr::String(s, _) => Ok(format!("\"{}\"", s)),

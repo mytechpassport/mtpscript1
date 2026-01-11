@@ -1,7 +1,6 @@
 use crate::errors::MtpError;
 use crate::runtime::Interpreter;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::env;
 
 /// Lambda adapter for host effects
@@ -52,8 +51,8 @@ impl LambdaAdapter {
     /// Inject environment variable access effect
     fn inject_environment_effect(
         &self,
-        interpreter: &mut Interpreter,
-        seed: &[u8; 32],
+        _interpreter: &mut Interpreter,
+        _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
         // In a real implementation, this would inject a function that safely accesses env vars
         // For Lambda, we might restrict to specific allowed env vars
@@ -63,8 +62,8 @@ impl LambdaAdapter {
     /// Inject structured logging effect
     fn inject_logging_effect(
         &self,
-        interpreter: &mut Interpreter,
-        seed: &[u8; 32],
+        _interpreter: &mut Interpreter,
+        _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
         // Lambda logs go to CloudWatch via stdout/stderr
         Ok(())
@@ -73,8 +72,8 @@ impl LambdaAdapter {
     /// Inject deterministic time effect
     fn inject_time_effect(
         &self,
-        interpreter: &mut Interpreter,
-        seed: &[u8; 32],
+        _interpreter: &mut Interpreter,
+        _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
         // Time should be deterministic based on seed, not wall clock
         Ok(())

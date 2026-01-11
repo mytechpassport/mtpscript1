@@ -1,5 +1,6 @@
-// Test basic string functionality
-const hello = "Hello"
-const world = "World"
-const combined = hello + " " + world
-respond json({ greeting: combined })
+api GET "/string" uses {} {
+  const hello = "Hello";
+  const world = "World";
+  const combined = hello + " " + world;
+  respond json({ "greeting": combined })
+}

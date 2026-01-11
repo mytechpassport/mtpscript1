@@ -1,6 +1,7 @@
-// Test basic number operations
-const a = 10
-const b = 5
-const sum = a + b
-const product = a * b
-respond json({ a: a, b: b, sum: sum, product: product })
+api GET "/numbers" uses {} {
+  const a = 10;
+  const b = 5;
+  const sum = a + b;
+  const product = a * b;
+  respond json({ "a": a, "b": b, "sum": sum, "product": product })
+}

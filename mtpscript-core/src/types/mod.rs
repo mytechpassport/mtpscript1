@@ -1,8 +1,12 @@
 pub mod builtins;
+pub mod checker;
 pub mod decimal;
 pub mod primitives;
+pub mod record;
+pub mod unify;
 
 pub use decimal::Decimal;
+pub use record::RecordType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AdtVariant {
@@ -44,13 +48,46 @@ impl AdtType {
         format!("{:x}", hasher.finalize())
     }
 
+    pub fn substitute(&self, substitutions: &std::collections::HashMap<String, Type>) -> AdtType {
+        let mut new_variants = Vec::new();
+        for variant in &self.variants {
+            match variant {
+                AdtVariant::Unit(name) => new_variants.push(AdtVariant::Unit(name.clone())),
+                AdtVariant::Tuple(name, types) => {
+                    let new_types = types.iter().map(|t| Self::substitute_type(t, substitutions)).collect();
+                    new_variants.push(AdtVariant::Tuple(name.clone(), new_types));
+                }
+            }
+        }
+        AdtType {
+            name: self.name.clone(),
+            type_params: vec![], // substituted, no params
+            variants: new_variants,
+        }
+    }
+
+    fn substitute_type(typ: &Type, substitutions: &std::collections::HashMap<String, Type>) -> Type {
+        match typ {
+            Type::TypeVar(name) => substitutions.get(name).cloned().unwrap_or_else(|| Type::TypeVar(name.clone())),
+            Type::Adt(adt) => Type::Adt(Box::new(adt.substitute(substitutions))),
+            Type::Record(record) => {
+                // Assuming RecordType needs substitution too, but for now
+                Type::Record(record.clone())
+            }
+            other => other.clone(),
+        }
+    }
+
     fn type_to_bytes(typ: &Type) -> Vec<u8> {
         match typ {
             Type::Number => b"number".to_vec(),
             Type::Boolean => b"boolean".to_vec(),
             Type::String => b"string".to_vec(),
             Type::Decimal => b"decimal".to_vec(),
-            Type::Adt(adt) => format!("adt:{}", adt.name).as_bytes().to_vec(),
+            Type::TypeVar(name) => format!("typevar:{}", name).as_bytes().to_vec(),
+            Type::Record(_) => b"record".to_vec(),
+            Type::Adt(adt) => adt.name.as_bytes().to_vec(),
+            Type::Json => b"json".to_vec(),
             Type::Var(name) => format!("var:{}", name).as_bytes().to_vec(),
         }
     }
@@ -58,17 +95,15 @@ impl AdtType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    // Primitives
     Number,
     Boolean,
     String,
     Decimal,
-
-    // ADTs
-    Adt(Box<AdtType>),
-
-    // Type variables (for generics)
+    TypeVar(String),
+    Json,
     Var(String),
+    Adt(Box<AdtType>),
+    Record(Box<RecordType>),
 }
 
 impl Type {
@@ -85,7 +120,10 @@ impl Type {
             Type::Boolean => 1,
             Type::String => 0,    // Variable size
             Type::Decimal => 128, // Approximation
+            Type::TypeVar(_) => 0, // Unknown
+            Type::Record(_) => 0, // Variable size
             Type::Adt(_) => 0,    // Variable
+            Type::Json => 0,      // Variable size
             Type::Var(_) => 0,    // Unknown
         }
     }
@@ -114,6 +152,7 @@ impl Type {
     }
 }
 
+#[derive(Clone)]
 pub struct TypeContext {
     types: std::collections::HashMap<String, Type>,
 }
@@ -129,6 +168,44 @@ impl TypeContext {
         ctx.types.insert("boolean".to_string(), Type::Boolean);
         ctx.types.insert("string".to_string(), Type::String);
         ctx.types.insert("Decimal".to_string(), Type::Decimal);
+        ctx.types.insert("Json".to_string(), Type::Json);
+
+        // Add built-in ADTs
+        ctx.types.insert(
+            "Option".to_string(),
+            Type::Adt(Box::new(AdtType {
+                name: "Option".to_string(),
+                type_params: vec!["T".to_string()],
+                variants: vec![
+                    AdtVariant::Unit("None".to_string()),
+                    AdtVariant::Tuple("Some".to_string(), vec![Type::Var("T".to_string())]),
+                ],
+            })),
+        );
+        ctx.types.insert(
+            "Result".to_string(),
+            Type::Adt(Box::new(AdtType {
+                name: "Result".to_string(),
+                type_params: vec!["T".to_string(), "E".to_string()],
+                variants: vec![
+                    AdtVariant::Tuple("Ok".to_string(), vec![Type::Var("T".to_string())]),
+                    AdtVariant::Tuple("Err".to_string(), vec![Type::Var("E".to_string())]),
+                ],
+            })),
+        );
+
+        // Result<T,E> = Ok(T) | Err(E)
+        ctx.types.insert(
+            "Result".to_string(),
+            Type::Adt(Box::new(AdtType {
+                name: "Result".to_string(),
+                type_params: vec!["T".to_string(), "E".to_string()],
+                variants: vec![
+                    AdtVariant::Tuple("Ok".to_string(), vec![Type::Var("T".to_string())]),
+                    AdtVariant::Tuple("Err".to_string(), vec![Type::Var("E".to_string())]),
+                ],
+            })),
+        );
 
         // Option and Result are generic, so we don't add them here
         // They need to be instantiated with type parameters

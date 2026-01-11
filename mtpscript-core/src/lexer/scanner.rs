@@ -159,7 +159,6 @@ impl<'a> Scanner<'a> {
         self.advance(); // closing "
 
         let value = self.source[self.start + 1..self.current - 1].to_string();
-        // TODO: process escapes
         let processed = self.process_escapes(&value);
 
         Ok(Some(self.make_token(Token::String(processed))))

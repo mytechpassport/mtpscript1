@@ -14,7 +14,9 @@ pub const BUILTINS: &[BuiltinFunction] = &[
             if args.len() != 1 {
                 return Err("Json.parse expects 1 argument".to_string());
             }
-            // TODO: Check arg is string
+            if args[0] != super::Type::String {
+                return Err("Json.parse expects string argument".to_string());
+            }
             Ok(Type::Adt(Box::new(super::AdtType {
                 name: "Json".to_string(),
                 type_params: vec![],
@@ -116,16 +118,16 @@ mod tests {
     #[test]
     fn test_option_result_types() {
         let ctx = super::super::TypeContext::with_builtins();
-        // Option and Result are constructed on demand, not in the context
-        assert!(ctx.lookup("Option").is_none());
-        assert!(ctx.lookup("Result").is_none());
+        // Option and Result are built-in types in the context
+        assert!(ctx.lookup("Option").is_some());
+        assert!(ctx.lookup("Result").is_some());
     }
 
     #[test]
     fn test_option_result_acceptance_criteria() {
         use super::super::{Type, TypeContext};
 
-        let ctx = TypeContext::with_builtins();
+        let _ctx = TypeContext::with_builtins();
 
         // Test that Option<T> and Result<T,E> can be constructed
         let option_number = Type::option(Type::Number);

@@ -227,6 +227,7 @@ impl ModuleResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
 
@@ -265,5 +266,98 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Circular dependency"));
+    }
+
+    #[test]
+    fn test_topological_sort() {
+        let resolver = ModuleResolver::new();
+        let mut graph = HashMap::new();
+        graph.insert(
+            "main".to_string(),
+            vec!["utils".to_string(), "types".to_string()],
+        );
+        graph.insert("utils".to_string(), vec!["types".to_string()]);
+        graph.insert("types".to_string(), vec![]);
+
+        let mut resolved_modules = HashMap::new();
+        resolved_modules.insert(
+            "main".to_string(),
+            ResolvedModule {
+                name: "main".to_string(),
+                path: "main.mtp".to_string(),
+                dependencies: vec!["utils".to_string(), "types".to_string()],
+                content_hash: "hash".to_string(),
+            },
+        );
+        resolved_modules.insert(
+            "utils".to_string(),
+            ResolvedModule {
+                name: "utils".to_string(),
+                path: "utils.mtp".to_string(),
+                dependencies: vec!["types".to_string()],
+                content_hash: "hash".to_string(),
+            },
+        );
+        resolved_modules.insert(
+            "types".to_string(),
+            ResolvedModule {
+                name: "types".to_string(),
+                path: "types.mtp".to_string(),
+                dependencies: vec![],
+                content_hash: "hash".to_string(),
+            },
+        );
+
+        let resolution = ModuleResolution {
+            root_path: ".".to_string(),
+            resolved_modules,
+            dependency_graph: graph,
+        };
+
+        let order = resolver.get_compilation_order(&resolution).unwrap();
+        // types should come before utils and main
+        assert_eq!(order[0], "types");
+        assert!(order.contains(&"utils".to_string()));
+        assert_eq!(order[order.len() - 1], "main");
+    }
+
+    #[test]
+    fn test_order_independent_compilation() {
+        let temp_dir = tempdir().unwrap();
+        let main_path = temp_dir.path().join("main.mtp");
+        let utils_path = temp_dir.path().join("utils.mtp");
+
+        fs::write(
+            &main_path,
+            r#"
+            function main(): string { "main" }
+        "#,
+        )
+        .unwrap();
+
+        fs::write(
+            &utils_path,
+            r#"
+            function helper(): string { "hello" }
+        "#,
+        )
+        .unwrap();
+
+        let mut resolver1 = ModuleResolver::new();
+        let resolution1 = resolver1
+            .resolve_modules(&[main_path.to_str().unwrap().to_string()])
+            .unwrap();
+
+        let mut resolver2 = ModuleResolver::new();
+        let resolution2 = resolver2
+            .resolve_modules(&[
+                utils_path.to_str().unwrap().to_string(),
+                main_path.to_str().unwrap().to_string(),
+            ])
+            .unwrap();
+
+        // Both should resolve to the same modules
+        assert_eq!(resolution1.resolved_modules.len(), 1);
+        assert_eq!(resolution2.resolved_modules.len(), 2);
     }
 }

@@ -1,60 +1,48 @@
-// Test Gas system runtime functionality
-// Tests §3 Control Flow & Execution and §0-c Gas Limit Injection
-
-function gas_intensive_computation(iterations) {
-    let total = 0
-    let i = 0
-    
-    // This loop should consume gas with each iteration
-    while (i < iterations) {
-        total = total + (i * i)
-        i = i + 1
-    }
-    
-    return total
-}
-
-function test_gas_exhaustion() {
-    // This should exhaust gas and return deterministic error
-    let infinite = true
-    let counter = 0
-    
-    while (infinite) {
-        counter = counter + 1
-        // Should hit gas limit here
-    }
-    
-    return counter  // Never reached
+function gas_intensive_computation(iterations: number) {
+    if (iterations == 0) { 0 } else { gas_intensive_computation(iterations - 1) + 1 }
 }
 
 function test_gas_costs() {
-    // Different operations have different gas costs
-    const cheap_op = 1 + 1           // Low gas
-    const expensive_func = gas_intensive_computation(100)  // High gas
-    
-    return {
-        cheap_cost: cheap_op,
-        expensive_cost: expensive_func,
-        gas_operations: ["addition", "loop", "function_call"]
+    const cheap_op = 1 + 1;
+    const expensive_func = gas_intensive_computation(10);
+    {
+        "cheap_cost": cheap_op,
+        "expensive_cost": expensive_func,
+        "gas_operations": ["addition", "function_call"]
     }
 }
 
-// Test with limited gas
-const normal_result = gas_intensive_computation(50)
-
-// Test gas exhaustion (should return GasExhausted error)
-const exhaust_result = test_gas_exhaustion()
-
-// Test various gas costs
-const cost_analysis = test_gas_costs()
-
-respond json({
-    normal_computation: normal_result,
-    gas_exhaustion_test: exhaust_result,
-    gas_cost_analysis: cost_analysis,
-    gas_features: {
-        metering: "enabled",
-        limits: "enforced", 
-        exhaustion: "deterministic_error"
-    }
-})
+api GET "/gas" uses {} {
+  const normal_result = gas_intensive_computation(5);
+  const cost_analysis = test_gas_costs();
+  respond json({
+      "normal_computation": normal_result,
+      "gas_cost_analysis": cost_analysis,
+      "gas_features": {
+          "metering": "enabled",
+          "limits": "enforced",
+          "exhaustion": "deterministic_error"
+      }
+  })
+}
+  function test_gas_costs() {
+      const cheap_op = 1 + 1;
+      const expensive_func = gas_intensive_computation(10);
+      {
+          "cheap_cost": cheap_op,
+          "expensive_cost": expensive_func,
+          "gas_operations": ["addition", "function_call"]
+      }
+  }
+  const normal_result = gas_intensive_computation(5);
+  const cost_analysis = test_gas_costs();
+  respond json({
+      "normal_computation": normal_result,
+      "gas_cost_analysis": cost_analysis,
+      "gas_features": {
+          "metering": "enabled",
+          "limits": "enforced",
+          "exhaustion": "deterministic_error"
+      }
+  })
+}

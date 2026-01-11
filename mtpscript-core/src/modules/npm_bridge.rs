@@ -1,7 +1,6 @@
 use crate::errors::MtpError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -433,8 +432,8 @@ mod tests {
         fs::write(package_dir.join("index.js"), "console.log('test');").unwrap();
 
         let bridge = create_standard_bridge();
-        let size = bridge.get_package_size_kb(&package_dir).unwrap();
-        assert!(size >= 0);
+        let _size = bridge.get_package_size_kb(&package_dir).unwrap();
+        // size is usize, always >= 0
     }
 
     #[test]
