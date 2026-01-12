@@ -13,11 +13,7 @@ pub fn unify(left: &Type, right: &Type) -> Result<Substitution, String> {
 }
 
 /// Unify with existing substitutions
-fn unify_with_subs(
-    left: &Type,
-    right: &Type,
-    subs: &Substitution,
-) -> Result<Substitution, String> {
+fn unify_with_subs(left: &Type, right: &Type, subs: &Substitution) -> Result<Substitution, String> {
     let left = apply_substitution(left, subs);
     let right = apply_substitution(right, subs);
 
@@ -67,16 +63,10 @@ fn unify_with_subs(
         // ADT types - unify if same name
         (Type::Adt(adt1), Type::Adt(adt2)) => {
             if adt1.name != adt2.name {
-                return Err(format!(
-                    "Type mismatch: {} vs {}",
-                    adt1.name, adt2.name
-                ));
+                return Err(format!("Type mismatch: {} vs {}", adt1.name, adt2.name));
             }
             if adt1.type_params.len() != adt2.type_params.len() {
-                return Err(format!(
-                    "Type parameter count mismatch for {}",
-                    adt1.name
-                ));
+                return Err(format!("Type parameter count mismatch for {}", adt1.name));
             }
 
             let mut current_subs = subs.clone();
@@ -120,12 +110,8 @@ fn occurs_check(var: &str, ty: &Type) -> bool {
         Type::Function(params, ret) => {
             params.iter().any(|p| occurs_check(var, p)) || occurs_check(var, ret)
         }
-        Type::Adt(adt) => {
-            adt.type_params.iter().any(|p| p == var)
-        }
-        Type::Record(rec) => {
-            rec.fields.iter().any(|(_, t)| occurs_check(var, t))
-        }
+        Type::Adt(adt) => adt.type_params.iter().any(|p| p == var),
+        Type::Record(rec) => rec.fields.iter().any(|(_, t)| occurs_check(var, t)),
         _ => false,
     }
 }
@@ -140,12 +126,10 @@ pub fn apply_substitution(ty: &Type, subs: &Substitution) -> Type {
                 ty.clone()
             }
         }
-        Type::Function(params, ret) => {
-            Type::Function(
-                params.iter().map(|p| apply_substitution(p, subs)).collect(),
-                Box::new(apply_substitution(ret, subs)),
-            )
-        }
+        Type::Function(params, ret) => Type::Function(
+            params.iter().map(|p| apply_substitution(p, subs)).collect(),
+            Box::new(apply_substitution(ret, subs)),
+        ),
         Type::Adt(adt) => {
             // For ADT, we don't substitute type params directly
             // as they are stored as strings
@@ -230,10 +214,7 @@ mod tests {
             vec![Type::TypeVar("T".to_string())],
             Box::new(Type::TypeVar("T".to_string())),
         );
-        let f2 = Type::Function(
-            vec![Type::Number],
-            Box::new(Type::Number),
-        );
+        let f2 = Type::Function(vec![Type::Number], Box::new(Type::Number));
         let result = unify(&f1, &f2);
         assert!(result.is_ok());
         let subs = result.unwrap();

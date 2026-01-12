@@ -151,7 +151,8 @@ impl NpmBridge {
         // Format: 2024-01-01T00:00:00Z + offset derived from hash
         let time_offset = u32::from_le_bytes(content_hash[0..4].try_into().unwrap()) % 86400;
         let base_timestamp = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap();
-        let deterministic_timestamp = base_timestamp + chrono::Duration::seconds(time_offset as i64);
+        let deterministic_timestamp =
+            base_timestamp + chrono::Duration::seconds(time_offset as i64);
 
         let manifest = AuditManifest {
             unsafe_deps,

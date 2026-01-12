@@ -231,7 +231,11 @@ impl LambdaRuntime {
     }
 
     /// Send response to Lambda runtime API
-    fn send_response_with_id(&self, response: &LambdaResponse, request_id: &str) -> Result<(), MtpError> {
+    fn send_response_with_id(
+        &self,
+        response: &LambdaResponse,
+        request_id: &str,
+    ) -> Result<(), MtpError> {
         let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
             error: "Runtime".to_string(),
             message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
@@ -349,8 +353,14 @@ impl PreloadedRuntime {
                 let remaining_ms = deadline_ms.saturating_sub(now_ms);
                 if remaining_ms < 100 {
                     // Not enough time, send timeout error and continue
-                    eprintln!("Warning: Insufficient time remaining ({}ms), skipping invocation", remaining_ms);
-                    let _ = runtime.send_error(&invocation.request_id, "Timeout: insufficient execution time");
+                    eprintln!(
+                        "Warning: Insufficient time remaining ({}ms), skipping invocation",
+                        remaining_ms
+                    );
+                    let _ = runtime.send_error(
+                        &invocation.request_id,
+                        "Timeout: insufficient execution time",
+                    );
                     continue;
                 }
             }

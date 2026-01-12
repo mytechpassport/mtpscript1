@@ -366,14 +366,18 @@ fn execute_command(input: &Path) -> Result<(), CliError> {
             if error_str.contains("GasExhausted") {
                 // Extract gas_limit and gas_used from the error
                 if let Some(limit_start) = error_str.find("gas_limit: ") {
-                    let limit_end = error_str[limit_start..].find(',').unwrap_or(error_str.len() - limit_start);
+                    let limit_end = error_str[limit_start..]
+                        .find(',')
+                        .unwrap_or(error_str.len() - limit_start);
                     let gas_limit: u64 = error_str[limit_start + 11..limit_start + limit_end]
                         .trim()
                         .parse()
                         .unwrap_or(0);
 
                     if let Some(used_start) = error_str.find("gas_used: ") {
-                        let used_end = error_str[used_start..].find('}').unwrap_or(error_str.len() - used_start);
+                        let used_end = error_str[used_start..]
+                            .find('}')
+                            .unwrap_or(error_str.len() - used_start);
                         let gas_used: u64 = error_str[used_start + 10..used_start + used_end]
                             .trim()
                             .parse()

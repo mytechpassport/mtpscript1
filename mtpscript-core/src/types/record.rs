@@ -55,7 +55,9 @@ impl RecordType {
             super::Type::String => b"string".to_vec(),
             super::Type::Decimal => b"decimal".to_vec(),
             super::Type::TypeVar(name) => format!("typevar:{}", name).as_bytes().to_vec(),
-            super::Type::Record(rec) => format!("record:{}", rec.content_hash()).as_bytes().to_vec(),
+            super::Type::Record(rec) => {
+                format!("record:{}", rec.content_hash()).as_bytes().to_vec()
+            }
             super::Type::Adt(adt) => format!("adt:{}", adt.content_hash()).as_bytes().to_vec(),
             super::Type::Json => b"json".to_vec(),
             super::Type::Var(name) => format!("var:{}", name).as_bytes().to_vec(),

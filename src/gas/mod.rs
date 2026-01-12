@@ -108,7 +108,7 @@ impl GasCosts {
         50
     }
     pub fn effect_call_db_write() -> u64 {
-        50
+        100
     }
     pub fn effect_call_http_out() -> u64 {
         100

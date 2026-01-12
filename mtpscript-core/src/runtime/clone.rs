@@ -59,15 +59,16 @@ fn verify_snapshot_signature(snapshot: &[u8]) -> Result<(), RuntimeError> {
         Err(_) => {
             // No certificate configured - skip signature verification
             // In production, this should be required
-            eprintln!("Warning: Snapshot signature verification skipped - no MTP_SIGNING_CERT configured");
+            eprintln!(
+                "Warning: Snapshot signature verification skipped - no MTP_SIGNING_CERT configured"
+            );
             return Ok(());
         }
     };
 
     // Load certificate
-    let cert_pem = std::fs::read_to_string(&cert_path).map_err(|e| {
-        RuntimeError::ValueError(format!("Failed to read certificate: {}", e))
-    })?;
+    let cert_pem = std::fs::read_to_string(&cert_path)
+        .map_err(|e| RuntimeError::ValueError(format!("Failed to read certificate: {}", e)))?;
 
     // Extract signature (64 bytes before CRC)
     // Snapshot format: ... | signature(64) | crc(4)

@@ -1,6 +1,6 @@
 use crate::errors::MtpError;
-use crate::runtime::Interpreter;
 use crate::runtime::value::Value;
+use crate::runtime::Interpreter;
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -56,8 +56,8 @@ impl LambdaAdapter {
         interpreter: &mut Interpreter,
         _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
-        use crate::runtime::value::{FunctionValue, Value};
         use crate::runtime::interpreter::{JsExpr, StoredFunction};
+        use crate::runtime::value::{FunctionValue, Value};
         use std::collections::HashMap;
 
         // Allowed environment variables for Lambda
@@ -91,33 +91,35 @@ impl LambdaAdapter {
         );
 
         // Register the builtin implementation
-        interpreter.builtins.insert("getenv_impl".to_string(), |args| {
-            if args.len() != 1 {
-                return Err("getenv_impl expects 1 argument".to_string());
-            }
-            let name = match &args[0] {
-                Value::String(s) => s,
-                _ => return Err("Environment variable name must be a string".to_string()),
-            };
+        interpreter
+            .builtins
+            .insert("getenv_impl".to_string(), |args| {
+                if args.len() != 1 {
+                    return Err("getenv_impl expects 1 argument".to_string());
+                }
+                let name = match &args[0] {
+                    Value::String(s) => s,
+                    _ => return Err("Environment variable name must be a string".to_string()),
+                };
 
-            // Only allow specific environment variables
-            let allowed = [
-                "AWS_LAMBDA_FUNCTION_NAME",
-                "AWS_LAMBDA_FUNCTION_VERSION",
-                "AWS_LAMBDA_FUNCTION_MEMORY_SIZE",
-                "AWS_REGION",
-                "AWS_DEFAULT_REGION",
-            ];
+                // Only allow specific environment variables
+                let allowed = [
+                    "AWS_LAMBDA_FUNCTION_NAME",
+                    "AWS_LAMBDA_FUNCTION_VERSION",
+                    "AWS_LAMBDA_FUNCTION_MEMORY_SIZE",
+                    "AWS_REGION",
+                    "AWS_DEFAULT_REGION",
+                ];
 
-            if !allowed.contains(&name.as_str()) {
-                return Ok(Value::Null);
-            }
+                if !allowed.contains(&name.as_str()) {
+                    return Ok(Value::Null);
+                }
 
-            match env::var(name) {
-                Ok(val) => Ok(Value::String(val)),
-                Err(_) => Ok(Value::Null),
-            }
-        });
+                match env::var(name) {
+                    Ok(val) => Ok(Value::String(val)),
+                    Err(_) => Ok(Value::Null),
+                }
+            });
 
         Ok(())
     }
@@ -128,8 +130,8 @@ impl LambdaAdapter {
         interpreter: &mut Interpreter,
         _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
-        use crate::runtime::value::{FunctionValue, Value};
         use crate::runtime::interpreter::{JsExpr, StoredFunction};
+        use crate::runtime::value::{FunctionValue, Value};
         use std::collections::HashMap;
 
         // Register the LambdaLog function
@@ -138,7 +140,9 @@ impl LambdaAdapter {
             params: vec!["level".to_string(), "message".to_string()],
             closure: HashMap::new(),
         });
-        interpreter.global_scope.insert("LambdaLog".to_string(), func);
+        interpreter
+            .global_scope
+            .insert("LambdaLog".to_string(), func);
 
         // Register the function body
         let body = JsExpr::Call(
@@ -157,28 +161,30 @@ impl LambdaAdapter {
         );
 
         // Register the builtin implementation
-        interpreter.builtins.insert("lambda_log_impl".to_string(), |args| {
-            if args.len() != 2 {
-                return Err("lambda_log_impl expects 2 arguments".to_string());
-            }
-            let level = match &args[0] {
-                Value::String(s) => s.clone(),
-                _ => "INFO".to_string(),
-            };
-            let message = match &args[1] {
-                Value::String(s) => s.clone(),
-                other => format!("{}", other),
-            };
+        interpreter
+            .builtins
+            .insert("lambda_log_impl".to_string(), |args| {
+                if args.len() != 2 {
+                    return Err("lambda_log_impl expects 2 arguments".to_string());
+                }
+                let level = match &args[0] {
+                    Value::String(s) => s.clone(),
+                    _ => "INFO".to_string(),
+                };
+                let message = match &args[1] {
+                    Value::String(s) => s.clone(),
+                    other => format!("{}", other),
+                };
 
-            // Log to stderr in structured JSON format for CloudWatch
-            let log_entry = serde_json::json!({
-                "level": level,
-                "message": message
+                // Log to stderr in structured JSON format for CloudWatch
+                let log_entry = serde_json::json!({
+                    "level": level,
+                    "message": message
+                });
+                eprintln!("{}", log_entry);
+
+                Ok(Value::Boolean(true))
             });
-            eprintln!("{}", log_entry);
-
-            Ok(Value::Boolean(true))
-        });
 
         Ok(())
     }
@@ -189,10 +195,10 @@ impl LambdaAdapter {
         interpreter: &mut Interpreter,
         seed: &[u8; 32],
     ) -> Result<(), MtpError> {
-        use crate::runtime::value::{FunctionValue, Value};
         use crate::runtime::interpreter::{JsExpr, StoredFunction};
-        use std::collections::HashMap;
+        use crate::runtime::value::{FunctionValue, Value};
         use sha2::{Digest, Sha256};
+        use std::collections::HashMap;
 
         // Compute deterministic timestamp from seed
         let mut hasher = Sha256::new();
@@ -218,10 +224,7 @@ impl LambdaAdapter {
         );
 
         // Register the function body
-        let body = JsExpr::Call(
-            Box::new(JsExpr::Ident("gettime_impl".to_string())),
-            vec![],
-        );
+        let body = JsExpr::Call(Box::new(JsExpr::Ident("gettime_impl".to_string())), vec![]);
         interpreter.function_bodies.insert(
             "GetTime".to_string(),
             StoredFunction {
@@ -231,12 +234,14 @@ impl LambdaAdapter {
         );
 
         // Register the builtin implementation
-        interpreter.builtins.insert("gettime_impl".to_string(), |_args| {
-            // Return deterministic timestamp based on seed
-            // In real implementation, this would be computed from the seed
-            // For now, return a fixed value that represents "Lambda invocation time"
-            Ok(Value::Number(1704067200000)) // 2024-01-01T00:00:00Z in milliseconds
-        });
+        interpreter
+            .builtins
+            .insert("gettime_impl".to_string(), |_args| {
+                // Return deterministic timestamp based on seed
+                // In real implementation, this would be computed from the seed
+                // For now, return a fixed value that represents "Lambda invocation time"
+                Ok(Value::Number(1704067200000)) // 2024-01-01T00:00:00Z in milliseconds
+            });
 
         Ok(())
     }

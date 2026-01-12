@@ -1,7 +1,7 @@
+use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use rusqlite::{Connection, params};
 
 use crate::errors::runtime::RuntimeError;
 use crate::runtime::interpreter::{Interpreter, JsExpr, StoredFunction};
@@ -25,7 +25,8 @@ pub fn init_sqlite(path: &str) -> Result<(), RuntimeError> {
             email TEXT
         )",
         [],
-    ).map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
+    )
+    .map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS test (
@@ -33,7 +34,8 @@ pub fn init_sqlite(path: &str) -> Result<(), RuntimeError> {
             value TEXT
         )",
         [],
-    ).map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
+    )
+    .map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
 
     let mut db = SQLITE_CONNECTION.lock().unwrap();
     *db = Some(conn);
@@ -42,8 +44,9 @@ pub fn init_sqlite(path: &str) -> Result<(), RuntimeError> {
 
 /// Initialize in-memory SQLite database
 pub fn init_sqlite_memory() -> Result<(), RuntimeError> {
-    let conn = Connection::open_in_memory()
-        .map_err(|e| RuntimeError::ValueError(format!("Failed to open in-memory database: {}", e)))?;
+    let conn = Connection::open_in_memory().map_err(|e| {
+        RuntimeError::ValueError(format!("Failed to open in-memory database: {}", e))
+    })?;
 
     // Create default tables
     conn.execute(
@@ -53,7 +56,8 @@ pub fn init_sqlite_memory() -> Result<(), RuntimeError> {
             email TEXT
         )",
         [],
-    ).map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
+    )
+    .map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS test (
@@ -61,13 +65,15 @@ pub fn init_sqlite_memory() -> Result<(), RuntimeError> {
             value TEXT
         )",
         [],
-    ).map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
+    )
+    .map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
 
     // Insert some test data
     conn.execute(
         "INSERT OR REPLACE INTO users (id, name, email) VALUES (42, 'Alice', 'alice@example.com')",
         [],
-    ).map_err(|e| RuntimeError::ValueError(format!("Failed to insert test data: {}", e)))?;
+    )
+    .map_err(|e| RuntimeError::ValueError(format!("Failed to insert test data: {}", e)))?;
 
     let mut db = SQLITE_CONNECTION.lock().unwrap();
     *db = Some(conn);
@@ -99,14 +105,16 @@ impl EffectRegistry {
 /// Execute a SQL query using SQLite
 fn execute_sql_read(sql: &str, params_value: &Value) -> Result<Value, String> {
     let db_guard = SQLITE_CONNECTION.lock().unwrap();
-    let conn = db_guard.as_ref()
+    let conn = db_guard
+        .as_ref()
         .ok_or_else(|| "Database not initialized. Call init_sqlite() first.".to_string())?;
 
     // Extract parameters from Value
     let param_vec = extract_params(params_value)?;
 
     // Prepare and execute the query
-    let mut stmt = conn.prepare(sql)
+    let mut stmt = conn
+        .prepare(sql)
         .map_err(|e| format!("SQL prepare error: {}", e))?;
 
     // Get column count and names
@@ -116,9 +124,8 @@ fn execute_sql_read(sql: &str, params_value: &Value) -> Result<Value, String> {
         .collect();
 
     // Execute with parameters and collect results
-    let rows_result: Result<Vec<Value>, _> = stmt.query_map(
-        rusqlite::params_from_iter(param_vec.iter()),
-        |row| {
+    let rows_result: Result<Vec<Value>, _> = stmt
+        .query_map(rusqlite::params_from_iter(param_vec.iter()), |row| {
             let mut row_obj = HashMap::new();
             for (i, name) in column_names.iter().enumerate() {
                 let value = match row.get_ref(i) {
@@ -128,16 +135,14 @@ fn execute_sql_read(sql: &str, params_value: &Value) -> Result<Value, String> {
                     Ok(rusqlite::types::ValueRef::Text(s)) => {
                         Value::String(String::from_utf8_lossy(s).to_string())
                     }
-                    Ok(rusqlite::types::ValueRef::Blob(b)) => {
-                        Value::String(hex::encode(b))
-                    }
+                    Ok(rusqlite::types::ValueRef::Blob(b)) => Value::String(hex::encode(b)),
                     Err(_) => Value::Null,
                 };
                 row_obj.insert(name.clone(), value);
             }
             Ok(Value::Object(row_obj))
-        },
-    ).and_then(|rows| rows.collect());
+        })
+        .and_then(|rows| rows.collect());
 
     match rows_result {
         Ok(rows) => Ok(Value::Array(rows)),
@@ -148,23 +153,26 @@ fn execute_sql_read(sql: &str, params_value: &Value) -> Result<Value, String> {
 /// Execute a SQL write operation using SQLite
 fn execute_sql_write(sql: &str, params_value: &Value) -> Result<Value, String> {
     let db_guard = SQLITE_CONNECTION.lock().unwrap();
-    let conn = db_guard.as_ref()
+    let conn = db_guard
+        .as_ref()
         .ok_or_else(|| "Database not initialized. Call init_sqlite() first.".to_string())?;
 
     // Extract parameters
     let param_vec = extract_params(params_value)?;
 
     // Execute the statement
-    let affected_rows = conn.execute(
-        sql,
-        rusqlite::params_from_iter(param_vec.iter()),
-    ).map_err(|e| format!("SQL execute error: {}", e))?;
+    let affected_rows = conn
+        .execute(sql, rusqlite::params_from_iter(param_vec.iter()))
+        .map_err(|e| format!("SQL execute error: {}", e))?;
 
     // Get last insert rowid
     let last_id = conn.last_insert_rowid();
 
     Ok(Value::Object(HashMap::from([
-        ("affectedRows".to_string(), Value::Number(affected_rows as i64)),
+        (
+            "affectedRows".to_string(),
+            Value::Number(affected_rows as i64),
+        ),
         ("insertId".to_string(), Value::Number(last_id)),
     ])))
 }
@@ -172,16 +180,10 @@ fn execute_sql_write(sql: &str, params_value: &Value) -> Result<Value, String> {
 /// Extract parameters from Value to rusqlite values
 fn extract_params(params_value: &Value) -> Result<Vec<rusqlite::types::Value>, String> {
     match params_value {
-        Value::Array(arr) => {
-            arr.iter()
-                .map(|v| value_to_sqlite(v))
-                .collect()
-        }
+        Value::Array(arr) => arr.iter().map(|v| value_to_sqlite(v)).collect(),
         Value::Object(obj) => {
             // For objects, just use values in iteration order (not ideal, but workable)
-            obj.values()
-                .map(|v| value_to_sqlite(v))
-                .collect()
+            obj.values().map(|v| value_to_sqlite(v)).collect()
         }
         Value::Null => Ok(vec![]),
         _ => Err("Parameters must be an array or object".to_string()),
@@ -217,7 +219,9 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
         params: vec!["sql".to_string(), "params".to_string()],
         closure: HashMap::new(),
     });
-    interp.global_scope.insert("DbRead".to_string(), db_read_func);
+    interp
+        .global_scope
+        .insert("DbRead".to_string(), db_read_func);
 
     let db_read_body = JsExpr::Call(
         Box::new(JsExpr::Ident("db_read_impl".to_string())),
@@ -251,7 +255,9 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
         params: vec!["sql".to_string(), "params".to_string()],
         closure: HashMap::new(),
     });
-    interp.global_scope.insert("DbWrite".to_string(), db_write_func);
+    interp
+        .global_scope
+        .insert("DbWrite".to_string(), db_write_func);
 
     let db_write_body = JsExpr::Call(
         Box::new(JsExpr::Ident("db_write_impl".to_string())),
@@ -352,7 +358,8 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
                 let body = resp.text().unwrap_or_default();
 
                 // Try to parse as JSON
-                let body_value = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                let body_value = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body)
+                {
                     json_value_to_value(&json)
                 } else {
                     Value::String(body)
@@ -417,7 +424,11 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
     // Async function
     let async_func = Value::Function(FunctionValue {
         name: Some("Async".to_string()),
-        params: vec!["promise_hash".to_string(), "cont_id".to_string(), "effect_args".to_string()],
+        params: vec![
+            "promise_hash".to_string(),
+            "cont_id".to_string(),
+            "effect_args".to_string(),
+        ],
         closure: HashMap::new(),
     });
     interp.global_scope.insert("Async".to_string(), async_func);
@@ -433,7 +444,11 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
     interp.function_bodies.insert(
         "Async".to_string(),
         StoredFunction {
-            params: vec!["promise_hash".to_string(), "cont_id".to_string(), "effect_args".to_string()],
+            params: vec![
+                "promise_hash".to_string(),
+                "cont_id".to_string(),
+                "effect_args".to_string(),
+            ],
             body: Box::new(async_body),
         },
     );
@@ -450,7 +465,10 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
         };
 
         Ok(Value::Object(HashMap::from([
-            ("async_result".to_string(), Value::String("completed".to_string())),
+            (
+                "async_result".to_string(),
+                Value::String("completed".to_string()),
+            ),
             ("result_id".to_string(), Value::String(result_hash)),
         ])))
     });
@@ -476,13 +494,11 @@ fn json_value_to_value(json: &serde_json::Value) -> Value {
         serde_json::Value::Array(arr) => {
             Value::Array(arr.iter().map(json_value_to_value).collect())
         }
-        serde_json::Value::Object(obj) => {
-            Value::Object(
-                obj.iter()
-                    .map(|(k, v)| (k.clone(), json_value_to_value(v)))
-                    .collect(),
-            )
-        }
+        serde_json::Value::Object(obj) => Value::Object(
+            obj.iter()
+                .map(|(k, v)| (k.clone(), json_value_to_value(v)))
+                .collect(),
+        ),
     }
 }
 
@@ -503,7 +519,8 @@ mod tests {
         let result = execute_sql_read(
             "SELECT id, name FROM users WHERE id = ?",
             &Value::Array(vec![Value::Number(42)]),
-        ).unwrap();
+        )
+        .unwrap();
 
         match result {
             Value::Array(rows) => {
@@ -523,8 +540,12 @@ mod tests {
         // Test write
         let result = execute_sql_write(
             "INSERT INTO test (id, value) VALUES (?, ?)",
-            &Value::Array(vec![Value::Number(1), Value::String("test_value".to_string())]),
-        ).unwrap();
+            &Value::Array(vec![
+                Value::Number(1),
+                Value::String("test_value".to_string()),
+            ]),
+        )
+        .unwrap();
 
         match result {
             Value::Object(obj) => {
@@ -537,7 +558,8 @@ mod tests {
         let read_result = execute_sql_read(
             "SELECT value FROM test WHERE id = ?",
             &Value::Array(vec![Value::Number(1)]),
-        ).unwrap();
+        )
+        .unwrap();
 
         match read_result {
             Value::Array(rows) => {

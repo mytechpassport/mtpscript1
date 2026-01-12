@@ -464,7 +464,10 @@ impl Interpreter {
                 '-' if paren_depth == 0 && i > 0 => {
                     // Make sure it's not part of a number literal
                     let prev_char = expr.chars().nth(i - 1);
-                    if prev_char.map(|c| !c.is_whitespace() && c != '(' && c != ',').unwrap_or(false) {
+                    if prev_char
+                        .map(|c| !c.is_whitespace() && c != '(' && c != ',')
+                        .unwrap_or(false)
+                    {
                         sub_pos = Some(i);
                         break;
                     }
@@ -602,7 +605,9 @@ impl Interpreter {
                             .collect();
 
                         // Find function body (between { and matching })
-                        let body_start = js_code[close_paren_idx..].find('{').map(|p| close_paren_idx + p);
+                        let body_start = js_code[close_paren_idx..]
+                            .find('{')
+                            .map(|p| close_paren_idx + p);
                         if let Some(body_start_idx) = body_start {
                             let mut brace_count = 1;
                             let mut body_end_idx = body_start_idx + 1;
@@ -621,10 +626,8 @@ impl Interpreter {
                             let body = js_code[body_start_idx + 1..body_end_idx].trim().to_string();
 
                             // Store the function as string-based
-                            self.string_functions.insert(
-                                func_name,
-                                StringFunction { params, body },
-                            );
+                            self.string_functions
+                                .insert(func_name, StringFunction { params, body });
 
                             pos = body_end_idx + 1;
                             continue;
