@@ -1,6 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
+use std::sync::{Mutex, OnceLock};
+
+// Global mutex for thread-safe audit logging
+fn audit_mutex() -> &'static Mutex<()> {
+    static AUDIT_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+    AUDIT_MUTEX.get_or_init(|| Mutex::new(()))
+}
 
 /// Audit entry for logging request execution
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,11 +32,22 @@ pub struct AuditLogger;
 
 impl AuditLogger {
     /// Log an audit entry to stderr as JSON line
+    ///
+    /// This function uses a mutex to ensure atomic line writes,
+    /// preventing interleaved output from multiple threads.
     pub fn log(entry: &AuditEntry) -> Result<(), io::Error> {
+        // Pre-serialize the JSON before acquiring the lock to minimize lock time
         let json = serde_json::to_string(entry)?;
-        let mut stderr = io::stderr();
-        writeln!(stderr, "{}", json)?;
-        stderr.flush()?;
+
+        // Acquire lock for atomic write
+        let _guard = audit_mutex().lock().unwrap_or_else(|e| e.into_inner());
+
+        // Write the complete line atomically
+        let stderr = io::stderr();
+        let mut handle = stderr.lock();
+        writeln!(handle, "{}", json)?;
+        handle.flush()?;
+
         Ok(())
     }
 

@@ -140,14 +140,27 @@ impl NpmBridge {
         }
 
         let total_deps = unsafe_deps.len();
+
+        // Compute content hash first (for deterministic timestamp derivation)
+        // We hash the unsafe_deps content to derive a stable "timestamp"
+        let content_for_hash = serde_json::to_string(&unsafe_deps)?;
+        let content_hash = Sha256::new().chain_update(&content_for_hash).finalize();
+
+        // Derive deterministic timestamp from content hash
+        // This ensures the same content always produces the same timestamp
+        // Format: 2024-01-01T00:00:00Z + offset derived from hash
+        let time_offset = u32::from_le_bytes(content_hash[0..4].try_into().unwrap()) % 86400;
+        let base_timestamp = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap();
+        let deterministic_timestamp = base_timestamp + chrono::Duration::seconds(time_offset as i64);
+
         let manifest = AuditManifest {
             unsafe_deps,
-            generated_at: chrono::Utc::now().to_rfc3339(),
+            generated_at: deterministic_timestamp.to_rfc3339(),
             total_deps,
             manifest_hash: String::new(), // Will be set below
         };
 
-        // Compute manifest hash
+        // Compute manifest hash (includes the deterministic timestamp)
         let json = serde_json::to_string(&manifest)?;
         let hash = Sha256::new().chain_update(&json).finalize();
         let manifest_hash = format!("{:x}", hash);

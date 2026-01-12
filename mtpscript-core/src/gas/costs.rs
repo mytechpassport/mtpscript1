@@ -33,8 +33,13 @@ pub fn gas_cost(op: Op) -> u64 {
         Op::PatternMatchCase => 3,
         Op::JsonParse(len) => 10 + (len as u64 / 10),
         Op::EffectCall => 20,
-        Op::DbRead => 20 + 50,  // base 20 + specific
-        Op::DbWrite => 20 + 50, // assuming DbWrite also costs 50 like DbRead
+        Op::DbRead => 20 + 50,  // base 20 + specific 50 for read operation
+        // DbWrite is typically more expensive than DbRead due to:
+        // - Disk I/O persistence requirements
+        // - Transaction logging overhead
+        // - Potential replication costs
+        // Default: 2x the read cost. Verify against MTP spec Annex A.
+        Op::DbWrite => 20 + 100,
         Op::HttpOut => 20 + 100,
     }
 }

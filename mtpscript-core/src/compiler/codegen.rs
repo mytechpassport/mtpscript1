@@ -336,7 +336,9 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
 
         IrExpr::Lambda { params, body, .. } => {
             let body_js = compile_expr(body, 0)?;
-            Ok(format!("function({}) {{ {} }}", params.join(", "), body_js))
+            // Extract just parameter names for JS output
+            let param_names: Vec<&str> = params.iter().map(|(name, _)| name.as_str()).collect();
+            Ok(format!("function({}) {{ {} }}", param_names.join(", "), body_js))
         }
 
         IrExpr::RespondJson(expr, _) => {

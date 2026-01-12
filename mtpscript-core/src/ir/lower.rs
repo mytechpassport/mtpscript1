@@ -283,10 +283,14 @@ fn lower_expr_with_tail(
         }
 
         AstExpr::Lambda { params, body } => {
-            // Lower lambda to IR lambda
+            // Lower lambda to IR lambda, preserving type annotations
             let ir_body = lower_expr_with_tail(body, expected_type, false)?;
+            let ir_params: Vec<(String, Type)> = params
+                .iter()
+                .map(|(name, type_expr)| (name.clone(), resolve_type_expr(type_expr)))
+                .collect();
             Ok(IrExpr::Lambda {
-                params: params.iter().map(|(name, _)| name.clone()).collect(),
+                params: ir_params,
                 body: Box::new(ir_body),
                 result_type: expected_type.clone(),
             })
@@ -683,7 +687,9 @@ mod tests {
         let ir = lower_expr(&ast, &Type::Var("func".to_string())).unwrap();
         match ir {
             IrExpr::Lambda { params, body, .. } => {
-                assert_eq!(params, vec!["x"]);
+                assert_eq!(params.len(), 1);
+                assert_eq!(params[0].0, "x");
+                assert_eq!(params[0].1, Type::Number); // Type annotation preserved
                 assert!(matches!(*body, IrExpr::Var(ref n, _) if n == "x"));
             }
             _ => panic!("Expected Lambda"),

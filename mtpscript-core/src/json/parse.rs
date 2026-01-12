@@ -150,8 +150,13 @@ impl<'a> JsonParser<'a> {
             self.skip_whitespace();
             if self.peek() == Some(',') {
                 self.next();
+                // RFC 8259: reject trailing commas - check if next non-whitespace is ]
+                self.skip_whitespace();
+                if self.peek() == Some(']') {
+                    return Err(ParseError::UnexpectedChar(',', self.pos - 1));
+                }
             } else if self.peek() == Some(']') {
-                // allow trailing comma
+                // No trailing comma - this is fine
             } else {
                 return Err(ParseError::UnexpectedChar(self.peek().unwrap(), self.pos));
             }
@@ -179,8 +184,13 @@ impl<'a> JsonParser<'a> {
             self.skip_whitespace();
             if self.peek() == Some(',') {
                 self.next();
+                // RFC 8259: reject trailing commas - check if next non-whitespace is }
+                self.skip_whitespace();
+                if self.peek() == Some('}') {
+                    return Err(ParseError::UnexpectedChar(',', self.pos - 1));
+                }
             } else if self.peek() == Some('}') {
-                // allow trailing comma
+                // No trailing comma - this is fine
             } else {
                 return Err(ParseError::UnexpectedChar(self.peek().unwrap(), self.pos));
             }

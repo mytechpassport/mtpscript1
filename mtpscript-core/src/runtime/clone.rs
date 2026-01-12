@@ -1,8 +1,13 @@
 use crate::errors::runtime::RuntimeError;
 use crate::runtime::interpreter::{Interpreter, JsExpr, StoredFunction};
+use crate::security::sign::verify_ecdsa_p256;
 use crc32fast;
+use std::env;
 
-// Placeholder for snapshot verification - would verify signature, etc.
+// Default public key for signature verification (can be overridden by MTP_SIGNING_CERT env var)
+const DEFAULT_PUBLIC_KEY: &str = "";
+
+/// Verify snapshot integrity and signature
 fn verify_snapshot(snapshot: &[u8]) -> Result<(), RuntimeError> {
     if snapshot.len() < 52 {
         return Err(RuntimeError::ValueError("Snapshot too small".to_string()));
@@ -35,6 +40,49 @@ fn verify_snapshot(snapshot: &[u8]) -> Result<(), RuntimeError> {
         ));
     }
 
+    // Verify ECDSA signature if certificate is available
+    // Signature is 64 bytes (ECDSA-P256 raw format) before CRC
+    // Layout: content_hash(32) | ... | signature(64) | crc(4)
+    if snapshot.len() >= 68 + 52 {
+        // At least header + sig + crc
+        verify_snapshot_signature(snapshot)?;
+    }
+
+    Ok(())
+}
+
+/// Verify ECDSA-P256 signature on snapshot
+fn verify_snapshot_signature(snapshot: &[u8]) -> Result<(), RuntimeError> {
+    // Check if signature verification is enabled
+    let cert_path = match env::var("MTP_SIGNING_CERT") {
+        Ok(path) => path,
+        Err(_) => {
+            // No certificate configured - skip signature verification
+            // In production, this should be required
+            eprintln!("Warning: Snapshot signature verification skipped - no MTP_SIGNING_CERT configured");
+            return Ok(());
+        }
+    };
+
+    // Load certificate
+    let cert_pem = std::fs::read_to_string(&cert_path).map_err(|e| {
+        RuntimeError::ValueError(format!("Failed to read certificate: {}", e))
+    })?;
+
+    // Extract signature (64 bytes before CRC)
+    // Snapshot format: ... | signature(64) | crc(4)
+    let sig_start = snapshot.len() - 68; // 64 bytes sig + 4 bytes CRC
+    let sig_end = snapshot.len() - 4;
+    let signature = &snapshot[sig_start..sig_end];
+
+    // Extract content hash from header (bytes 20-51)
+    let content_hash = &snapshot[20..52];
+
+    // Verify signature
+    verify_ecdsa_p256(content_hash, signature, &cert_pem).map_err(|e| {
+        RuntimeError::ValueError(format!("Snapshot signature verification failed: {}", e))
+    })?;
+
     Ok(())
 }
 
@@ -48,7 +96,8 @@ fn extract_js_code(snapshot: &[u8]) -> Result<String, RuntimeError> {
     }
 
     let js_start = 52;
-    let js_end = size - 132; // Before signature
+    // JS content ends before signature (64 bytes) and CRC (4 bytes)
+    let js_end = size - 68; // Before signature (64) + CRC (4)
     let js_bytes = &snapshot[js_start..js_end];
 
     String::from_utf8(js_bytes.to_vec())

@@ -28,7 +28,7 @@ pub enum IrExpr {
         result_type: Type,
     },
     Lambda {
-        params: Vec<String>,
+        params: Vec<(String, Type)>, // Parameters with their type annotations
         body: Box<IrExpr>,
         result_type: Type,
     },

@@ -13,15 +13,16 @@ pub fn verify_snapshot(snapshot_path: &str, cert_path: &str) -> Result<(), MtpEr
     // Read certificate
     let cert_pem = load_certificate(cert_path)?;
 
-    // Extract signature from snapshot (last 64 bytes before CRC)
-    if snapshot.len() < 132 {
+    // Extract signature from snapshot (64 bytes before CRC)
+    // ECDSA-P256 signatures are 64 bytes in raw (R || S) format
+    if snapshot.len() < 68 {
         return Err(MtpError::Security {
             error: "Security".to_string(),
             message: "Snapshot too small".to_string(),
         });
     }
 
-    let sig_start = snapshot.len() - 132;
+    let sig_start = snapshot.len() - 68; // 64 bytes signature + 4 bytes CRC
     let sig_end = snapshot.len() - 4; // Before CRC32
     let signature = &snapshot[sig_start..sig_end];
 
@@ -125,11 +126,12 @@ mod tests {
         data.extend_from_slice(&51u32.to_le_bytes()); // version
 
         // Calculate total size: magic(8) + version(4) + size(8) + hash(32) + content + sig(64) + crc(4)
+        // ECDSA-P256 signature is 64 bytes in raw format
         let total_size = 8 + 4 + 8 + 32 + js_content.len() + 64 + 4;
         data.extend_from_slice(&(total_size as u64).to_le_bytes()); // size
         data.extend_from_slice(&[0u8; 32]); // hash placeholder
         data.extend_from_slice(js_content); // JS content
-        data.extend_from_slice(&[0u8; 64]); // signature placeholder
+        data.extend_from_slice(&[0u8; 64]); // signature placeholder (64 bytes for ECDSA-P256)
 
         // Add CRC of everything except the CRC itself
         let crc = crc32fast::hash(&data);

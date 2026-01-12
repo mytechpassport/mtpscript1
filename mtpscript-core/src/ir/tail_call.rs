@@ -24,12 +24,13 @@ fn is_tail_recursive_call(expr: &IrExpr, func_name: &str) -> bool {
             else_branch,
             ..
         } => {
+            // A function is tail-recursive if ANY branch contains a tail call to itself
             is_tail_recursive_call(then_branch, func_name)
-                && is_tail_recursive_call(else_branch, func_name)
+                || is_tail_recursive_call(else_branch, func_name)
         }
         IrExpr::Match { cases, .. } => cases
             .iter()
-            .all(|(_, body)| is_tail_recursive_call(body, func_name)),
+            .any(|(_, body)| is_tail_recursive_call(body, func_name)),
         _ => false,
     }
 }
@@ -79,7 +80,8 @@ mod tests {
         };
 
         analyze_function_tail_calls(&mut func);
-        assert!(!func.is_tail_recursive); // Not tail recursive because then branch is not a call
+        // Now correctly identifies as tail-recursive because else branch has a tail call
+        assert!(func.is_tail_recursive);
     }
 
     proptest! {

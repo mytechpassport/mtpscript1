@@ -24,6 +24,9 @@ pub struct LambdaPayload {
     pub function_version: String,
     pub body: serde_json::Value,
     pub headers: HashMap<String, String>,
+    /// Deadline in milliseconds since Unix epoch (from Lambda-Runtime-Deadline-Ms header)
+    #[serde(default)]
+    pub deadline_ms: Option<u64>,
 }
 
 /// Lambda response
@@ -56,11 +59,14 @@ impl LambdaRuntime {
             // Get next invocation
             let invocation = self.get_next_invocation()?;
 
+            // Store request_id before processing
+            let request_id = invocation.request_id.clone();
+
             // Process the invocation
             let response = self.process_invocation(invocation)?;
 
-            // Send response
-            self.send_response(&response)?;
+            // Send response with the correct request_id
+            self.send_response_with_id(&response, &request_id)?;
 
             // Optional: send initialization error if needed
             // This would be for cold start failures
@@ -102,6 +108,13 @@ impl LambdaRuntime {
         let function_version =
             env::var("AWS_LAMBDA_FUNCTION_VERSION").unwrap_or_else(|_| "$LATEST".to_string());
 
+        // Extract deadline from Lambda-Runtime-Deadline-Ms header
+        let deadline_ms = response
+            .headers()
+            .get("lambda-runtime-deadline-ms")
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok());
+
         let headers = response
             .headers()
             .iter()
@@ -119,6 +132,7 @@ impl LambdaRuntime {
             function_version,
             body,
             headers,
+            deadline_ms,
         })
     }
 
@@ -217,13 +231,11 @@ impl LambdaRuntime {
     }
 
     /// Send response to Lambda runtime API
-    fn send_response(&self, response: &LambdaResponse) -> Result<(), MtpError> {
+    fn send_response_with_id(&self, response: &LambdaResponse, request_id: &str) -> Result<(), MtpError> {
         let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
             error: "Runtime".to_string(),
             message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
         })?;
-
-        let request_id = env::var("_X_AMZN_TRACE_ID").unwrap_or_else(|_| "unknown".to_string());
 
         let client = reqwest::blocking::Client::new();
         let url = format!(
@@ -300,21 +312,99 @@ impl PreloadedRuntime {
     }
 
     /// Run with preloaded snapshot
+    ///
+    /// This method respects Lambda's context deadline and will exit gracefully
+    /// when a shutdown signal is received or the deadline expires.
     pub fn run(&self) -> Result<(), MtpError> {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
         // Use preloaded data instead of reading from disk each time
         let runtime = self.runtime.clone();
-        // Override snapshot loading to use preloaded data
 
-        loop {
-            let invocation = runtime.get_next_invocation()?;
-            let response = runtime
-                .process_invocation_with_snapshot(invocation.clone(), &self.snapshot_data)?;
-            runtime.send_response(&response)?;
+        // Setup shutdown flag
+        let shutdown = Arc::new(AtomicBool::new(false));
+
+        // Note: In production, you would register a SIGTERM handler here
+        // For now, we check the deadline on each invocation
+
+        while !shutdown.load(Ordering::SeqCst) {
+            // Get next invocation
+            let invocation = match runtime.get_next_invocation() {
+                Ok(inv) => inv,
+                Err(e) => {
+                    // Log error but continue - the Lambda runtime API will retry
+                    eprintln!("Error getting invocation: {}", e);
+                    continue;
+                }
+            };
+
+            // Check if we have enough time remaining (minimum 100ms buffer)
+            if let Some(deadline_ms) = invocation.deadline_ms {
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+
+                let remaining_ms = deadline_ms.saturating_sub(now_ms);
+                if remaining_ms < 100 {
+                    // Not enough time, send timeout error and continue
+                    eprintln!("Warning: Insufficient time remaining ({}ms), skipping invocation", remaining_ms);
+                    let _ = runtime.send_error(&invocation.request_id, "Timeout: insufficient execution time");
+                    continue;
+                }
+            }
+
+            let request_id = invocation.request_id.clone();
+            match runtime.process_invocation_with_snapshot(invocation, &self.snapshot_data) {
+                Ok(response) => {
+                    if let Err(e) = runtime.send_response_with_id(&response, &request_id) {
+                        eprintln!("Error sending response: {}", e);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error processing invocation: {}", e);
+                    let _ = runtime.send_error(&request_id, &format!("{}", e));
+                }
+            }
         }
+
+        Ok(())
     }
 }
 
 impl LambdaRuntime {
+    /// Send error to Lambda runtime API
+    fn send_error(&self, request_id: &str, error_message: &str) -> Result<(), MtpError> {
+        let runtime_api = env::var("AWS_LAMBDA_RUNTIME_API").map_err(|_| MtpError::Runtime {
+            error: "Runtime".to_string(),
+            message: "AWS_LAMBDA_RUNTIME_API not set".to_string(),
+        })?;
+
+        let client = reqwest::blocking::Client::new();
+        let url = format!(
+            "http://{}/2018-06-01/runtime/invocation/{}/error",
+            runtime_api, request_id
+        );
+
+        let error_body = serde_json::json!({
+            "errorType": "RuntimeError",
+            "errorMessage": error_message
+        });
+
+        client
+            .post(&url)
+            .header("Lambda-Runtime-Function-Error-Type", "RuntimeError")
+            .json(&error_body)
+            .send()
+            .map_err(|e| MtpError::Runtime {
+                error: "Runtime".to_string(),
+                message: format!("Failed to send error: {}", e),
+            })?;
+
+        Ok(())
+    }
+
     /// Process invocation with preloaded snapshot
     fn process_invocation_with_snapshot(
         &self,
@@ -379,6 +469,7 @@ mod tests {
             function_version: "1".to_string(),
             body: serde_json::json!({"test": "data"}),
             headers: HashMap::new(),
+            deadline_ms: None,
         };
 
         let seed = runtime.compute_seed(&payload).unwrap();

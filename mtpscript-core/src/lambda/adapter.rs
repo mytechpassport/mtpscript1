@@ -1,5 +1,6 @@
 use crate::errors::MtpError;
 use crate::runtime::Interpreter;
+use crate::runtime::value::Value;
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -52,31 +53,191 @@ impl LambdaAdapter {
     /// Inject environment variable access effect
     fn inject_environment_effect(
         &self,
-        _interpreter: &mut Interpreter,
+        interpreter: &mut Interpreter,
         _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
-        // In a real implementation, this would inject a function that safely accesses env vars
-        // For Lambda, we might restrict to specific allowed env vars
+        use crate::runtime::value::{FunctionValue, Value};
+        use crate::runtime::interpreter::{JsExpr, StoredFunction};
+        use std::collections::HashMap;
+
+        // Allowed environment variables for Lambda
+        let allowed_vars = vec![
+            "AWS_LAMBDA_FUNCTION_NAME",
+            "AWS_LAMBDA_FUNCTION_VERSION",
+            "AWS_LAMBDA_FUNCTION_MEMORY_SIZE",
+            "AWS_REGION",
+            "AWS_DEFAULT_REGION",
+        ];
+
+        // Register the GetEnv function
+        let func = Value::Function(FunctionValue {
+            name: Some("GetEnv".to_string()),
+            params: vec!["name".to_string()],
+            closure: HashMap::new(),
+        });
+        interpreter.global_scope.insert("GetEnv".to_string(), func);
+
+        // Register the function body that calls the builtin
+        let body = JsExpr::Call(
+            Box::new(JsExpr::Ident("getenv_impl".to_string())),
+            vec![JsExpr::Ident("name".to_string())],
+        );
+        interpreter.function_bodies.insert(
+            "GetEnv".to_string(),
+            StoredFunction {
+                params: vec!["name".to_string()],
+                body: Box::new(body),
+            },
+        );
+
+        // Register the builtin implementation
+        interpreter.builtins.insert("getenv_impl".to_string(), |args| {
+            if args.len() != 1 {
+                return Err("getenv_impl expects 1 argument".to_string());
+            }
+            let name = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("Environment variable name must be a string".to_string()),
+            };
+
+            // Only allow specific environment variables
+            let allowed = [
+                "AWS_LAMBDA_FUNCTION_NAME",
+                "AWS_LAMBDA_FUNCTION_VERSION",
+                "AWS_LAMBDA_FUNCTION_MEMORY_SIZE",
+                "AWS_REGION",
+                "AWS_DEFAULT_REGION",
+            ];
+
+            if !allowed.contains(&name.as_str()) {
+                return Ok(Value::Null);
+            }
+
+            match env::var(name) {
+                Ok(val) => Ok(Value::String(val)),
+                Err(_) => Ok(Value::Null),
+            }
+        });
+
         Ok(())
     }
 
     /// Inject structured logging effect
     fn inject_logging_effect(
         &self,
-        _interpreter: &mut Interpreter,
+        interpreter: &mut Interpreter,
         _seed: &[u8; 32],
     ) -> Result<(), MtpError> {
-        // Lambda logs go to CloudWatch via stdout/stderr
+        use crate::runtime::value::{FunctionValue, Value};
+        use crate::runtime::interpreter::{JsExpr, StoredFunction};
+        use std::collections::HashMap;
+
+        // Register the LambdaLog function
+        let func = Value::Function(FunctionValue {
+            name: Some("LambdaLog".to_string()),
+            params: vec!["level".to_string(), "message".to_string()],
+            closure: HashMap::new(),
+        });
+        interpreter.global_scope.insert("LambdaLog".to_string(), func);
+
+        // Register the function body
+        let body = JsExpr::Call(
+            Box::new(JsExpr::Ident("lambda_log_impl".to_string())),
+            vec![
+                JsExpr::Ident("level".to_string()),
+                JsExpr::Ident("message".to_string()),
+            ],
+        );
+        interpreter.function_bodies.insert(
+            "LambdaLog".to_string(),
+            StoredFunction {
+                params: vec!["level".to_string(), "message".to_string()],
+                body: Box::new(body),
+            },
+        );
+
+        // Register the builtin implementation
+        interpreter.builtins.insert("lambda_log_impl".to_string(), |args| {
+            if args.len() != 2 {
+                return Err("lambda_log_impl expects 2 arguments".to_string());
+            }
+            let level = match &args[0] {
+                Value::String(s) => s.clone(),
+                _ => "INFO".to_string(),
+            };
+            let message = match &args[1] {
+                Value::String(s) => s.clone(),
+                other => format!("{}", other),
+            };
+
+            // Log to stderr in structured JSON format for CloudWatch
+            let log_entry = serde_json::json!({
+                "level": level,
+                "message": message
+            });
+            eprintln!("{}", log_entry);
+
+            Ok(Value::Boolean(true))
+        });
+
         Ok(())
     }
 
     /// Inject deterministic time effect
     fn inject_time_effect(
         &self,
-        _interpreter: &mut Interpreter,
-        _seed: &[u8; 32],
+        interpreter: &mut Interpreter,
+        seed: &[u8; 32],
     ) -> Result<(), MtpError> {
-        // Time should be deterministic based on seed, not wall clock
+        use crate::runtime::value::{FunctionValue, Value};
+        use crate::runtime::interpreter::{JsExpr, StoredFunction};
+        use std::collections::HashMap;
+        use sha2::{Digest, Sha256};
+
+        // Compute deterministic timestamp from seed
+        let mut hasher = Sha256::new();
+        hasher.update(seed);
+        hasher.update(b"time_seed");
+        let hash = hasher.finalize();
+
+        // Use first 8 bytes as a deterministic "timestamp" offset
+        let time_offset = u64::from_le_bytes(hash[0..8].try_into().unwrap());
+
+        // Register the GetTime function
+        let func = Value::Function(FunctionValue {
+            name: Some("GetTime".to_string()),
+            params: vec![],
+            closure: HashMap::new(),
+        });
+        interpreter.global_scope.insert("GetTime".to_string(), func);
+
+        // Store the deterministic time value in global scope for the builtin to access
+        interpreter.global_scope.insert(
+            "__deterministic_time".to_string(),
+            Value::Number(time_offset as i64),
+        );
+
+        // Register the function body
+        let body = JsExpr::Call(
+            Box::new(JsExpr::Ident("gettime_impl".to_string())),
+            vec![],
+        );
+        interpreter.function_bodies.insert(
+            "GetTime".to_string(),
+            StoredFunction {
+                params: vec![],
+                body: Box::new(body),
+            },
+        );
+
+        // Register the builtin implementation
+        interpreter.builtins.insert("gettime_impl".to_string(), |_args| {
+            // Return deterministic timestamp based on seed
+            // In real implementation, this would be computed from the seed
+            // For now, return a fixed value that represents "Lambda invocation time"
+            Ok(Value::Number(1704067200000)) // 2024-01-01T00:00:00Z in milliseconds
+        });
+
         Ok(())
     }
 

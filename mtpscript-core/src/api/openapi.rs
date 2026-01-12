@@ -170,7 +170,8 @@ pub fn generate_openapi(apis: &[ApiDeclaration], types: &[Type]) -> OpenApiSpec 
 fn add_type_to_schemas(typ: &Type, schemas: &mut BTreeMap<String, OpenApiSchema>) {
     match typ {
         Type::Record(record) => {
-            let ref_name = format!("Record{}", sha256_ref(&record.name));
+            // Use content hash for deterministic schema folding per Annex B §8
+            let ref_name = format!("Record{}", record.content_hash());
             if schemas.contains_key(&ref_name) {
                 return;
             }
@@ -278,14 +279,16 @@ fn type_to_schema(typ: &Type, schemas: &mut BTreeMap<String, OpenApiSchema>) -> 
             r#ref: "#/components/schemas/Json".to_string(),
         },
         Type::Record(record) => {
-            let ref_name = format!("Record{}", sha256_ref(&record.name));
+            // Use content hash for deterministic schema folding per Annex B §8
+            let ref_name = format!("Record{}", record.content_hash());
             add_type_to_schemas(typ, schemas);
             OpenApiSchema::Ref {
                 r#ref: format!("#/components/schemas/{}", ref_name),
             }
         }
         Type::Adt(adt) => {
-            let ref_name = format!("Adt{}", sha256_ref(&adt.content_hash()));
+            // ADT already uses content_hash which hashes the variant structure
+            let ref_name = format!("Adt{}", adt.content_hash());
             add_type_to_schemas(typ, schemas);
             OpenApiSchema::Ref {
                 r#ref: format!("#/components/schemas/{}", ref_name),

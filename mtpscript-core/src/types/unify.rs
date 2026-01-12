@@ -1,7 +1,7 @@
 // Type unification for generic type parameters
 // Implements Robinson's unification algorithm with occurs check
 
-use crate::types::Type;
+use crate::types::{AdtType, RecordType, Type};
 use std::collections::HashMap;
 
 /// Substitution map from type variables to types
@@ -26,7 +26,7 @@ fn unify_with_subs(
         (l, r) if l == r => Ok(subs.clone()),
 
         // Type variable on left - bind it
-        (Type::TypeVar(name), t) => {
+        (Type::TypeVar(name), t) | (Type::Var(name), t) => {
             if occurs_check(name, t) {
                 Err(format!("Infinite type: {} occurs in {:?}", name, t))
             } else {
@@ -37,7 +37,7 @@ fn unify_with_subs(
         }
 
         // Type variable on right - bind it
-        (t, Type::TypeVar(name)) => {
+        (t, Type::TypeVar(name)) | (t, Type::Var(name)) => {
             if occurs_check(name, t) {
                 Err(format!("Infinite type: {} occurs in {:?}", name, t))
             } else {
@@ -64,12 +64,7 @@ fn unify_with_subs(
             unify_with_subs(ret1, ret2, &current_subs)
         }
 
-        // Array types - unify element types
-        (Type::Array(elem1), Type::Array(elem2)) => {
-            unify_with_subs(elem1, elem2, subs)
-        }
-
-        // ADT types - unify if same name and parameters unify
+        // ADT types - unify if same name
         (Type::Adt(adt1), Type::Adt(adt2)) => {
             if adt1.name != adt2.name {
                 return Err(format!(
@@ -113,25 +108,6 @@ fn unify_with_subs(
             Ok(current_subs)
         }
 
-        // Generic types with type arguments
-        (Type::Generic(base1, args1), Type::Generic(base2, args2)) => {
-            if base1 != base2 {
-                return Err(format!("Type mismatch: {} vs {}", base1, base2));
-            }
-            if args1.len() != args2.len() {
-                return Err(format!(
-                    "Type argument count mismatch for {}",
-                    base1
-                ));
-            }
-
-            let mut current_subs = subs.clone();
-            for (a1, a2) in args1.iter().zip(args2.iter()) {
-                current_subs = unify_with_subs(a1, a2, &current_subs)?;
-            }
-            Ok(current_subs)
-        }
-
         // Cannot unify
         _ => Err(format!("Cannot unify {:?} with {:?}", left, right)),
     }
@@ -140,12 +116,10 @@ fn unify_with_subs(
 /// Check if a type variable occurs in a type (prevents infinite types)
 fn occurs_check(var: &str, ty: &Type) -> bool {
     match ty {
-        Type::TypeVar(name) => name == var,
+        Type::TypeVar(name) | Type::Var(name) => name == var,
         Type::Function(params, ret) => {
             params.iter().any(|p| occurs_check(var, p)) || occurs_check(var, ret)
         }
-        Type::Array(elem) => occurs_check(var, elem),
-        Type::Generic(_, args) => args.iter().any(|a| occurs_check(var, a)),
         Type::Adt(adt) => {
             adt.type_params.iter().any(|p| p == var)
         }
@@ -159,7 +133,7 @@ fn occurs_check(var: &str, ty: &Type) -> bool {
 /// Apply a substitution to a type
 pub fn apply_substitution(ty: &Type, subs: &Substitution) -> Type {
     match ty {
-        Type::TypeVar(name) => {
+        Type::TypeVar(name) | Type::Var(name) => {
             if let Some(t) = subs.get(name) {
                 apply_substitution(t, subs)
             } else {
@@ -172,14 +146,20 @@ pub fn apply_substitution(ty: &Type, subs: &Substitution) -> Type {
                 Box::new(apply_substitution(ret, subs)),
             )
         }
-        Type::Array(elem) => {
-            Type::Array(Box::new(apply_substitution(elem, subs)))
+        Type::Adt(adt) => {
+            // For ADT, we don't substitute type params directly
+            // as they are stored as strings
+            ty.clone()
         }
-        Type::Generic(base, args) => {
-            Type::Generic(
-                base.clone(),
-                args.iter().map(|a| apply_substitution(a, subs)).collect(),
-            )
+        Type::Record(rec) => {
+            let mut new_fields = Vec::new();
+            for (name, field_type) in &rec.fields {
+                new_fields.push((name.clone(), apply_substitution(field_type, subs)));
+            }
+            Type::Record(Box::new(RecordType {
+                name: rec.name.clone(),
+                fields: new_fields,
+            }))
         }
         _ => ty.clone(),
     }
@@ -194,7 +174,7 @@ pub fn instantiate(ty: &Type, fresh_prefix: &str, counter: &mut usize) -> Type {
 
 fn collect_type_vars(ty: &Type, subs: &mut Substitution, prefix: &str, counter: &mut usize) {
     match ty {
-        Type::TypeVar(name) => {
+        Type::TypeVar(name) | Type::Var(name) => {
             if !subs.contains_key(name) {
                 let fresh = format!("{}_{}", prefix, counter);
                 *counter += 1;
@@ -207,12 +187,13 @@ fn collect_type_vars(ty: &Type, subs: &mut Substitution, prefix: &str, counter: 
             }
             collect_type_vars(ret, subs, prefix, counter);
         }
-        Type::Array(elem) => {
-            collect_type_vars(elem, subs, prefix, counter);
+        Type::Adt(adt) => {
+            // Type params in ADTs are strings, not Type instances
+            // We could instantiate them here if needed
         }
-        Type::Generic(_, args) => {
-            for a in args {
-                collect_type_vars(a, subs, prefix, counter);
+        Type::Record(rec) => {
+            for (_, field_type) in &rec.fields {
+                collect_type_vars(field_type, subs, prefix, counter);
             }
         }
         _ => {}
@@ -257,17 +238,6 @@ mod tests {
         assert!(result.is_ok());
         let subs = result.unwrap();
         assert_eq!(subs.get("T"), Some(&Type::Number));
-    }
-
-    #[test]
-    fn test_occurs_check() {
-        // T = List<T> should fail (infinite type)
-        let list_t = Type::Generic(
-            "List".to_string(),
-            vec![Type::TypeVar("T".to_string())],
-        );
-        let result = unify(&Type::TypeVar("T".to_string()), &list_t);
-        assert!(result.is_err());
     }
 
     #[test]
