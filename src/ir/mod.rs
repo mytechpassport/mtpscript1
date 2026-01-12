@@ -1,3 +1,5 @@
+pub mod lower;
+
 use crate::effects::Effect;
 use crate::errors::MtpError;
 use crate::types::Type;
@@ -437,13 +439,9 @@ impl IrSchemaValidator {
     }
 }
 
-/// Lower AST to IR (stub for now)
-pub fn lower_ast_to_ir(_ast: &crate::parser::ast::Program) -> Result<IrProgram, MtpError> {
-    // TODO: Implement actual lowering
-    Err(MtpError::ValidationError {
-        error: "NotImplemented".to_string(),
-        message: "AST to IR lowering not yet implemented".to_string(),
-    })
+/// Lower AST to IR
+pub fn lower_ast_to_ir(ast: &crate::parser::ast::Program) -> Result<IrProgram, MtpError> {
+    lower::lower_program(ast)
 }
 
 /// Validate IR program

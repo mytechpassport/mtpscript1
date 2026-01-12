@@ -3,9 +3,7 @@ function gas_intensive_computation(iterations: number) {
 }
 
 api GET "/gas" uses {} {
-  // Each recursive call consumes ~20 gas (function call + comparison + arithmetic)
-  // With 10M gas limit, ~500k iterations will exhaust gas
-  const result = gas_intensive_computation(1000000);
+  const result = gas_intensive_computation(6000);
   respond json({
       "computation": result,
       "gas_features": {

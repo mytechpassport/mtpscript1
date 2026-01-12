@@ -56,15 +56,39 @@ impl Interpreter {
     pub fn execute(&mut self, js_code: &str) -> Result<Value, MtpError> {
         self.check_timeout()?;
 
-        // Very basic interpretation for now
-        if js_code.contains("return") {
-            Ok(Value::String("executed".to_string()))
-        } else {
-            Err(MtpError::RuntimeError {
-                error: "RuntimeError".to_string(),
-                message: "No return statement".into(),
-            })
+        // Very basic JS interpretation
+        let mut lines = js_code.lines();
+        let mut result = Value::Null;
+
+        for line in lines {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
+            if line.contains("return") {
+                // Extract return value
+                if let Some(return_part) = line.strip_prefix("return ") {
+                    if let Some(semicolon) = return_part.strip_suffix(";") {
+                        result = Value::String(semicolon.to_string());
+                    } else {
+                        result = Value::String(return_part.to_string());
+                    }
+                }
+                break;
+            }
+            // Handle assignments
+            if line.contains(" = ") {
+                // For now, just acknowledge the assignment
+                continue;
+            }
+            // Handle function calls
+            if line.contains("(") && line.contains(")") {
+                // For now, just acknowledge the call
+                continue;
+            }
         }
+
+        Ok(result)
     }
 
     /// Check if execution timeout has been exceeded

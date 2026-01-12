@@ -48,7 +48,9 @@ impl PatternCompiler {
         cases: &[(IrPattern, IrExpr)],
     ) -> Result<String, CompileError> {
         if cases.is_empty() {
-            return Err(CompileError::CodeGenError("Match must have at least one case".to_string()));
+            return Err(CompileError::CodeGenError(
+                "Match must have at least one case".to_string(),
+            ));
         }
 
         let mut result = String::new();
@@ -210,7 +212,11 @@ impl PatternCompiler {
         self.compile_expr_with_subs(expr, &std::collections::HashMap::new())
     }
 
-    fn compile_expr_with_subs(&mut self, expr: &IrExpr, subs: &std::collections::HashMap<String, String>) -> Result<String, CompileError> {
+    fn compile_expr_with_subs(
+        &mut self,
+        expr: &IrExpr,
+        subs: &std::collections::HashMap<String, String>,
+    ) -> Result<String, CompileError> {
         // This is a simplified version - in practice, we'd reuse the main codegen
         match expr {
             IrExpr::String(s, _) => Ok(format!("\"{}\"", s)),
@@ -248,46 +254,6 @@ impl PatternCompiler {
                     crate::parser::ast::BinOp::Le => "<=",
                     crate::parser::ast::BinOp::Gt => ">",
                     crate::parser::ast::BinOp::Ge => ">=",
-                    _ => return Err(CompileError::CodeGenError(
-                        format!("Unsupported binary operator: {:?}", op),
-                    )),
-                };
-                Ok(format!("({} {} {})", left_js, op_js, right_js))
-            }
-            IrExpr::Unary(op, expr, _) => {
-                let expr_js = self.compile_expr_with_subs(expr, subs)?;
-                let op_js = match op {
-                    crate::parser::ast::BinOp::Sub => "-", // -x
-                    _ => return Err(CompileError::CodeGenError(
-                        format!("Unsupported unary operator: {:?}", op),
-                    )),
-                };
-                Ok(format!("{}{}", op_js, expr_js))
-            }
-            _ => Err(CompileError::CodeGenError(
-                "Complex expressions in match arms not yet supported".to_string(),
-            )),
-        }
-    }
-            IrExpr::Index(array, index, _) => {
-                let array_js = self.compile_expr(array, 0)?;
-                let index_js = self.compile_expr(index, 0)?;
-                Ok(format!("{}[{}]", array_js, index_js))
-            }
-            IrExpr::Binary(op, left, right, _) => {
-                let left_js = self.compile_expr(left, 0)?;
-                let right_js = self.compile_expr(right, 0)?;
-                let op_js = match op {
-                    crate::parser::ast::BinOp::Add => "+",
-                    crate::parser::ast::BinOp::Sub => "-",
-                    crate::parser::ast::BinOp::Mul => "*",
-                    crate::parser::ast::BinOp::Div => "/",
-                    crate::parser::ast::BinOp::Eq => "===",
-                    crate::parser::ast::BinOp::Ne => "!==",
-                    crate::parser::ast::BinOp::Lt => "<",
-                    crate::parser::ast::BinOp::Le => "<=",
-                    crate::parser::ast::BinOp::Gt => ">",
-                    crate::parser::ast::BinOp::Ge => ">=",
                     _ => {
                         return Err(CompileError::CodeGenError(format!(
                             "Unsupported binary operator: {:?}",
@@ -298,7 +264,7 @@ impl PatternCompiler {
                 Ok(format!("({} {} {})", left_js, op_js, right_js))
             }
             IrExpr::Unary(op, expr, _) => {
-                let expr_js = self.compile_expr(expr, 0)?;
+                let expr_js = self.compile_expr_with_subs(expr, subs)?;
                 let op_js = match op {
                     crate::parser::ast::BinOp::Sub => "-", // -x
                     _ => {

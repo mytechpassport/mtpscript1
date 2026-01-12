@@ -13,6 +13,9 @@ fn main() {
     // Initialize schema registry
     mtpscript_core::validation::init_schema_registry();
 
+    // Initialize module registry
+    mtpscript_core::modules::import::init_module_registry();
+
     let matches = Command::new("mtpscript")
         .version("0.1.0")
         .author("MTPScript Team")
@@ -120,6 +123,8 @@ fn snapshot_command(input: &str, output: &str) -> Result<(), Box<dyn std::error:
 }
 
 fn run_command(input: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use mtpscript_core::runtime::interpreter::Interpreter;
+    use mtpscript_core::runtime::interpreter::InterpreterConfig;
     use mtpscript_core::snapshot::extract_js_code;
     use mtpscript_core::snapshot::load_snapshot;
 
@@ -127,8 +132,13 @@ fn run_command(input: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     let snapshot = load_snapshot(input)?;
     let js = extract_js_code(&snapshot)?;
-    println!("Extracted JS:\n{}", js);
-    println!("Snapshot run successfully (JS extracted)");
+
+    // Execute the JS
+    let config = InterpreterConfig::default();
+    let mut interpreter = Interpreter::new(config);
+    let result = interpreter.execute(&js)?;
+
+    println!("Execution result: {}", result);
     Ok(())
 }
 

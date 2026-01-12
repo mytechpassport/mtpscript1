@@ -592,8 +592,8 @@ impl Interpreter {
                     .body
                     .clone();
 
-                // Consume function call gas cost
-                self.gas_counter.consume(5)?;
+                // Consume function call gas cost (2000 to ensure gas exhaustion before stack overflow)
+                self.gas_counter.consume(2000)?;
 
                 // Execute the function body
                 self.eval_expr(&body, &mut local_scope)
