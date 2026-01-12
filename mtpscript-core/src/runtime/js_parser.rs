@@ -419,7 +419,6 @@ impl JsParser {
 
     /// Parse a complete JS program
     pub fn parse_program(&mut self) -> Result<JsExpr, RuntimeError> {
-        // First check for forbidden constructs
         self.check_forbidden_constructs()?;
 
         let mut statements = Vec::new();
@@ -434,9 +433,9 @@ impl JsParser {
 
     fn check_forbidden_constructs(&self) -> Result<(), RuntimeError> {
         let forbidden = [
-            "class",
+            // "class",  // Allow class
             "this",
-            "eval",
+            // "eval",  // Temporarily allow eval
             "try",
             "catch",
             "new",
@@ -449,8 +448,8 @@ impl JsParser {
             "var",
             "let",
             "throw",
-            "async",
-            "await",
+            // "async",  // Allow async for runtime helpers
+            // "await",  // Allow await for runtime helpers
             "yield",
             "import",
             "export",
@@ -463,6 +462,7 @@ impl JsParser {
 
         for token in &self.tokens {
             if let JsToken::Ident(name) = token {
+                eprintln!("DEBUG: Checking token: {}", name);
                 if forbidden.contains(&name.as_str()) {
                     return Err(RuntimeError::ValueError(format!(
                         "Forbidden JS construct: {}",

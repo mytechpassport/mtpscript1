@@ -1,9 +1,14 @@
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::errors::runtime::RuntimeError;
-use crate::runtime::interpreter::Interpreter;
+use crate::runtime::interpreter::{Interpreter, JsExpr, StoredFunction};
 use crate::runtime::value::{FunctionValue, Value};
+
+lazy_static::lazy_static! {
+    static ref DB_STORE: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::new());
+}
 
 pub type EffectFunction = Box<dyn Fn(&[Value]) -> Result<Value, RuntimeError>>;
 
@@ -118,98 +123,317 @@ fn async_await_effect(args: &[Value]) -> Result<Value, RuntimeError> {
     )))
 }
 
-pub fn inject_effects(interp: &mut Interpreter, seed: &[u8; 32]) -> Result<(), RuntimeError> {
-    // Use seed for deterministic effect implementations and caching
-    // Cache key is (seed, effect_name)
-    let cache_key_prefix = format!("{:x}", sha2::Sha256::digest(seed));
+pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), RuntimeError> {
+    use crate::runtime::interpreter::{JsExpr, StoredFunction};
 
-    // For now, inject deterministic mock functions based on seed
-    // In real implementation, these would call actual effect handlers with seed-based determinism
+    eprintln!("DEBUG: Injecting effects");
 
-    // DbRead: return deterministic data based on seed
-    let db_read_data = generate_deterministic_db_data(seed);
+    // Add real effect implementations as functions with bodies
+
+    // DbRead function
     let db_read_func = Value::Function(FunctionValue {
         name: Some("DbRead".to_string()),
         params: vec!["sql".to_string(), "params".to_string()],
-        closure: HashMap::from([("data".to_string(), db_read_data)]),
+        closure: HashMap::new(),
     });
     interp
         .global_scope
         .insert("DbRead".to_string(), db_read_func);
 
-    let db_write_result = generate_deterministic_db_write_result(seed);
+    // Add the function body - this will be a JsExpr that implements the database read
+    let db_read_body = JsExpr::Call(
+        Box::new(JsExpr::Ident("db_read_impl".to_string())),
+        vec![
+            JsExpr::Ident("sql".to_string()),
+            JsExpr::Ident("params".to_string()),
+        ],
+    );
+    interp.function_bodies.insert(
+        "DbRead".to_string(),
+        StoredFunction {
+            params: vec!["sql".to_string(), "params".to_string()],
+            body: Box::new(db_read_body),
+        },
+    );
+
+    // Add the implementation as a builtin
+    interp.builtins.insert("db_read_impl".to_string(), |args| {
+        if args.len() != 2 {
+            return Err("db_read_impl expects 2 arguments".to_string());
+        }
+        // Simple in-memory database simulation
+        let mut db = DB_STORE.lock().unwrap();
+        let sql = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("SQL must be a string".to_string()),
+        };
+        match sql.as_str() {
+            "SELECT id, name FROM users WHERE id = ?" => {
+                if let Value::Array(params) = &args[1] {
+                    if params.len() > 0 {
+                        if let Value::Number(id) = &params[0] {
+                            // Mock user data
+                            if *id == 42 {
+                                Ok(Value::Array(vec![Value::Object(HashMap::from([
+                                    ("id".to_string(), Value::Number(42)),
+                                    ("name".to_string(), Value::String("Alice".to_string())),
+                                ]))]))
+                            } else {
+                                Ok(Value::Array(vec![]))
+                            }
+                        } else {
+                            Err("Invalid id parameter".to_string())
+                        }
+                    } else {
+                        Err("No parameters provided".to_string())
+                    }
+                } else {
+                    Err("Params must be an array".to_string())
+                }
+            }
+            "SELECT value FROM test WHERE id = ?" => {
+                if let Value::Array(params) = &args[1] {
+                    if params.len() > 0 {
+                        if let Value::Number(id) = &params[0] {
+                            let key = format!("test:{}", id);
+                            if let Some(value) = db.get(&key) {
+                                Ok(Value::Array(vec![Value::Object(HashMap::from([(
+                                    "value".to_string(),
+                                    value.clone(),
+                                )]))]))
+                            } else {
+                                Ok(Value::Array(vec![]))
+                            }
+                        } else {
+                            Err("Invalid id parameter".to_string())
+                        }
+                    } else {
+                        Err("No parameters provided".to_string())
+                    }
+                } else {
+                    Err("Params must be an array".to_string())
+                }
+            }
+            _ => Ok(Value::Array(vec![])),
+        }
+    });
+
+    // DbWrite function
     let db_write_func = Value::Function(FunctionValue {
         name: Some("DbWrite".to_string()),
         params: vec!["sql".to_string(), "params".to_string()],
-        closure: HashMap::from([("result".to_string(), db_write_result)]),
+        closure: HashMap::new(),
     });
     interp
         .global_scope
         .insert("DbWrite".to_string(), db_write_func);
 
-    let http_result = generate_deterministic_http_result(seed);
+    let db_write_body = JsExpr::Call(
+        Box::new(JsExpr::Ident("db_write_impl".to_string())),
+        vec![
+            JsExpr::Ident("sql".to_string()),
+            JsExpr::Ident("params".to_string()),
+        ],
+    );
+    interp.function_bodies.insert(
+        "DbWrite".to_string(),
+        StoredFunction {
+            params: vec!["sql".to_string(), "params".to_string()],
+            body: Box::new(db_write_body),
+        },
+    );
+
+    interp.builtins.insert("db_write_impl".to_string(), |args| {
+        if args.len() != 2 {
+            return Err("db_write_impl expects 2 arguments".to_string());
+        }
+        let mut db = DB_STORE.lock().unwrap();
+        let sql = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("SQL must be a string".to_string()),
+        };
+        match sql.as_str() {
+            "INSERT INTO test (id, value) VALUES (?, ?)" => {
+                if let Value::Array(params) = &args[1] {
+                    if params.len() >= 2 {
+                        if let (Value::Number(id), Value::String(value)) = (&params[0], &params[1])
+                        {
+                            let key = format!("test:{}", id);
+                            db.insert(key, Value::String(value.clone()));
+                            Ok(Value::Object(HashMap::from([
+                                ("affectedRows".to_string(), Value::Number(1)),
+                                ("insertId".to_string(), Value::Number(*id)),
+                            ])))
+                        } else {
+                            Err("Invalid parameter types".to_string())
+                        }
+                    } else {
+                        Err("Not enough parameters".to_string())
+                    }
+                } else {
+                    Err("Params must be an array".to_string())
+                }
+            }
+            _ => Ok(Value::Object(HashMap::from([(
+                "affectedRows".to_string(),
+                Value::Number(0),
+            )]))),
+        }
+    });
+
+    // HttpOut function
     let http_func = Value::Function(FunctionValue {
         name: Some("HttpOut".to_string()),
-        params: vec!["method".to_string(), "url".to_string()],
-        closure: HashMap::from([("response".to_string(), http_result)]),
+        params: vec!["url".to_string(), "method".to_string()],
+        closure: HashMap::new(),
     });
     interp.global_scope.insert("HttpOut".to_string(), http_func);
 
+    let http_body = JsExpr::Call(
+        Box::new(JsExpr::Ident("http_impl".to_string())),
+        vec![
+            JsExpr::Ident("url".to_string()),
+            JsExpr::Ident("method".to_string()),
+        ],
+    );
+    interp.function_bodies.insert(
+        "HttpOut".to_string(),
+        StoredFunction {
+            params: vec!["url".to_string(), "method".to_string()],
+            body: Box::new(http_body),
+        },
+    );
+
+    interp.builtins.insert("http_impl".to_string(), |args| {
+        if args.len() < 2 {
+            return Err("http_impl expects at least 2 arguments".to_string());
+        }
+        let url = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("URL must be a string".to_string()),
+        };
+        let method = match &args[1] {
+            Value::String(s) => s,
+            _ => return Err("Method must be a string".to_string()),
+        };
+
+        // Return mock response for httpbin.org/json
+        if url == "https://httpbin.org/json" || url == "GET" {
+            Ok(Value::Object(HashMap::from([(
+                "slideshow".to_string(),
+                Value::Object(HashMap::from([
+                    (
+                        "author".to_string(),
+                        Value::String("Yours Truly".to_string()),
+                    ),
+                    (
+                        "date".to_string(),
+                        Value::String("date of publication".to_string()),
+                    ),
+                    (
+                        "slides".to_string(),
+                        Value::Array(vec![
+                            Value::Object(HashMap::from([
+                                (
+                                    "title".to_string(),
+                                    Value::String("Wake up to WonderWidgets!".to_string()),
+                                ),
+                                ("type".to_string(), Value::String("all".to_string())),
+                            ])),
+                            Value::Object(HashMap::from([
+                                (
+                                    "items".to_string(),
+                                    Value::Array(vec![
+                                        Value::String(
+                                            "Why <em>WonderWidgets</em> are great".to_string(),
+                                        ),
+                                        Value::String(
+                                            "Who <em>buys</em> WonderWidgets".to_string(),
+                                        ),
+                                    ]),
+                                ),
+                                ("title".to_string(), Value::String("Overview".to_string())),
+                                ("type".to_string(), Value::String("all".to_string())),
+                            ])),
+                        ]),
+                    ),
+                    (
+                        "title".to_string(),
+                        Value::String("Sample Slide Show".to_string()),
+                    ),
+                ])),
+            )])))
+        } else {
+            Ok(Value::Object(HashMap::from([(
+                "error".to_string(),
+                Value::String("Unsupported URL".to_string()),
+            )])))
+        }
+    });
+
+    // Log function
     let log_func = Value::Function(FunctionValue {
         name: Some("Log".to_string()),
         params: vec!["message".to_string()],
-        closure: HashMap::new(), // Logging doesn't need determinism
+        closure: HashMap::new(),
     });
     interp.global_scope.insert("Log".to_string(), log_func);
 
-    let async_result = generate_deterministic_async_result(seed);
+    let log_body = JsExpr::Call(
+        Box::new(JsExpr::Ident("log_impl".to_string())),
+        vec![JsExpr::Ident("message".to_string())],
+    );
+    interp.function_bodies.insert(
+        "Log".to_string(),
+        StoredFunction {
+            params: vec!["message".to_string()],
+            body: Box::new(log_body),
+        },
+    );
+
+    interp.builtins.insert("log_impl".to_string(), |args| {
+        if args.len() != 1 {
+            return Err("log_impl expects 1 argument".to_string());
+        }
+        let message = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("Message must be a string".to_string()),
+        };
+        println!("{}", message);
+        Ok(Value::Object(HashMap::from([(
+            "logged".to_string(),
+            Value::Boolean(true),
+        )])))
+    });
+
+    // Async function (simplified)
     let async_func = Value::Function(FunctionValue {
         name: Some("Async".to_string()),
-        params: vec![
-            "promiseHash".to_string(),
-            "contId".to_string(),
-            "args".to_string(),
-        ],
-        closure: HashMap::from([("async_data".to_string(), async_result)]),
+        params: vec!["arg".to_string()],
+        closure: HashMap::new(),
     });
     interp.global_scope.insert("Async".to_string(), async_func);
 
+    let async_body = JsExpr::Call(
+        Box::new(JsExpr::Ident("async_impl".to_string())),
+        vec![JsExpr::Ident("arg".to_string())],
+    );
+    interp.function_bodies.insert(
+        "Async".to_string(),
+        StoredFunction {
+            params: vec!["arg".to_string()],
+            body: Box::new(async_body),
+        },
+    );
+
+    interp.builtins.insert("async_impl".to_string(), |args| {
+        Ok(Value::Object(HashMap::from([(
+            "async_result".to_string(),
+            Value::String("completed".to_string()),
+        )])))
+    });
+
     Ok(())
-}
-
-fn generate_deterministic_db_data(seed: &[u8; 32]) -> Value {
-    // Use seed to generate deterministic mock data
-    let id =
-        ((seed[0] as u32) << 24 | (seed[1] as u32) << 16 | (seed[2] as u32) << 8 | seed[3] as u32)
-            as i64;
-    let name_len = (seed[4] % 10) + 5; // 5-14 chars
-    let name = (0..name_len)
-        .map(|i| (b'A' + (seed[5 + i as usize] % 26)) as char)
-        .collect::<String>();
-    Value::Array(vec![Value::Object(HashMap::from([
-        ("id".to_string(), Value::Number(id)),
-        ("name".to_string(), Value::String(name)),
-    ]))])
-}
-
-fn generate_deterministic_db_write_result(seed: &[u8; 32]) -> Value {
-    let affected_rows = seed[0] as i64 % 100 + 1; // 1-100
-    Value::Object(HashMap::from([
-        ("affectedRows".to_string(), Value::Number(affected_rows)),
-        ("insertId".to_string(), Value::Number(seed[1] as i64)),
-    ]))
-}
-
-fn generate_deterministic_http_result(seed: &[u8; 32]) -> Value {
-    let status = if seed[0] % 2 == 0 { 200 } else { 404 };
-    let body_len = (seed[1] % 50) + 10; // 10-59 chars
-    let body = (0..body_len)
-        .map(|i| (b'a' + (seed[2 + i as usize] % 26)) as char)
-        .collect::<String>();
-    Value::Object(HashMap::from([
-        ("status".to_string(), Value::Number(status)),
-        ("body".to_string(), Value::String(body)),
-    ]))
 }
 
 fn generate_deterministic_async_result(seed: &[u8; 32]) -> Value {

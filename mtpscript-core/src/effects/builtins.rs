@@ -5,8 +5,11 @@ use std::collections::HashMap;
 
 // Built-in pure functions
 
-pub fn json_parse(s: Value) -> Result<Value, String> {
-    match s {
+pub fn json_parse(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("json_parse expects 1 argument".to_string());
+    }
+    match &args[0] {
         Value::String(s) => {
             // Input validation: check string length and content
             if s.len() > 10_000_000 {
@@ -26,18 +29,25 @@ pub fn json_parse(s: Value) -> Result<Value, String> {
     }
 }
 
-pub fn json_stringify(v: Value) -> Result<Value, String> {
-    // Input validation: check for reasonable object/array depth and size
-    validate_value_depth(&v, 100)?;
-    let json = value_to_json(v);
-    match json.to_canonical_string() {
-        Ok(s) => {
-            if s.len() > 10_000_000 {
-                return Err("JSON output too large".to_string());
+pub fn json_stringify(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("json_stringify expects 1 argument".to_string());
+    }
+    match &args[0] {
+        v => {
+            // Input validation: check for reasonable object/array depth and size
+            validate_value_depth(v, 100)?;
+            let json = value_to_json(v.clone());
+            match json.to_canonical_string() {
+                Ok(s) => {
+                    if s.len() > 10_000_000 {
+                        return Err("JSON output too large".to_string());
+                    }
+                    Ok(Value::String(s))
+                }
+                Err(e) => Err(format!("JSON stringify error: {:?}", e)),
             }
-            Ok(Value::String(s))
         }
-        Err(e) => Err(format!("JSON stringify error: {:?}", e)),
     }
 }
 
@@ -58,8 +68,11 @@ pub fn value_to_json(v: Value) -> Json {
     }
 }
 
-pub fn decimal_from_string(s: Value) -> Result<Value, String> {
-    match s {
+pub fn decimal_from_string(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("decimal_from_string expects 1 argument".to_string());
+    }
+    match &args[0] {
         Value::String(s) => {
             // Input validation: check string length and basic format
             if s.len() > 100 {
@@ -79,15 +92,21 @@ pub fn decimal_from_string(s: Value) -> Result<Value, String> {
     }
 }
 
-pub fn decimal_to_string(d: Value) -> Result<Value, String> {
-    match d {
+pub fn decimal_to_string(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("decimal_to_string expects 1 argument".to_string());
+    }
+    match &args[0] {
         Value::Decimal(d) => Ok(Value::String(d.to_string())),
         _ => Err("Decimal.toString expects Decimal".to_string()),
     }
 }
 
-pub fn fnv1a32(data: Value) -> Result<Value, String> {
-    match data {
+pub fn fnv1a32(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("fnv1a32 expects 1 argument".to_string());
+    }
+    match &args[0] {
         Value::String(s) => {
             // Input validation: check string length
             if s.len() > 1_000_000 {
@@ -100,8 +119,11 @@ pub fn fnv1a32(data: Value) -> Result<Value, String> {
     }
 }
 
-pub fn fnv1a64(data: Value) -> Result<Value, String> {
-    match data {
+pub fn fnv1a64(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("fnv1a64 expects 1 argument".to_string());
+    }
+    match &args[0] {
         Value::String(s) => {
             // Input validation: check string length
             if s.len() > 1_000_000 {
@@ -114,19 +136,26 @@ pub fn fnv1a64(data: Value) -> Result<Value, String> {
     }
 }
 
-pub fn cbor_encode(v: Value) -> Result<Value, String> {
-    // Input validation: check depth and size
-    validate_value_depth(&v, 50)?;
-    // Encode to CBOR and return hex string
-    let json = value_to_json(v);
-    match json.to_cbor_hex() {
-        Ok(hex) => {
-            if hex.len() > 2_000_000 {
-                return Err("CBOR output too large".to_string());
+pub fn cbor_encode(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err("cbor_encode expects 1 argument".to_string());
+    }
+    match &args[0] {
+        v => {
+            // Input validation: check depth and size
+            validate_value_depth(v, 50)?;
+            // Encode to CBOR and return hex string
+            let json = value_to_json(v.clone());
+            match json.to_cbor_hex() {
+                Ok(hex) => {
+                    if hex.len() > 2_000_000 {
+                        return Err("CBOR output too large".to_string());
+                    }
+                    Ok(Value::String(hex))
+                }
+                Err(e) => Err(format!("CBOR encode error: {:?}", e)),
             }
-            Ok(Value::String(hex))
         }
-        Err(e) => Err(format!("CBOR encode error: {:?}", e)),
     }
 }
 
@@ -192,7 +221,7 @@ fn fnv1a_64(data: &[u8]) -> u64 {
 
 // Function registry
 
-pub type BuiltinFn = fn(Value) -> Result<Value, String>;
+pub type BuiltinFn = fn(Vec<Value>) -> Result<Value, String>;
 
 pub fn get_builtin_functions() -> HashMap<String, BuiltinFn> {
     let mut map = HashMap::new();

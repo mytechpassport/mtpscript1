@@ -3354,4 +3354,82 @@ assert(result == Value::Number(3));
 
 ---
 
+### - [ ] MTP-231: INCOMPLETE FEATURES
+- src/runtime/interpreter.rs:371: Placeholder JSON serialization using Debug formatting instead of proper JSON.
+- src/runtime/interpreter.rs:382: Placeholder function call only handles console.log, returns error for unknown functions.
+- src/runtime/interpreter.rs:414: Same placeholder JSON serialization issue.
+- src/runtime/interpreter.rs:425: Same placeholder function call issue.
+- src/runtime/isolation.rs:40: Placeholder execution returns formatted string instead of actual isolated code execution.
+- src/runtime/js_interpreter.rs:85: console.log builtin initialized with empty body.
+- src/runtime/js_interpreter.rs:110: Return statements throw error instead of proper return handling.
+- src/runtime/js_interpreter.rs:386: Function calls return hardcoded "function_result" instead of executing body.
+- src/runtime/wipe.rs:1: Minimal Interpreter struct placeholder lacking real implementation.
+- mtpscript-core/src/runtime/effects.rs:35: Comment indicating placeholder implementations for built-in effects.
+- mtpscript-core/src/runtime/effects.rs:47-48: db_read_effect returns hardcoded mock data instead of executing SQL.
+- mtpscript-core/src/runtime/effects.rs:66: db_write_effect returns hardcoded number instead of executing SQL writes.
+- mtpscript-core/src/runtime/effects.rs:81-87: http_out_effect returns mock responses instead of real HTTP requests.
+- mtpscript-core/src/runtime/effects.rs:101: log_effect only prints to stdout instead of proper audit logging.
+- mtpscript-core/src/runtime/effects.rs:118-121: async_await_effect returns mock data instead of real cached async results.
+- mtpscript-core/src/runtime/effects.rs:175: db_read_impl returns hardcoded user data for queries.
+- mtpscript-core/src/runtime/effects.rs:320: http_impl returns hardcoded JSON for specific URLs.
+- mtpscript-core/src/runtime/clone.rs:5: verify_snapshot lacks real cryptographic signature verification.
+- mtpscript-core/src/runtime/clone.rs:171: populate_from_stmt ignores const declarations.
+- src/main.rs:121: TODO: Implement snapshot creation (not implemented).
+- src/main.rs:175: TODO: Implement REPL (not implemented).
+- src/main.rs:181: TODO: Implement HTTP server (not implemented).
+- src/ir/lower.rs:84: TODO: detect tail recursion (not implemented).
+- src/ir/lower.rs:128: TODO: Implement array lowering (not implemented).
+- src/ir/lower.rs:135: TODO: Implement object lowering (not implemented).
+- src/ir/lower.rs:191: Pipe operator not implemented.
+- src/ir/lower.rs:262: TODO: Phi node or proper result merging (not implemented).
+- src/ir/lower.rs:281: Placeholder type assignment for locals.
+- src/ir/lower.rs:359: TODO: Return the comparison result properly (not implemented).
+- src/ir/lower.rs:363: TODO: Implement ADT constructor pattern matching (not implemented).
+- src/ir/lower.rs:368: TODO: Implement record pattern matching (not implemented).
+- src/modules/import.rs:132: Placeholder git fetching for module content.
+- src/modules/import.rs:144: Placeholder return for module fetching.
+- src/modules/import.rs:160: Placeholder validation for malicious content.
+- src/parser/mod.rs:284: TODO: Implement array access (not implemented).
+- src/parser/mod.rs:529: Stub implementations for missing parts.
+- src/parser/mod.rs:565: Stub return Number type.
+- src/effects/builtins.rs:29: Placeholder JSON serialization.
+- src/sbom/mod.rs:498-511: Mock Cargo.toml content for testing.
+- src/modules/mod.rs:1: Stub implementation (entire module).
+- src/lambda/mod.rs:1: Stub implementation (entire module).
+- src/compiler/mod.rs:1: Stub implementation (entire module).
+- src/effects/mod.rs:1: Stub implementation (entire module).
+- src/types/mod.rs:1: Stub implementation (entire module).
+- src/api/router.rs:6: Placeholder handler type.
+- src/api/openapi.rs:110: Placeholder Route assumption.
+- src/lexer/mod.rs:49,58,62: Panics for unexpected tokens.
+- src/json/serialize.rs:15: Placeholder canonical JSON implementation.
+- src/json/equality.rs:13,19: Placeholder ordering and return values.
+- src/json/cbor.rs:5: Placeholder CBOR encoding.
+- src/compiler/effects.rs:1: Placeholder IrExpr definition.
+- src/ir/tail_call.rs:3: Placeholder IrExpr definition.
+- src/compiler/deterministic.rs:3: Placeholder IR/AST definition.
+- mtpscript-core/src/compiler/pattern.rs:134: Pattern matching not implemented.
+- mtpscript-core/src/types/checker.rs:49: Imports not implemented.
+- mtpscript-core/src/types/checker.rs:120: Placeholder Number return type.
+- mtpscript-core/src/types/checker.rs:175-176: Placeholder object and type handling.
+- mtpscript-core/src/types/checker.rs:196: Placeholder type return.
+- mtpscript-core/src/types/checker.rs:284: Placeholder for unimplemented types.
+- mtpscript-core/src/snapshot/mod.rs:28,127,138,207-210: Placeholder size, hash, signature fields.
+- mtpscript-core/src/security/sign.rs:183: Placeholder test key handling.
+- mtpscript-core/src/security/reproducible.rs:284: Placeholder signing with ECDSA.
+- mtpscript-core/src/modules/import.rs:109,119: Placeholder signature verification.
+- mtpscript-core/src/modules/import.rs:498: Mock content hash.
+- mtpscript-core/src/security/verify.rs:130,132: Placeholder hash and signature.
+- mtpscript-core/src/security/sandbox.rs:260-261: Mock interpreter for testing.
+- mtpscript-core/src/ir/lower.rs:63: Placeholder return type inference.
+- mtpscript-core/src/ir/lower.rs:388-701: Multiple panics for unexpected expressions.
+- mtpscript-core/src/api/handler.rs:45,209: Placeholder rate limiting.
+- mtpscript-core/src/api/handler.rs:226: Placeholder SHA-256 function.
+- mtpscript-core/src/api/handler.rs:238: Mock snapshot data.
+- mtpscript-core/src/parser/mod.rs:745-857: Multiple panics for unexpected declarations.
+- mtpscript-core/src/compiler/effects.rs:17,21: Placeholder string returns.
+- mtpscript-core/src/security/fuzz.rs:19,48,59: Placeholder fuzzing framework and size/signature.
+- mtpscript-core/src/types/builtins.rs:140,148: Panics for unexpected ADT types.
+- mtpscript-core/src/types/unify.rs:2: Placeholder unification implementation.
+- mtpscript-core/src/compiler/respond.rs:24: Expression type not supported in compiler.
 *Generated from TECHSPECV5.md Version 5.1 and BUGFIX.md*

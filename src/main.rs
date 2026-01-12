@@ -129,13 +129,23 @@ fn run_command(input: &str) -> Result<(), Box<dyn std::error::Error>> {
     use mtpscript_core::snapshot::load_snapshot;
 
     println!("Running snapshot {}", input);
+    eprintln!("DEBUG: Starting run_command");
 
     let snapshot = load_snapshot(input)?;
     let js = extract_js_code(&snapshot)?;
 
+    eprintln!("DEBUG: Extracted JS:\n{}", js);
+
     // Execute the JS
     let config = InterpreterConfig::default();
     let mut interpreter = Interpreter::new(config);
+
+    // Inject effects
+    eprintln!("DEBUG: About to inject effects");
+    use mtpscript_core::runtime::effects::inject_effects;
+    inject_effects(&mut interpreter, &[0; 32])?;
+    eprintln!("DEBUG: Effects injected");
+
     let result = interpreter.execute(&js)?;
 
     println!("Execution result: {}", result);

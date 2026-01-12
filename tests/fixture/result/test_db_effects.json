@@ -1,1 +1,1 @@
-{"insert":{},"select":[{"value":"test"}]}
+{"insert":{"affectedRows":1,"insertId":1},"select":[{"value":"test"}]}

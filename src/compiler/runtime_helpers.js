@@ -60,10 +60,12 @@ function matchPattern(value, pattern) {
 }
 
 // Array bounds checking
-function arrayGet(arr, index) {
-    if (!Array.isArray(arr)) {
-        throw new Error('Not an array');
+function array_get(arr, index) {
+    if (index < 0 || index >= arr.length) {
+        throw new Error(`Array index ${index} out of bounds for array of length ${arr.length}`);
     }
+    return arr[index];
+}
     if (index < 0 || index >= arr.length) {
         throw new Error(`Array index ${index} out of bounds for array of length ${arr.length}`);
     }
@@ -133,6 +135,7 @@ function createLambda(params, body) {
 }
 
 // Async/await support
-async function async_func(body) {
-    return await body();
+function async_func(body) {
+    // Simplified async support
+    return body();
 }
