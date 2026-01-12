@@ -140,7 +140,9 @@ fn is_simple_expr(expr: &IrExpr) -> bool {
         IrExpr::Binary(_, left, right, _) => is_simple_expr(left) && is_simple_expr(right),
         IrExpr::Unary(_, expr, _) => is_simple_expr(expr),
         IrExpr::Call { func, args, .. } => is_simple_expr(func) && args.iter().all(is_simple_expr),
-        IrExpr::TailCall { func, args, .. } => is_simple_expr(func) && args.iter().all(is_simple_expr),
+        IrExpr::TailCall { func, args, .. } => {
+            is_simple_expr(func) && args.iter().all(is_simple_expr)
+        }
         IrExpr::EffectCall(_, args, _) => args.iter().all(is_simple_expr),
         // Let bindings, if expressions, matches, and lambdas are complex
         IrExpr::Let { .. } => false,

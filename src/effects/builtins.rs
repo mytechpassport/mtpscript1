@@ -120,6 +120,56 @@ pub fn call_builtin_function(name: &str, args: &[String]) -> Result<String, MtpE
                 )),
             }
         }
+            let input = &args[0];
+
+            // Validate input size
+            if input.len() > 10 * 1024 * 1024 {
+                // 10MB limit
+                return Err(MtpError::RuntimeError("cborEncode input too large".into()));
+            }
+
+            match Json::parse(input) {
+                Ok(json) => {
+                    let cbor = crate::json::encode_cbor(&json);
+                    Ok(hex::encode(cbor))
+                }
+                Err(_) => Err(MtpError::RuntimeError(
+                    "Invalid JSON for CBOR encoding".into(),
+                )),
+            }
+        }
+        // ADT Constructors
+        "Some" => {
+            if args.len() != 1 {
+                return Err(MtpError::RuntimeError(
+                    "Some requires exactly 1 argument".into(),
+                ));
+            }
+            // Return ADT representation - for now as JSON-like string
+            Ok(format!("{{\"Some\":{}}}", args[0]))
+        }
+        "None" => {
+            if args.len() != 0 {
+                return Err(MtpError::RuntimeError("None requires no arguments".into()));
+            }
+            Ok("{\"None\":{}}".to_string())
+        }
+        "Ok" => {
+            if args.len() != 1 {
+                return Err(MtpError::RuntimeError(
+                    "Ok requires exactly 1 argument".into(),
+                ));
+            }
+            Ok(format!("{{\"Ok\":{}}}", args[0]))
+        }
+        "Err" => {
+            if args.len() != 1 {
+                return Err(MtpError::RuntimeError(
+                    "Err requires exactly 1 argument".into(),
+                ));
+            }
+            Ok(format!("{{\"Err\":{}}}", args[0]))
+        }
         _ => Err(MtpError::RuntimeError(format!(
             "Unknown built-in function: {}",
             name

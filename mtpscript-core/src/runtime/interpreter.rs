@@ -95,15 +95,45 @@ impl Interpreter {
         // Create builtin namespace objects
         // JSON, Decimal, etc. are represented as special objects
         let mut json_obj = HashMap::new();
-        json_obj.insert("parse".to_string(), Value::String("__builtin:JSON.parse".to_string()));
-        json_obj.insert("stringify".to_string(), Value::String("__builtin:JSON.stringify".to_string()));
-        json_obj.insert("stringifyCanonical".to_string(), Value::String("__builtin:JSON.stringifyCanonical".to_string()));
-        self.global_scope.insert("JSON".to_string(), Value::Object(json_obj));
+        json_obj.insert(
+            "parse".to_string(),
+            Value::String("__builtin:JSON.parse".to_string()),
+        );
+        json_obj.insert(
+            "stringify".to_string(),
+            Value::String("__builtin:JSON.stringify".to_string()),
+        );
+        json_obj.insert(
+            "stringifyCanonical".to_string(),
+            Value::String("__builtin:JSON.stringifyCanonical".to_string()),
+        );
+        self.global_scope
+            .insert("JSON".to_string(), Value::Object(json_obj));
 
         let mut decimal_obj = HashMap::new();
-        decimal_obj.insert("fromString".to_string(), Value::String("__builtin:Decimal.fromString".to_string()));
-        decimal_obj.insert("toString".to_string(), Value::String("__builtin:Decimal.toString".to_string()));
-        self.global_scope.insert("Decimal".to_string(), Value::Object(decimal_obj));
+        decimal_obj.insert(
+            "fromString".to_string(),
+            Value::String("__builtin:Decimal.fromString".to_string()),
+        );
+        decimal_obj.insert(
+            "toString".to_string(),
+            Value::String("__builtin:Decimal.toString".to_string()),
+        );
+        self.global_scope
+            .insert("Decimal".to_string(), Value::Object(decimal_obj));
+
+        // ADT Constructors
+        self.global_scope
+            .insert("Some".to_string(), Value::String("Some".to_string()));
+        // None as a predefined value
+        let mut none_obj = HashMap::new();
+        none_obj.insert("None".to_string(), Value::Object(HashMap::new()));
+        self.global_scope
+            .insert("None".to_string(), Value::Object(none_obj));
+        self.global_scope
+            .insert("Ok".to_string(), Value::String("Ok".to_string()));
+        self.global_scope
+            .insert("Err".to_string(), Value::String("Err".to_string()));
     }
 
     /// Check if a value is a builtin reference and get the builtin name
@@ -242,6 +272,53 @@ impl Interpreter {
                 let mut arg_vals = Vec::new();
                 for arg in args {
                     arg_vals.push(self.eval_expr(arg, local_scope)?);
+                }
+
+                // Check if this is an ADT constructor
+                if let Value::String(func_name) = &func_val {
+                    match func_name.as_str() {
+                        "Some" => {
+                            if arg_vals.len() != 1 {
+                                return Err(RuntimeError::ValueError(
+                                    "Some constructor expects exactly 1 argument".to_string(),
+                                ));
+                            }
+                            let mut obj = HashMap::new();
+                            obj.insert("Some".to_string(), arg_vals[0].clone());
+                            return Ok(Value::Object(obj));
+                        }
+                        "None" => {
+                            if arg_vals.len() != 0 {
+                                return Err(RuntimeError::ValueError(
+                                    "None constructor expects no arguments".to_string(),
+                                ));
+                            }
+                            let mut obj = HashMap::new();
+                            obj.insert("None".to_string(), Value::Object(HashMap::new()));
+                            return Ok(Value::Object(obj));
+                        }
+                        "Ok" => {
+                            if arg_vals.len() != 1 {
+                                return Err(RuntimeError::ValueError(
+                                    "Ok constructor expects exactly 1 argument".to_string(),
+                                ));
+                            }
+                            let mut obj = HashMap::new();
+                            obj.insert("Ok".to_string(), arg_vals[0].clone());
+                            return Ok(Value::Object(obj));
+                        }
+                        "Err" => {
+                            if arg_vals.len() != 1 {
+                                return Err(RuntimeError::ValueError(
+                                    "Err constructor expects exactly 1 argument".to_string(),
+                                ));
+                            }
+                            let mut obj = HashMap::new();
+                            obj.insert("Err".to_string(), arg_vals[0].clone());
+                            return Ok(Value::Object(obj));
+                        }
+                        _ => {}
+                    }
                 }
 
                 // Check if this is a builtin reference

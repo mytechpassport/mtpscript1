@@ -129,13 +129,13 @@ impl Type {
         match self {
             Type::Number => 64,
             Type::Boolean => 1,
-            Type::String => 0,        // Variable size
-            Type::Decimal => 128,     // Approximation
-            Type::TypeVar(_) => 0,    // Unknown
-            Type::Record(_) => 0,     // Variable size
-            Type::Adt(_) => 0,        // Variable
-            Type::Json => 0,          // Variable size
-            Type::Var(_) => 0,        // Unknown
+            Type::String => 0,         // Variable size
+            Type::Decimal => 128,      // Approximation
+            Type::TypeVar(_) => 0,     // Unknown
+            Type::Record(_) => 0,      // Variable size
+            Type::Adt(_) => 0,         // Variable
+            Type::Json => 0,           // Variable size
+            Type::Var(_) => 0,         // Unknown
             Type::Function(_, _) => 0, // Function pointer
         }
     }

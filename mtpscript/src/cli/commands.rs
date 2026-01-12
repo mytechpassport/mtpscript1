@@ -1,6 +1,7 @@
 use clap::{value_parser, Arg, Command};
 use crc32fast;
 use mtpscript_core::compiler::codegen;
+use mtpscript_core::effects::desugar_async_effects;
 use mtpscript_core::errors::compile::CompileError;
 use mtpscript_core::errors::runtime::RuntimeError;
 use mtpscript_core::errors::MtpError;
@@ -193,9 +194,11 @@ fn compile_command(input: &Path, output: &Path) -> Result<(), CliError> {
     let mut scanner = Scanner::new(&source)?;
     let tokens = scanner.scan_tokens()?;
     let mut parser = Parser::new(&tokens);
-    let program = parser.parse()?;
+    let mut program = parser.parse()?;
     let mut type_checker = TypeChecker::new();
     type_checker.typecheck_program(&program)?;
+    // Desugar await expressions to Async.await calls (per spec §7-a)
+    desugar_async_effects(&mut program)?;
     let ir = lower::lower_ast_to_ir(&program)?;
     let js = codegen::compile_ir_to_js(&ir)?;
     fs::write(output, js)?;
@@ -336,8 +339,6 @@ fn serve_command(snapshot_path: &Path, port: u16) -> Result<(), CliError> {
 }
 
 fn execute_command(input: &Path) -> Result<(), CliError> {
-    use std::env;
-
     println!("Executing MTPScript file: {}", input.display());
 
     // Compile to JS in memory
@@ -345,9 +346,11 @@ fn execute_command(input: &Path) -> Result<(), CliError> {
     let mut scanner = Scanner::new(&source)?;
     let tokens = scanner.scan_tokens()?;
     let mut parser = Parser::new(&tokens);
-    let program = parser.parse()?;
+    let mut program = parser.parse()?;
     let mut type_checker = TypeChecker::new();
     type_checker.typecheck_program(&program)?;
+    // Desugar await expressions to Async.await calls (per spec §7-a)
+    desugar_async_effects(&mut program)?;
     let ir = lower::lower_ast_to_ir(&program)?;
     let js = codegen::compile_ir_to_js(&ir)?;
 

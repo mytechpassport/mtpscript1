@@ -116,45 +116,54 @@ impl PatternCompiler {
         sub_patterns: &[IrPattern],
         expr_var: &str,
     ) -> Result<(String, Vec<(String, String)>), CompileError> {
-        let mut conditions = vec![format!("{}.tag === \"{}\"", expr_var, name)];
+        // Check if the ADT has this constructor
+        let mut conditions = vec![format!("typeof {}.{} !== \"undefined\"", expr_var, name)];
         let mut bindings = vec![];
 
-        for (i, sub_pattern) in sub_patterns.iter().enumerate() {
-            let value_expr = format!("{}.value[{}]", expr_var, i);
+        // For constructors with arguments, bind the value
+        if !sub_patterns.is_empty() {
+            let value_expr = format!("{}.{}", expr_var, name);
             let temp_var = self.next_temp_var();
             bindings.push((temp_var.clone(), value_expr.clone()));
 
-            match sub_pattern {
-                IrPattern::Wildcard => {
-                    // No additional condition
-                }
-                IrPattern::Var(var_name) => {
-                    bindings.push((var_name.clone(), temp_var));
-                }
-                IrPattern::Literal(lit_expr) => {
-                    let lit_js = self.compile_expr(lit_expr, 0)?;
-                    conditions.push(format!("{} === {}", temp_var, lit_js));
-                }
-                IrPattern::Variant(sub_name, sub_subs) => {
-                    let (sub_cond, sub_bindings) =
-                        self.compile_variant_pattern(sub_name, sub_subs, &temp_var)?;
-                    if sub_cond != "true" {
-                        conditions.push(sub_cond);
+            for (i, sub_pattern) in sub_patterns.iter().enumerate() {
+                match sub_pattern {
+                    IrPattern::Wildcard => {
+                        // No additional condition
                     }
-                    bindings.extend(sub_bindings);
-                }
-                IrPattern::Record(rec_name, rec_fields) => {
-                    let (rec_cond, rec_bindings) =
-                        self.compile_record_pattern(rec_name, rec_fields, &temp_var)?;
-                    if rec_cond != "true" {
-                        conditions.push(rec_cond);
+                    IrPattern::Var(var_name) => {
+                        // For single argument constructors like Some(x), bind x to the value
+                        if sub_patterns.len() == 1 {
+                            bindings.push((var_name.clone(), temp_var.clone()));
+                        } else {
+                            // For multiple arguments, this would be an array or tuple
+                            // For now, not implemented
+                            return Err(CompileError::CodeGenError(
+                                "Complex ADT patterns not yet supported".to_string(),
+                            ));
+                        }
                     }
-                    bindings.extend(rec_bindings);
+                    IrPattern::Literal(_) => {
+                        return Err(CompileError::CodeGenError(
+                            "Complex expressions in patterns not yet supported".to_string(),
+                        ));
+                    }
+                    IrPattern::Variant(_, _) | IrPattern::Record(_, _) => {
+                        return Err(CompileError::CodeGenError(
+                            "Nested patterns not yet supported".to_string(),
+                        ));
+                    }
                 }
             }
         }
 
-        Ok((conditions.join(" && "), bindings))
+        let condition = if conditions.len() == 1 {
+            conditions[0].clone()
+        } else {
+            format!("({})", conditions.join(" && "))
+        };
+
+        Ok((condition, bindings))
     }
 
     fn compile_record_pattern(
@@ -222,8 +231,44 @@ impl PatternCompiler {
                 let index_js = self.compile_expr(index, 0)?;
                 Ok(format!("{}[{}]", array_js, index_js))
             }
+            IrExpr::Binary(op, left, right, _) => {
+                let left_js = self.compile_expr(left, 0)?;
+                let right_js = self.compile_expr(right, 0)?;
+                let op_js = match op {
+                    crate::parser::ast::BinOp::Add => "+",
+                    crate::parser::ast::BinOp::Sub => "-",
+                    crate::parser::ast::BinOp::Mul => "*",
+                    crate::parser::ast::BinOp::Div => "/",
+                    crate::parser::ast::BinOp::Eq => "===",
+                    crate::parser::ast::BinOp::Ne => "!==",
+                    crate::parser::ast::BinOp::Lt => "<",
+                    crate::parser::ast::BinOp::Le => "<=",
+                    crate::parser::ast::BinOp::Gt => ">",
+                    crate::parser::ast::BinOp::Ge => ">=",
+                    _ => {
+                        return Err(CompileError::CodeGenError(format!(
+                            "Unsupported binary operator: {:?}",
+                            op
+                        )))
+                    }
+                };
+                Ok(format!("({} {} {})", left_js, op_js, right_js))
+            }
+            IrExpr::Unary(op, expr, _) => {
+                let expr_js = self.compile_expr(expr, 0)?;
+                let op_js = match op {
+                    crate::parser::ast::BinOp::Sub => "-", // -x
+                    _ => {
+                        return Err(CompileError::CodeGenError(format!(
+                            "Unsupported unary operator: {:?}",
+                            op
+                        )))
+                    }
+                };
+                Ok(format!("{}{}", op_js, expr_js))
+            }
             _ => Err(CompileError::CodeGenError(
-                "Complex expressions in patterns not yet supported".to_string(),
+                "Complex expressions in match arms not yet supported".to_string(),
             )),
         }
     }
