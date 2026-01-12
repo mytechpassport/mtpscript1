@@ -67,28 +67,42 @@ pub enum JsStmt {
     Block(Vec<JsStmt>),
 }
 
+/// Return signal for proper return handling
+#[derive(Debug)]
+pub struct ReturnValue(pub Value);
+
 pub struct JsInterpreter {
     globals: HashMap<String, Value>,
     locals: Vec<HashMap<String, Value>>,
+    functions: HashMap<String, StoredFunction>,
+}
+
+#[derive(Clone)]
+pub struct StoredFunction {
+    pub params: Vec<String>,
+    pub body: Vec<JsStmt>,
 }
 
 impl JsInterpreter {
     pub fn new() -> Self {
         let mut globals = HashMap::new();
 
-        // Add built-in functions
-        globals.insert(
-            "console.log".to_string(),
+        // Add console object with log method
+        let mut console_obj = HashMap::new();
+        console_obj.insert(
+            "log".to_string(),
             Value::Function(crate::runtime::value::FunctionValue {
-                name: "console.log".to_string(),
+                name: "log".to_string(),
                 params: vec!["message".to_string()],
-                body: vec![], // Placeholder
+                body: vec![],
             }),
         );
+        globals.insert("console".to_string(), Value::Object(console_obj));
 
         JsInterpreter {
             globals,
             locals: vec![HashMap::new()],
+            functions: HashMap::new(),
         }
     }
 
@@ -96,7 +110,11 @@ impl JsInterpreter {
         let mut result = Value::Null;
 
         for stmt in stmts {
-            result = self.execute_stmt(stmt)?;
+            match self.execute_stmt(stmt) {
+                Ok(val) => result = val,
+                Err(MtpError::ReturnSignal(val)) => return Ok(val),
+                Err(e) => return Err(e),
+            }
         }
 
         Ok(result)
@@ -107,9 +125,9 @@ impl JsInterpreter {
             JsStmt::Expr(expr) => self.evaluate(expr),
             JsStmt::Return(Some(expr)) => {
                 let value = self.evaluate(expr)?;
-                Err(MtpError::RuntimeError(format!("Return: {:?}", value))) // Placeholder for return handling
+                Err(MtpError::ReturnSignal(value))
             }
-            JsStmt::Return(None) => Ok(Value::Null),
+            JsStmt::Return(None) => Err(MtpError::ReturnSignal(Value::Null)),
             JsStmt::If {
                 cond,
                 then_branch,
@@ -134,10 +152,19 @@ impl JsInterpreter {
                 Ok(Value::Null)
             }
             JsStmt::Function { name, params, body } => {
+                // Store function for later execution
+                self.functions.insert(
+                    name.clone(),
+                    StoredFunction {
+                        params: params.clone(),
+                        body: body.clone(),
+                    },
+                );
+
                 let func = Value::Function(crate::runtime::value::FunctionValue {
                     name: name.clone(),
                     params: params.clone(),
-                    body: vec![], // In real impl, serialize body
+                    body: vec![],
                 });
                 self.globals.insert(name.clone(), func);
                 Ok(Value::Null)
@@ -180,26 +207,31 @@ impl JsInterpreter {
                 self.eval_unary_op(op, &val)
             }
             JsExpr::Call { func, args } => {
+                // Evaluate function expression
                 let func_val = self.evaluate(func)?;
                 let mut arg_vals = Vec::new();
                 for arg in args {
                     arg_vals.push(self.evaluate(arg)?);
                 }
-                self.call_function(&func_val, &arg_vals)
+                self.call_function(&func_val, &arg_vals, func)
             }
             JsExpr::Function {
-                name: _,
-                params: _,
-                body: _,
+                name,
+                params,
+                body,
             } => {
-                // Return function value
+                // Return function value (anonymous or named)
+                let func_name = name.clone().unwrap_or_else(|| "anonymous".to_string());
                 Ok(Value::Function(crate::runtime::value::FunctionValue {
-                    name: "anonymous".to_string(),
-                    params: vec![],
+                    name: func_name,
+                    params: params.clone(),
                     body: vec![],
                 }))
             }
-            JsExpr::Return(expr) => self.evaluate(expr),
+            JsExpr::Return(expr) => {
+                let value = self.evaluate(expr)?;
+                Err(MtpError::ReturnSignal(value))
+            }
             JsExpr::If {
                 cond,
                 then_branch,
@@ -209,13 +241,19 @@ impl JsInterpreter {
                 if self.is_truthy(&cond_val) {
                     let mut result = Value::Null;
                     for stmt in then_branch {
-                        result = self.execute_stmt(stmt)?;
+                        match self.execute_stmt(stmt) {
+                            Ok(val) => result = val,
+                            Err(e) => return Err(e),
+                        }
                     }
                     Ok(result)
                 } else if let Some(else_branch) = else_branch {
                     let mut result = Value::Null;
                     for stmt in else_branch {
-                        result = self.execute_stmt(stmt)?;
+                        match self.execute_stmt(stmt) {
+                            Ok(val) => result = val,
+                            Err(e) => return Err(e),
+                        }
                     }
                     Ok(result)
                 } else {
@@ -228,14 +266,14 @@ impl JsInterpreter {
                 } else {
                     Value::Null
                 };
-                self.locals.last_mut().unwrap().insert(name.clone(), value);
+                self.locals.last_mut().unwrap().insert(name.clone(), value.clone());
                 Ok(value)
             }
             JsExpr::Assign { target, value } => {
                 let val = self.evaluate(value)?;
                 match &**target {
                     JsExpr::Ident(name) => {
-                        // Assign to variable
+                        // Assign to variable in nearest scope
                         for scope in self.locals.iter_mut().rev() {
                             if scope.contains_key(name) {
                                 scope.insert(name.clone(), val.clone());
@@ -250,6 +288,12 @@ impl JsInterpreter {
                             "Undefined variable: {}",
                             name
                         )))
+                    }
+                    JsExpr::Member { object, property } => {
+                        let obj_val = self.evaluate(object)?;
+                        let prop_val = self.evaluate(property)?;
+                        // Object mutation would go here (not supported in pure MTPScript)
+                        Err(MtpError::RuntimeError("Object mutation not supported".into()))
                     }
                     _ => Err(MtpError::RuntimeError("Invalid assignment target".into())),
                 }
@@ -277,10 +321,7 @@ impl JsInterpreter {
                         if let Some(val) = obj.get(prop) {
                             Ok(val.clone())
                         } else {
-                            Err(MtpError::RuntimeError(format!(
-                                "Property '{}' not found",
-                                prop
-                            )))
+                            Ok(Value::Null)
                         }
                     }
                     (Value::Array(arr), Value::Number(idx)) => {
@@ -291,6 +332,12 @@ impl JsInterpreter {
                             Err(MtpError::RuntimeError("Array index out of bounds".into()))
                         }
                     }
+                    (Value::String(s), Value::String(prop)) if prop == "length" => {
+                        Ok(Value::Number(s.len() as i64))
+                    }
+                    (Value::Array(arr), Value::String(prop)) if prop == "length" => {
+                        Ok(Value::Number(arr.len() as i64))
+                    }
                     _ => Err(MtpError::RuntimeError("Invalid member access".into())),
                 }
             }
@@ -300,55 +347,90 @@ impl JsInterpreter {
     fn eval_binary_op(&self, op: &str, left: &Value, right: &Value) -> Result<Value, MtpError> {
         match op {
             "+" => match (left, right) {
-                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+                (Value::Number(a), Value::Number(b)) => {
+                    // Checked addition for overflow
+                    a.checked_add(*b)
+                        .map(Value::Number)
+                        .ok_or_else(|| MtpError::RuntimeError("Integer overflow".into()))
+                }
                 (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
+                (Value::String(a), b) => Ok(Value::String(format!("{}{}", a, b))),
+                (a, Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
                 _ => Err(MtpError::RuntimeError("Invalid operands for +".into())),
             },
             "-" => match (left, right) {
-                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
+                (Value::Number(a), Value::Number(b)) => {
+                    a.checked_sub(*b)
+                        .map(Value::Number)
+                        .ok_or_else(|| MtpError::RuntimeError("Integer underflow".into()))
+                }
                 _ => Err(MtpError::RuntimeError("Invalid operands for -".into())),
             },
             "*" => match (left, right) {
-                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
+                (Value::Number(a), Value::Number(b)) => {
+                    a.checked_mul(*b)
+                        .map(Value::Number)
+                        .ok_or_else(|| MtpError::RuntimeError("Integer overflow".into()))
+                }
                 _ => Err(MtpError::RuntimeError("Invalid operands for *".into())),
             },
             "/" => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => {
-                    if *b != 0 {
-                        Ok(Value::Number(a / b))
-                    } else {
+                    if *b == 0 {
                         Err(MtpError::RuntimeError("Division by zero".into()))
+                    } else {
+                        Ok(Value::Number(a / b))
                     }
                 }
                 _ => Err(MtpError::RuntimeError("Invalid operands for /".into())),
             },
-            "==" => Ok(Value::Boolean(left == right)),
-            "!=" => Ok(Value::Boolean(left != right)),
+            "%" => match (left, right) {
+                (Value::Number(a), Value::Number(b)) => {
+                    if *b == 0 {
+                        Err(MtpError::RuntimeError("Division by zero".into()))
+                    } else {
+                        Ok(Value::Number(a % b))
+                    }
+                }
+                _ => Err(MtpError::RuntimeError("Invalid operands for %".into())),
+            },
+            "==" => Ok(Value::Boolean(self.values_equal(left, right))),
+            "===" => Ok(Value::Boolean(self.values_strict_equal(left, right))),
+            "!=" => Ok(Value::Boolean(!self.values_equal(left, right))),
+            "!==" => Ok(Value::Boolean(!self.values_strict_equal(left, right))),
             "<" => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a < b)),
+                (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a < b)),
                 _ => Err(MtpError::RuntimeError("Invalid operands for <".into())),
             },
             ">" => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a > b)),
+                (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a > b)),
                 _ => Err(MtpError::RuntimeError("Invalid operands for >".into())),
             },
             "<=" => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a <= b)),
+                (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a <= b)),
                 _ => Err(MtpError::RuntimeError("Invalid operands for <=".into())),
             },
             ">=" => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a >= b)),
+                (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a >= b)),
                 _ => Err(MtpError::RuntimeError("Invalid operands for >=".into())),
             },
             "&&" => {
-                let left_bool = self.is_truthy(left);
-                let right_bool = self.is_truthy(right);
-                Ok(Value::Boolean(left_bool && right_bool))
+                if !self.is_truthy(left) {
+                    Ok(left.clone())
+                } else {
+                    Ok(right.clone())
+                }
             }
             "||" => {
-                let left_bool = self.is_truthy(left);
-                let right_bool = self.is_truthy(right);
-                Ok(Value::Boolean(left_bool || right_bool))
+                if self.is_truthy(left) {
+                    Ok(left.clone())
+                } else {
+                    Ok(right.clone())
+                }
             }
             _ => Err(MtpError::RuntimeError(format!(
                 "Unknown binary operator: {}",
@@ -361,9 +443,25 @@ impl JsInterpreter {
         match op {
             "-" => match val {
                 Value::Number(n) => Ok(Value::Number(-n)),
-                _ => Err(MtpError::RuntimeError("Invalid operand for -".into())),
+                _ => Err(MtpError::RuntimeError("Invalid operand for unary -".into())),
+            },
+            "+" => match val {
+                Value::Number(n) => Ok(Value::Number(*n)),
+                _ => Err(MtpError::RuntimeError("Invalid operand for unary +".into())),
             },
             "!" => Ok(Value::Boolean(!self.is_truthy(val))),
+            "typeof" => {
+                let type_str = match val {
+                    Value::Number(_) => "number",
+                    Value::String(_) => "string",
+                    Value::Boolean(_) => "boolean",
+                    Value::Null => "object", // JS quirk
+                    Value::Array(_) => "object",
+                    Value::Object(_) => "object",
+                    Value::Function(_) => "function",
+                };
+                Ok(Value::String(type_str.to_string()))
+            }
             _ => Err(MtpError::RuntimeError(format!(
                 "Unknown unary operator: {}",
                 op
@@ -371,23 +469,50 @@ impl JsInterpreter {
         }
     }
 
-    fn call_function(&mut self, func: &Value, args: &[Value]) -> Result<Value, MtpError> {
+    fn call_function(&mut self, func: &Value, args: &[Value], func_expr: &JsExpr) -> Result<Value, MtpError> {
         match func {
             Value::Function(func_val) => {
-                // Create new scope
-                let mut new_scope = HashMap::new();
-                for (i, param) in func_val.params.iter().enumerate() {
-                    if i < args.len() {
-                        new_scope.insert(param.clone(), args[i].clone());
+                // Check if it's console.log
+                if func_val.name == "log" {
+                    for arg in args {
+                        println!("{}", arg);
                     }
+                    return Ok(Value::Null);
                 }
-                self.locals.push(new_scope);
 
-                // Execute function body (placeholder)
-                let result = Value::String("function_result".to_string());
+                // Look up stored function body
+                let stored = self.functions.get(&func_val.name).cloned();
 
-                self.locals.pop();
-                Ok(result)
+                if let Some(stored_func) = stored {
+                    // Create new scope with parameters bound
+                    let mut new_scope = HashMap::new();
+                    for (i, param) in stored_func.params.iter().enumerate() {
+                        let value = if i < args.len() {
+                            args[i].clone()
+                        } else {
+                            Value::Null
+                        };
+                        new_scope.insert(param.clone(), value);
+                    }
+
+                    self.locals.push(new_scope);
+
+                    // Execute function body
+                    let result = match self.execute(&stored_func.body) {
+                        Ok(val) => Ok(val),
+                        Err(MtpError::ReturnSignal(val)) => Ok(val),
+                        Err(e) => Err(e),
+                    };
+
+                    self.locals.pop();
+                    result
+                } else {
+                    // Function not found in stored functions
+                    Err(MtpError::RuntimeError(format!(
+                        "Function '{}' not defined",
+                        func_val.name
+                    )))
+                }
             }
             _ => Err(MtpError::RuntimeError("Cannot call non-function".into())),
         }
@@ -399,9 +524,46 @@ impl JsInterpreter {
             Value::Null => false,
             Value::Number(n) => *n != 0,
             Value::String(s) => !s.is_empty(),
-            Value::Array(arr) => !arr.is_empty(),
-            Value::Object(obj) => !obj.is_empty(),
+            Value::Array(arr) => true, // Arrays are always truthy in JS
+            Value::Object(_) => true,
             Value::Function(_) => true,
         }
+    }
+
+    fn values_equal(&self, left: &Value, right: &Value) -> bool {
+        match (left, right) {
+            (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a == b,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Null, Value::Null) => true,
+            // Type coercion
+            (Value::Number(n), Value::String(s)) | (Value::String(s), Value::Number(n)) => {
+                if let Ok(parsed) = s.parse::<i64>() {
+                    *n == parsed
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn values_strict_equal(&self, left: &Value, right: &Value) -> bool {
+        match (left, right) {
+            (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a == b,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Null, Value::Null) => true,
+            (Value::Array(a), Value::Array(b)) => {
+                a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| self.values_strict_equal(x, y))
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Default for JsInterpreter {
+    fn default() -> Self {
+        Self::new()
     }
 }
