@@ -26,65 +26,57 @@ impl PatternCompiler {
         let expr_js = self.compile_expr(expr, 0)?;
 
         let mut output = format!("{}// Match expression with advanced patterns\n", indent_str);
-        output.push_str(&format!("{}(function() {{\n", indent_str));
 
         // Bind the expression to a variable to avoid re-evaluation
         let match_var = self.next_temp_var();
         output.push_str(&format!(
-            "{}  const {} = {};\n",
+            "{}const {} = {};\n",
             indent_str, match_var, expr_js
         ));
 
-        // Generate pattern matching logic
-        let match_body = self.compile_pattern_cases(&match_var, cases, indent + 1)?;
-        output.push_str(&match_body);
-        output.push_str(&format!("{})()}}", indent_str));
+        // Generate simple pattern matching as ternary expressions
+        let match_expr = self.compile_simple_ternary_match(&match_var, cases)?;
+        output.push_str(&format!("{}{}", indent_str, match_expr));
 
         Ok(output)
     }
 
-    /// Compile pattern cases as a series of if-else statements
-    fn compile_pattern_cases(
+    /// Compile simple pattern cases as ternary expressions with variable substitution
+    fn compile_simple_ternary_match(
         &mut self,
         match_var: &str,
         cases: &[(IrPattern, IrExpr)],
-        indent: usize,
     ) -> Result<String, CompileError> {
-        let indent_str = "  ".repeat(indent);
-        let mut output = String::new();
-
-        let mut first = true;
-        for (pattern, body) in cases {
-            let (condition, bindings) = self.compile_pattern_binding(pattern, match_var)?;
-
-            if first {
-                output.push_str(&format!("{}if ({}) {{\n", indent_str, condition));
-                first = false;
-            } else {
-                output.push_str(&format!("{}  }} else if ({}) {{\n", indent_str, condition));
-            }
-
-            // Add variable bindings
-            for (var_name, var_expr) in bindings {
-                output.push_str(&format!(
-                    "{}  const {} = {};\n",
-                    indent_str, var_name, var_expr
-                ));
-            }
-
-            // Compile the body
-            let body_js = self.compile_expr(body, indent + 1)?;
-            output.push_str(&body_js);
-            output.push('\n');
+        if cases.is_empty() {
+            return Err(CompileError::CodeGenError("Match must have at least one case".to_string()));
         }
 
-        // Close the last case
-        output.push_str(&format!("{}  }}\n", indent_str));
+        let mut result = String::new();
 
-        Ok(output)
+        for (i, (pattern, body)) in cases.iter().enumerate() {
+            let (condition, bindings) = self.compile_pattern_binding(pattern, match_var)?;
+
+            // Create substitution map
+            let mut subs = std::collections::HashMap::new();
+            for (var_name, var_expr) in &bindings {
+                subs.insert(var_name.clone(), var_expr.clone());
+            }
+
+            let body_js = self.compile_expr_with_subs(body, &subs)?;
+
+            if i == 0 {
+                result = format!("{} ? {} : ", condition, body_js);
+            } else if i == cases.len() - 1 {
+                result.push_str(&body_js);
+            } else {
+                result.push_str(&format!("{} ? {} : ", condition, body_js));
+            }
+        }
+
+        Ok(format!("({})", result))
     }
 
-    /// Compile a pattern and return (condition, variable_bindings)
+    /// Compile a pattern and return (condition, variable_bindings as expressions)
     fn compile_pattern_binding(
         &mut self,
         pattern: &IrPattern,
@@ -117,7 +109,7 @@ impl PatternCompiler {
         expr_var: &str,
     ) -> Result<(String, Vec<(String, String)>), CompileError> {
         // Check if the ADT has this constructor
-        let mut conditions = vec![format!("typeof {}.{} !== \"undefined\"", expr_var, name)];
+        let mut conditions = vec![format!("{}[\"{}\"] !== undefined", expr_var, name)];
         let mut bindings = vec![];
 
         // For constructors with arguments, bind the value
@@ -215,17 +207,68 @@ impl PatternCompiler {
 
     /// Compile expressions (simplified version for pattern compilation)
     fn compile_expr(&mut self, expr: &IrExpr, _indent: usize) -> Result<String, CompileError> {
+        self.compile_expr_with_subs(expr, &std::collections::HashMap::new())
+    }
+
+    fn compile_expr_with_subs(&mut self, expr: &IrExpr, subs: &std::collections::HashMap<String, String>) -> Result<String, CompileError> {
         // This is a simplified version - in practice, we'd reuse the main codegen
         match expr {
             IrExpr::String(s, _) => Ok(format!("\"{}\"", s)),
             IrExpr::Number(n, _) => Ok(n.to_string()),
             IrExpr::Decimal(d, _) => Ok(format!("\"{}\"", d)),
             IrExpr::Boolean(b, _) => Ok(b.to_string()),
-            IrExpr::Var(name, _) => Ok(name.clone()),
+            IrExpr::Var(name, _) => {
+                // Apply substitution if available
+                if let Some(sub) = subs.get(name) {
+                    Ok(sub.clone())
+                } else {
+                    Ok(name.clone())
+                }
+            }
             IrExpr::Dot(expr, field, _) => {
-                let expr_js = self.compile_expr(expr, 0)?;
+                let expr_js = self.compile_expr_with_subs(expr, subs)?;
                 Ok(format!("{}.{}", expr_js, field))
             }
+            IrExpr::Index(array, index, _) => {
+                let array_js = self.compile_expr_with_subs(array, subs)?;
+                let index_js = self.compile_expr_with_subs(index, subs)?;
+                Ok(format!("{}[{}]", array_js, index_js))
+            }
+            IrExpr::Binary(op, left, right, _) => {
+                let left_js = self.compile_expr_with_subs(left, subs)?;
+                let right_js = self.compile_expr_with_subs(right, subs)?;
+                let op_js = match op {
+                    crate::parser::ast::BinOp::Add => "+",
+                    crate::parser::ast::BinOp::Sub => "-",
+                    crate::parser::ast::BinOp::Mul => "*",
+                    crate::parser::ast::BinOp::Div => "/",
+                    crate::parser::ast::BinOp::Eq => "===",
+                    crate::parser::ast::BinOp::Ne => "!==",
+                    crate::parser::ast::BinOp::Lt => "<",
+                    crate::parser::ast::BinOp::Le => "<=",
+                    crate::parser::ast::BinOp::Gt => ">",
+                    crate::parser::ast::BinOp::Ge => ">=",
+                    _ => return Err(CompileError::CodeGenError(
+                        format!("Unsupported binary operator: {:?}", op),
+                    )),
+                };
+                Ok(format!("({} {} {})", left_js, op_js, right_js))
+            }
+            IrExpr::Unary(op, expr, _) => {
+                let expr_js = self.compile_expr_with_subs(expr, subs)?;
+                let op_js = match op {
+                    crate::parser::ast::BinOp::Sub => "-", // -x
+                    _ => return Err(CompileError::CodeGenError(
+                        format!("Unsupported unary operator: {:?}", op),
+                    )),
+                };
+                Ok(format!("{}{}", op_js, expr_js))
+            }
+            _ => Err(CompileError::CodeGenError(
+                "Complex expressions in match arms not yet supported".to_string(),
+            )),
+        }
+    }
             IrExpr::Index(array, index, _) => {
                 let array_js = self.compile_expr(array, 0)?;
                 let index_js = self.compile_expr(index, 0)?;

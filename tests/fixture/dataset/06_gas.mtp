@@ -2,22 +2,12 @@ function gas_intensive_computation(iterations: number) {
     if (iterations == 0) { 0 } else { gas_intensive_computation(iterations - 1) + 1 }
 }
 
-function test_gas_costs() {
-    const cheap_op = 1 + 1;
-    const expensive_func = gas_intensive_computation(10);
-    {
-        "cheap_cost": cheap_op,
-        "expensive_cost": expensive_func,
-        "gas_operations": ["addition", "function_call"]
-    }
-}
-
 api GET "/gas" uses {} {
-  const normal_result = gas_intensive_computation(5);
-  const cost_analysis = test_gas_costs();
+  // Each recursive call consumes ~20 gas (function call + comparison + arithmetic)
+  // With 10M gas limit, ~500k iterations will exhaust gas
+  const result = gas_intensive_computation(1000000);
   respond json({
-      "normal_computation": normal_result,
-      "gas_cost_analysis": cost_analysis,
+      "computation": result,
       "gas_features": {
           "metering": "enabled",
           "limits": "enforced",

@@ -49,10 +49,11 @@ pub fn call_builtin_function(name: &str, args: &[String]) -> Result<String, MtpE
 
             // Validate decimal format
             if !is_valid_decimal_string(input) {
-                return Err(MtpError::RuntimeError("Invalid decimal format".into()));
+                return Err(MtpError::RuntimeError("invalid decimal string".into()));
             }
 
-            Ok(input.clone()) // Placeholder - proper Decimal conversion needed
+            // Parse and normalize the decimal
+            Ok(normalize_decimal_string(input))
         }
         "Decimal.toString" => {
             if args.len() != 1 {
@@ -60,7 +61,8 @@ pub fn call_builtin_function(name: &str, args: &[String]) -> Result<String, MtpE
                     "Decimal.toString requires exactly 1 argument".into(),
                 ));
             }
-            Ok(args[0].clone()) // Placeholder
+            // Already normalized from fromString, just return it
+            Ok(args[0].clone())
         }
         "fnv1a32" => {
             if args.len() != 1 {
@@ -208,6 +210,46 @@ fn is_valid_decimal_string(s: &str) -> bool {
     }
 
     has_digits && s.len() <= 34 // Max 34 characters as per spec
+}
+
+/// Normalize a decimal string by removing trailing zeros after decimal point
+fn normalize_decimal_string(s: &str) -> String {
+    // Handle sign
+    let (sign, rest) = if s.starts_with('-') {
+        ("-", &s[1..])
+    } else if s.starts_with('+') {
+        ("", &s[1..])
+    } else {
+        ("", s)
+    };
+
+    // Split on decimal point
+    if let Some(dot_pos) = rest.find('.') {
+        let integer_part = &rest[..dot_pos];
+        let fractional_part = &rest[dot_pos + 1..];
+
+        // Remove trailing zeros from fractional part
+        let trimmed_frac = fractional_part.trim_end_matches('0');
+
+        // Remove leading zeros from integer part (but keep at least one digit)
+        let trimmed_int = integer_part.trim_start_matches('0');
+        let int_part = if trimmed_int.is_empty() { "0" } else { trimmed_int };
+
+        if trimmed_frac.is_empty() {
+            // No fractional part after trimming
+            format!("{}{}", sign, int_part)
+        } else {
+            format!("{}{}.{}", sign, int_part, trimmed_frac)
+        }
+    } else {
+        // No decimal point - remove leading zeros
+        let trimmed = rest.trim_start_matches('0');
+        if trimmed.is_empty() {
+            "0".to_string()
+        } else {
+            format!("{}{}", sign, trimmed)
+        }
+    }
 }
 
 /// FNV-1a 32-bit hash
