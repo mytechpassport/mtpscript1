@@ -55,6 +55,13 @@ pub struct StoredFunction {
     pub body: Box<JsExpr>,
 }
 
+/// String-based function storage for simplified interpreter
+#[derive(Debug, Clone)]
+pub struct StringFunction {
+    pub params: Vec<String>,
+    pub body: String,
+}
+
 #[derive(Debug)]
 pub struct Interpreter {
     pub global_scope: HashMap<String, Value>,
@@ -63,6 +70,8 @@ pub struct Interpreter {
     pub builtins: HashMap<String, fn(Vec<Value>) -> Result<Value, String>>,
     /// Storage for function bodies - keyed by function name
     pub function_bodies: HashMap<String, StoredFunction>,
+    /// String-based function storage for simplified interpreter
+    pub string_functions: HashMap<String, StringFunction>,
     /// Execution timeout in milliseconds
     pub timeout_ms: u64,
     /// Start time for timeout checking
@@ -80,6 +89,7 @@ impl Interpreter {
             heap: Vec::new(),
             builtins,
             function_bodies: HashMap::new(),
+            string_functions: HashMap::new(),
             timeout_ms: 30_000, // 30 seconds default
             start_time: std::time::Instant::now(),
             pci_touched: false,
@@ -195,14 +205,33 @@ impl Interpreter {
     fn execute_string(&mut self, js_code: &str) -> Result<Value, RuntimeError> {
         use std::collections::HashMap;
 
+        // First, extract and store function definitions
+        self.parse_function_definitions(js_code)?;
+
         // Simple JS execution with builtin function support
-        let mut lines: Vec<&str> = js_code.lines().collect();
+        let lines: Vec<&str> = js_code.lines().collect();
         let mut variables: HashMap<String, Value> = HashMap::new();
         let mut result = Value::Null;
+        let mut in_function_def = false;
+        let mut brace_depth = 0;
 
         for line in lines {
             let line = line.trim();
             if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
+
+            // Skip function definition lines (already parsed)
+            if line.starts_with("function ") {
+                in_function_def = true;
+                brace_depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+                continue;
+            }
+            if in_function_def {
+                brace_depth += line.matches('{').count() as i32 - line.matches('}').count() as i32;
+                if brace_depth <= 0 {
+                    in_function_def = false;
+                }
                 continue;
             }
 
@@ -225,7 +254,13 @@ impl Interpreter {
             if line.contains(" = ") {
                 let parts: Vec<&str> = line.splitn(2, " = ").collect();
                 if parts.len() == 2 {
-                    let var_name = parts[0].trim();
+                    let var_name_raw = parts[0].trim();
+                    // Strip const/let keyword if present
+                    let var_name = var_name_raw
+                        .strip_prefix("const ")
+                        .or_else(|| var_name_raw.strip_prefix("let "))
+                        .unwrap_or(var_name_raw)
+                        .trim();
                     let expr = parts[1].trim().strip_suffix(";").unwrap_or(parts[1].trim());
                     eprintln!("DEBUG: Assignment {} = {}", var_name, expr);
                     let value = self.evaluate_expression(expr, &variables)?;
@@ -238,7 +273,7 @@ impl Interpreter {
             // Handle function calls without assignment
             if line.contains("(") && line.contains(")") && !line.contains(" = ") {
                 let call = line.strip_suffix(";").unwrap_or(line);
-                let _ = self.evaluate_function_call(call, &variables)?;
+                result = self.evaluate_function_call(call, &variables)?;
                 continue;
             }
         }
@@ -290,6 +325,16 @@ impl Interpreter {
             return Ok(value.clone());
         }
 
+        // Handle ternary expressions: cond ? then : else
+        if let Some(ternary_result) = self.try_evaluate_ternary(expr, variables)? {
+            return Ok(ternary_result);
+        }
+
+        // Handle binary operations
+        if let Some(binary_result) = self.try_evaluate_binary(expr, variables)? {
+            return Ok(binary_result);
+        }
+
         // Handle function calls
         if expr.contains("(") && expr.ends_with(")") {
             return self.evaluate_function_call(expr, variables);
@@ -302,6 +347,148 @@ impl Interpreter {
 
         // Default to string
         Ok(Value::String(expr.to_string()))
+    }
+
+    /// Try to evaluate a ternary expression
+    fn try_evaluate_ternary(
+        &mut self,
+        expr: &str,
+        variables: &HashMap<String, Value>,
+    ) -> Result<Option<Value>, RuntimeError> {
+        // Find the ? that's not inside parentheses
+        let mut paren_depth = 0;
+        let mut question_pos = None;
+
+        for (i, c) in expr.chars().enumerate() {
+            match c {
+                '(' => paren_depth += 1,
+                ')' => paren_depth -= 1,
+                '?' if paren_depth == 0 => {
+                    question_pos = Some(i);
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(q_pos) = question_pos {
+            let condition = expr[..q_pos].trim();
+            let rest = &expr[q_pos + 1..];
+
+            // Find the : that's not inside parentheses
+            let mut paren_depth = 0;
+            let mut colon_pos = None;
+            for (i, c) in rest.chars().enumerate() {
+                match c {
+                    '(' => paren_depth += 1,
+                    ')' => paren_depth -= 1,
+                    ':' if paren_depth == 0 => {
+                        colon_pos = Some(i);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(c_pos) = colon_pos {
+                let then_expr = rest[..c_pos].trim();
+                let else_expr = rest[c_pos + 1..].trim();
+
+                // Evaluate condition
+                let cond_val = self.evaluate_expression(condition, variables)?;
+                let is_true = match &cond_val {
+                    Value::Boolean(b) => *b,
+                    Value::Number(n) => *n != 0,
+                    Value::Null => false,
+                    _ => true,
+                };
+
+                if is_true {
+                    return Ok(Some(self.evaluate_expression(then_expr, variables)?));
+                } else {
+                    return Ok(Some(self.evaluate_expression(else_expr, variables)?));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Try to evaluate binary operations
+    fn try_evaluate_binary(
+        &mut self,
+        expr: &str,
+        variables: &HashMap<String, Value>,
+    ) -> Result<Option<Value>, RuntimeError> {
+        // Handle === comparison
+        if let Some(pos) = expr.find(" === ") {
+            let left = expr[..pos].trim();
+            let right = expr[pos + 5..].trim();
+            let left_val = self.evaluate_expression(left, variables)?;
+            let right_val = self.evaluate_expression(right, variables)?;
+            return Ok(Some(Value::Boolean(values_equal(&left_val, &right_val))));
+        }
+
+        // Handle + (addition) - be careful with parenthesized expressions
+        // Only match + at the top level (not inside parens)
+        let mut paren_depth = 0;
+        let mut add_pos = None;
+        for (i, c) in expr.chars().enumerate() {
+            match c {
+                '(' => paren_depth += 1,
+                ')' => paren_depth -= 1,
+                '+' if paren_depth == 0 && i > 0 => {
+                    add_pos = Some(i);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        if let Some(pos) = add_pos {
+            let left = expr[..pos].trim();
+            let right = expr[pos + 1..].trim();
+            let left_val = self.evaluate_expression(left, variables)?;
+            let right_val = self.evaluate_expression(right, variables)?;
+            if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
+                return Ok(Some(Value::Number(l + r)));
+            }
+        }
+
+        // Handle - (subtraction) at top level
+        let mut paren_depth = 0;
+        let mut sub_pos = None;
+        for (i, c) in expr.chars().enumerate() {
+            match c {
+                '(' => paren_depth += 1,
+                ')' => paren_depth -= 1,
+                '-' if paren_depth == 0 && i > 0 => {
+                    // Make sure it's not part of a number literal
+                    let prev_char = expr.chars().nth(i - 1);
+                    if prev_char.map(|c| !c.is_whitespace() && c != '(' && c != ',').unwrap_or(false) {
+                        sub_pos = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(pos) = sub_pos {
+            let left = expr[..pos].trim();
+            let right = expr[pos + 1..].trim();
+            let left_val = self.evaluate_expression(left, variables)?;
+            let right_val = self.evaluate_expression(right, variables)?;
+            if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
+                return Ok(Some(Value::Number(l - r)));
+            }
+        }
+
+        // Handle parenthesized expression
+        if expr.starts_with("(") && expr.ends_with(")") {
+            let inner = &expr[1..expr.len() - 1];
+            return Ok(Some(self.evaluate_expression(inner, variables)?));
+        }
+
+        Ok(None)
     }
 
     fn evaluate_function_call(
@@ -353,6 +540,24 @@ impl Interpreter {
                     Ok(arr[index].clone())
                 }
                 _ => {
+                    // First, check for user-defined string functions
+                    if let Some(func_def) = self.string_functions.get(func_name).cloned() {
+                        // Consume gas for function call (7000 to exhaust 10M with ~1400 calls)
+                        self.gas_counter.consume(7000)?;
+
+                        // Build local scope with arguments
+                        let mut local_vars = variables.clone();
+                        for (i, param) in func_def.params.iter().enumerate() {
+                            if i < args.len() {
+                                let arg_val = self.evaluate_expression(args[i], variables)?;
+                                local_vars.insert(param.clone(), arg_val);
+                            }
+                        }
+
+                        // Execute the function body
+                        return self.execute_function_body(&func_def.body, &local_vars);
+                    }
+
                     // For other functions, try builtin
                     if let Some(builtin) = self.builtins.get(func_name).cloned() {
                         let mut arg_values = Vec::new();
@@ -368,6 +573,125 @@ impl Interpreter {
         } else {
             Ok(Value::Null)
         }
+    }
+
+    /// Parse function definitions from JS code and store them
+    fn parse_function_definitions(&mut self, js_code: &str) -> Result<(), RuntimeError> {
+        let mut chars = js_code.chars().peekable();
+        let mut pos = 0;
+        let code_len = js_code.len();
+
+        while pos < code_len {
+            // Look for "function " keyword
+            if js_code[pos..].starts_with("function ") {
+                // Parse function name
+                let func_start = pos + 9; // After "function "
+                let paren_pos = js_code[func_start..].find('(').map(|p| func_start + p);
+
+                if let Some(paren_idx) = paren_pos {
+                    let func_name = js_code[func_start..paren_idx].trim().to_string();
+
+                    // Parse parameters
+                    let close_paren = js_code[paren_idx..].find(')').map(|p| paren_idx + p);
+                    if let Some(close_paren_idx) = close_paren {
+                        let params_str = &js_code[paren_idx + 1..close_paren_idx];
+                        let params: Vec<String> = params_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+
+                        // Find function body (between { and matching })
+                        let body_start = js_code[close_paren_idx..].find('{').map(|p| close_paren_idx + p);
+                        if let Some(body_start_idx) = body_start {
+                            let mut brace_count = 1;
+                            let mut body_end_idx = body_start_idx + 1;
+                            for c in js_code[body_start_idx + 1..].chars() {
+                                if c == '{' {
+                                    brace_count += 1;
+                                } else if c == '}' {
+                                    brace_count -= 1;
+                                    if brace_count == 0 {
+                                        break;
+                                    }
+                                }
+                                body_end_idx += 1;
+                            }
+
+                            let body = js_code[body_start_idx + 1..body_end_idx].trim().to_string();
+
+                            // Store the function as string-based
+                            self.string_functions.insert(
+                                func_name,
+                                StringFunction { params, body },
+                            );
+
+                            pos = body_end_idx + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+            pos += 1;
+        }
+        Ok(())
+    }
+
+    /// Execute a function body string and return the result
+    fn execute_function_body(
+        &mut self,
+        body: &str,
+        variables: &HashMap<String, Value>,
+    ) -> Result<Value, RuntimeError> {
+        // Check gas before execution
+        self.gas_counter.consume(1)?;
+
+        // Create local scope from passed variables
+        let mut local_vars = variables.clone();
+
+        // Process statements line by line
+        for line in body.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
+
+            // Handle return statement
+            if line.starts_with("return ") {
+                let return_expr = line
+                    .strip_prefix("return ")
+                    .unwrap()
+                    .strip_suffix(";")
+                    .unwrap_or(line.strip_prefix("return ").unwrap())
+                    .trim();
+                return self.evaluate_expression(return_expr, &local_vars);
+            }
+
+            // Handle assignments
+            if line.contains(" = ") {
+                let parts: Vec<&str> = line.splitn(2, " = ").collect();
+                if parts.len() == 2 {
+                    let var_name_raw = parts[0].trim();
+                    let var_name = var_name_raw
+                        .strip_prefix("const ")
+                        .or_else(|| var_name_raw.strip_prefix("let "))
+                        .unwrap_or(var_name_raw)
+                        .trim();
+                    let expr = parts[1].trim().strip_suffix(";").unwrap_or(parts[1].trim());
+                    let value = self.evaluate_expression(expr, &local_vars)?;
+                    local_vars.insert(var_name.to_string(), value);
+                }
+                continue;
+            }
+        }
+
+        // If no return was found, check if body is a simple expression
+        let expr = body.strip_suffix(";").unwrap_or(body).trim();
+        if !expr.is_empty() && !expr.contains('\n') {
+            return self.evaluate_expression(expr, &local_vars);
+        }
+
+        Ok(Value::Null)
     }
 
     fn evaluate_array_access(
@@ -849,5 +1173,16 @@ impl Drop for Interpreter {
                 *value = Value::Null;
             }
         }
+    }
+}
+
+/// Helper function to compare two values for equality
+fn values_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Null, Value::Null) => true,
+        (Value::Boolean(a), Value::Boolean(b)) => a == b,
+        (Value::Number(a), Value::Number(b)) => a == b,
+        (Value::String(a), Value::String(b)) => a == b,
+        _ => false,
     }
 }

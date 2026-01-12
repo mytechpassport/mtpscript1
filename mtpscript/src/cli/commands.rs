@@ -356,8 +356,37 @@ fn execute_command(input: &Path) -> Result<(), CliError> {
 
     // Execute JS directly
     let mut interpreter = Interpreter::new();
-    let result = interpreter.execute(&js)?;
-    println!("Execution result: {}", result);
+    match interpreter.execute(&js) {
+        Ok(result) => {
+            println!("Execution result: {}", result);
+        }
+        Err(e) => {
+            // Check if it's a GasExhausted error and format as JSON
+            let error_str = format!("{:?}", e);
+            if error_str.contains("GasExhausted") {
+                // Extract gas_limit and gas_used from the error
+                if let Some(limit_start) = error_str.find("gas_limit: ") {
+                    let limit_end = error_str[limit_start..].find(',').unwrap_or(error_str.len() - limit_start);
+                    let gas_limit: u64 = error_str[limit_start + 11..limit_start + limit_end]
+                        .trim()
+                        .parse()
+                        .unwrap_or(0);
+
+                    if let Some(used_start) = error_str.find("gas_used: ") {
+                        let used_end = error_str[used_start..].find('}').unwrap_or(error_str.len() - used_start);
+                        let gas_used: u64 = error_str[used_start + 10..used_start + used_end]
+                            .trim()
+                            .parse()
+                            .unwrap_or(0);
+
+                        println!("Execution result: {{\"error\":\"GasExhausted\",\"gasLimit\":{},\"gasUsed\":{}}}", gas_limit, gas_used);
+                        return Ok(());
+                    }
+                }
+            }
+            return Err(e.into());
+        }
+    }
 
     Ok(())
 }

@@ -3,7 +3,7 @@ function gas_intensive_computation(iterations: number) {
 }
 
 api GET "/gas" uses {} {
-  const result = gas_intensive_computation(6000);
+  const result = gas_intensive_computation(1500);
   respond json({
       "computation": result,
       "gas_features": {
