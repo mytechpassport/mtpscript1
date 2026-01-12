@@ -99,6 +99,11 @@ pub fn run() -> Result<(), CliError> {
             let cert = sub.get_one::<String>("cert").map(PathBuf::from);
             run_command(&input, cert.as_deref())
         }
+        Some(("execute", sub)) => {
+            let input = PathBuf::from(sub.get_one::<String>("input").unwrap());
+            execute_command(&input)
+        }
+        Some(("repl", _)) => repl_command(),
         _ => Ok(()),
     }
 }
@@ -171,6 +176,16 @@ fn build_cli() -> Command {
                         .help("PEM certificate for verifying the snapshot"),
                 ),
         )
+        .subcommand(
+            Command::new("execute")
+                .about("Compile and run MTPScript file directly")
+                .arg(
+                    Arg::new("input")
+                        .help("MTPScript source file")
+                        .required(true),
+                ),
+        )
+        .subcommand(Command::new("repl").about("Start interactive REPL"))
 }
 
 fn compile_command(input: &Path, output: &Path) -> Result<(), CliError> {
@@ -318,6 +333,92 @@ fn serve_command(snapshot_path: &Path, port: u16) -> Result<(), CliError> {
     }
 
     Ok(())
+}
+
+fn execute_command(input: &Path) -> Result<(), CliError> {
+    use std::env;
+
+    println!("Executing MTPScript file: {}", input.display());
+
+    // Compile to JS in memory
+    let source = fs::read_to_string(input)?;
+    let mut scanner = Scanner::new(&source)?;
+    let tokens = scanner.scan_tokens()?;
+    let mut parser = Parser::new(&tokens);
+    let program = parser.parse()?;
+    let mut type_checker = TypeChecker::new();
+    type_checker.typecheck_program(&program)?;
+    let ir = lower::lower_ast_to_ir(&program)?;
+    let js = codegen::compile_ir_to_js(&ir)?;
+
+    // Execute JS directly
+    let mut interpreter = Interpreter::new();
+    let result = interpreter.execute(&js)?;
+    println!("Execution result: {}", result);
+
+    Ok(())
+}
+
+fn repl_command() -> Result<(), CliError> {
+    use std::io::{self, Write};
+
+    println!("MTPScript REPL - Type 'exit' to quit");
+    println!("Note: MTPScript expects API definitions. Example: api GET \"/test\" uses {{}} {{ respond json({{\"msg\": \"hello\"}}) }}");
+
+    loop {
+        print!("mtp> ");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        match io::stdin().read_line(&mut input) {
+            Ok(0) => break, // EOF
+            Ok(_) => {}
+            Err(e) => return Err(CliError::Io(e)),
+        }
+
+        let input = input.trim();
+
+        if input == "exit" {
+            println!("Goodbye!");
+            break;
+        }
+
+        if input.is_empty() {
+            continue;
+        }
+
+        // Try to evaluate the input
+        match evaluate_repl_input(input) {
+            Ok(result) => println!("=> {}", result),
+            Err(e) => eprintln!("Error: {}", e),
+        }
+    }
+
+    Ok(())
+}
+
+fn evaluate_repl_input(input: &str) -> Result<String, CliError> {
+    // Simple REPL that treats input as an expression
+    let full_input = if input.contains('=') || input.contains('{') {
+        input.to_string()
+    } else {
+        // Treat as expression - wrap in console.log
+        format!("console.log({});", input)
+    };
+
+    let mut scanner = Scanner::new(&full_input)?;
+    let tokens = scanner.scan_tokens()?;
+    let mut parser = Parser::new(&tokens);
+    let program = parser.parse()?;
+    let mut type_checker = TypeChecker::new();
+    type_checker.typecheck_program(&program)?;
+    let ir = lower::lower_ast_to_ir(&program)?;
+    let js = codegen::compile_ir_to_js(&ir)?;
+
+    let mut interpreter = Interpreter::new();
+    let result = interpreter.execute(&js)?;
+
+    Ok(result.to_string())
 }
 
 impl From<()> for CliError {

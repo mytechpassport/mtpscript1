@@ -294,6 +294,9 @@ fn type_to_schema(typ: &Type, schemas: &mut BTreeMap<String, OpenApiSchema>) -> 
         Type::Var(_) => OpenApiSchema::Primitive {
             schema_type: "string".to_string(), // Fallback
         },
+        Type::Function(_, _) => OpenApiSchema::Primitive {
+            schema_type: "string".to_string(), // Functions not represented in OpenAPI
+        },
     }
 }
 

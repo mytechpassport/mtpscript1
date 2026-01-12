@@ -1,6 +1,6 @@
 api GET "/array-bounds" uses {} {
   const arr = [1, 2, 3];
   const valid = arr[1];
-  const invalid = arr[10];  // out of bounds
+  const invalid = arr[10];
   respond json({ "valid": valid, "invalid": invalid })
 }

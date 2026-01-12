@@ -98,6 +98,7 @@ impl AdtType {
             Type::Adt(adt) => adt.name.as_bytes().to_vec(),
             Type::Json => b"json".to_vec(),
             Type::Var(name) => format!("var:{}", name).as_bytes().to_vec(),
+            Type::Function(_, _) => b"function".to_vec(),
         }
     }
 }
@@ -113,6 +114,7 @@ pub enum Type {
     Var(String),
     Adt(Box<AdtType>),
     Record(Box<RecordType>),
+    Function(Vec<Type>, Box<Type>), // Function type: (param_types, return_type)
 }
 
 impl Type {
@@ -127,13 +129,14 @@ impl Type {
         match self {
             Type::Number => 64,
             Type::Boolean => 1,
-            Type::String => 0,     // Variable size
-            Type::Decimal => 128,  // Approximation
-            Type::TypeVar(_) => 0, // Unknown
-            Type::Record(_) => 0,  // Variable size
-            Type::Adt(_) => 0,     // Variable
-            Type::Json => 0,       // Variable size
-            Type::Var(_) => 0,     // Unknown
+            Type::String => 0,        // Variable size
+            Type::Decimal => 128,     // Approximation
+            Type::TypeVar(_) => 0,    // Unknown
+            Type::Record(_) => 0,     // Variable size
+            Type::Adt(_) => 0,        // Variable
+            Type::Json => 0,          // Variable size
+            Type::Var(_) => 0,        // Unknown
+            Type::Function(_, _) => 0, // Function pointer
         }
     }
 

@@ -92,7 +92,28 @@ impl Interpreter {
     }
 
     fn inject_builtin_objects(&mut self) {
-        // TODO: Inject builtins
+        // Create builtin namespace objects
+        // JSON, Decimal, etc. are represented as special objects
+        let mut json_obj = HashMap::new();
+        json_obj.insert("parse".to_string(), Value::String("__builtin:JSON.parse".to_string()));
+        json_obj.insert("stringify".to_string(), Value::String("__builtin:JSON.stringify".to_string()));
+        json_obj.insert("stringifyCanonical".to_string(), Value::String("__builtin:JSON.stringifyCanonical".to_string()));
+        self.global_scope.insert("JSON".to_string(), Value::Object(json_obj));
+
+        let mut decimal_obj = HashMap::new();
+        decimal_obj.insert("fromString".to_string(), Value::String("__builtin:Decimal.fromString".to_string()));
+        decimal_obj.insert("toString".to_string(), Value::String("__builtin:Decimal.toString".to_string()));
+        self.global_scope.insert("Decimal".to_string(), Value::Object(decimal_obj));
+    }
+
+    /// Check if a value is a builtin reference and get the builtin name
+    fn get_builtin_name(&self, val: &Value) -> Option<String> {
+        match val {
+            Value::String(s) if s.starts_with("__builtin:") => {
+                Some(s.strip_prefix("__builtin:").unwrap().to_string())
+            }
+            _ => None,
+        }
     }
 
     pub fn set_gas_limit(&mut self, limit: u64) {
@@ -222,6 +243,27 @@ impl Interpreter {
                 for arg in args {
                     arg_vals.push(self.eval_expr(arg, local_scope)?);
                 }
+
+                // Check if this is a builtin reference
+                if let Some(builtin_name) = self.get_builtin_name(&func_val) {
+                    if let Some(builtin) = self.builtins.get(&builtin_name).cloned() {
+                        if arg_vals.len() != 1 {
+                            return Err(RuntimeError::ValueError(format!(
+                                "Builtin {} expects 1 argument, got {}",
+                                builtin_name,
+                                arg_vals.len()
+                            )));
+                        }
+                        self.gas_counter.consume(10)?;
+                        return builtin(arg_vals[0].clone()).map_err(RuntimeError::ValueError);
+                    } else {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Unknown builtin: {}",
+                            builtin_name
+                        )));
+                    }
+                }
+
                 self.call_function(&func_val, arg_vals)
             }
             JsExpr::Member(obj_expr, prop) => {
@@ -336,7 +378,7 @@ impl Interpreter {
                 Ok(val)
             }
 
-            JsExpr::ExprStmt(expr) => Ok(Value::Null),
+            JsExpr::ExprStmt(expr) => self.eval_expr(expr, local_scope),
         }
     }
 

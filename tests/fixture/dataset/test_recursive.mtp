@@ -1,8 +1,8 @@
-function factorial(n) {
+function factorial(n: number) {
   if (n == 0) { 1 } else { n * factorial(n - 1) }
 }
 
-function tail_factorial(n, acc) {
+function tail_factorial(n: number, acc: number) {
   if (n == 0) { acc } else { tail_factorial(n - 1, n * acc) }
 }
 

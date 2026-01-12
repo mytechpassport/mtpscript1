@@ -1,8 +1,8 @@
-function loop_func(n: number) {
-  if (n == 0) { 0 } else { loop_func(n - 1) + 1 }
+function loopfn(n: number) {
+  if (n == 0) { 0 } else { loopfn(n - 1) + 1 }
 }
 
 api GET "/test-gas" uses {} {
-  const small = loop_func(10);
+  const small = loopfn(10);
   respond json({ "small": small })
 }

@@ -120,8 +120,8 @@ fn snapshot_command(input: &str, output: &str) -> Result<(), Box<dyn std::error:
 }
 
 fn run_command(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use mtpscript_core::snapshot::load_snapshot;
     use mtpscript_core::snapshot::extract_js_code;
+    use mtpscript_core::snapshot::load_snapshot;
 
     println!("Running snapshot {}", input);
 
@@ -146,16 +146,6 @@ fn execute_command(input: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     // Run
     run_command(&temp_path)?;
-
-    Ok(())
-}
-
-    // Run
-    let run_status = Command::new("mtpjs").arg(&temp_path).status()?;
-
-    if !run_status.success() {
-        return Err("Execution failed".into());
-    }
 
     Ok(())
 }

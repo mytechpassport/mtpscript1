@@ -67,6 +67,7 @@ pub enum JsToken {
     Colon,
     Semicolon,
     Dot,
+    Question,
 
     // Special
     Eof,
@@ -265,6 +266,7 @@ impl<'a> JsLexer<'a> {
             ']' => Ok(JsToken::RBracket),
             ',' => Ok(JsToken::Comma),
             ':' => Ok(JsToken::Colon),
+            '?' => Ok(JsToken::Question),
             ';' => Ok(JsToken::Semicolon),
             '.' => Ok(JsToken::Dot),
             '+' => Ok(JsToken::Plus),
@@ -636,7 +638,26 @@ impl JsParser {
     }
 
     fn parse_expression(&mut self) -> Result<JsExpr, RuntimeError> {
-        self.parse_or_expr()
+        self.parse_ternary_expr()
+    }
+
+    fn parse_ternary_expr(&mut self) -> Result<JsExpr, RuntimeError> {
+        let condition = self.parse_or_expr()?;
+
+        // Check for ternary operator: condition ? then_expr : else_expr
+        if self.check(&JsToken::Question) {
+            self.advance();
+            let then_expr = self.parse_expression()?;
+            self.expect(JsToken::Colon)?;
+            let else_expr = self.parse_ternary_expr()?;
+            Ok(JsExpr::If(
+                Box::new(condition),
+                Box::new(then_expr),
+                Some(Box::new(else_expr)),
+            ))
+        } else {
+            Ok(condition)
+        }
     }
 
     fn parse_or_expr(&mut self) -> Result<JsExpr, RuntimeError> {

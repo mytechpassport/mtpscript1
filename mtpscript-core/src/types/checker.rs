@@ -109,7 +109,21 @@ impl TypeChecker {
     }
 
     fn typecheck_func_decl(&mut self, decl: &ast::FuncDecl) -> Result<(), CompileError> {
-        // Add parameters to context
+        // Get parameter types
+        let param_types: Vec<Type> = decl
+            .params
+            .iter()
+            .map(|(_, param_type_expr)| self.resolve_type_expr(param_type_expr))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Register the function in context first (for recursive calls)
+        // Using Number as placeholder return type for now
+        self.context.insert(
+            decl.name.clone(),
+            Type::Function(param_types.clone(), Box::new(Type::Number)),
+        );
+
+        // Add parameters to local context
         let mut local_context = self.context.clone();
         for (param_name, param_type_expr) in &decl.params {
             let param_type = self.resolve_type_expr(param_type_expr)?;

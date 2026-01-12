@@ -39,12 +39,21 @@ pub fn compile_ir_to_js(ir: &IrProgram) -> Result<String, CompileError> {
     Ok(output)
 }
 
+/// Sanitize a path to make it a valid JavaScript identifier
+fn sanitize_path_for_js(path: &str) -> String {
+    path.replace("/", "_")
+        .replace("-", "_")
+        .replace("{", "")
+        .replace("}", "")
+        .replace(".", "_")
+}
+
 /// Get the full handler name for an API
 fn get_api_handler_name(api: &IrApi) -> String {
     format!(
         "{}_{}",
         api_method_to_handler_name(&api.method),
-        api.path.replace("/", "_").replace("{", "").replace("}", "")
+        sanitize_path_for_js(&api.path)
     )
 }
 
@@ -81,7 +90,7 @@ fn compile_api(api: &IrApi) -> Result<String, CompileError> {
     output.push_str("function ");
     output.push_str(&api_method_to_handler_name(&api.method));
     output.push_str("_");
-    output.push_str(&api.path.replace("/", "_").replace("{", "").replace("}", ""));
+    output.push_str(&sanitize_path_for_js(&api.path));
     output.push_str("() {\n");
 
     // API body
@@ -92,6 +101,54 @@ fn compile_api(api: &IrApi) -> Result<String, CompileError> {
     output.push('}');
 
     Ok(output)
+}
+
+/// Escape a string for JavaScript output
+fn escape_js_string(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => result.push_str("\\\\"),
+            '"' => result.push_str("\\\""),
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            '\x08' => result.push_str("\\b"), // backspace
+            '\x0C' => result.push_str("\\f"), // form feed
+            c if c.is_control() => {
+                // Escape other control characters as \uXXXX
+                result.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            c => result.push(c),
+        }
+    }
+    result
+}
+
+/// Check if an expression is simple enough to use in a ternary operator
+fn is_simple_expr(expr: &IrExpr) -> bool {
+    match expr {
+        IrExpr::String(_, _) => true,
+        IrExpr::Number(_, _) => true,
+        IrExpr::Decimal(_, _) => true,
+        IrExpr::Boolean(_, _) => true,
+        IrExpr::Var(_, _) => true,
+        IrExpr::Array(elements, _) => elements.iter().all(is_simple_expr),
+        IrExpr::Object(fields, _) => fields.iter().all(|(_, v)| is_simple_expr(v)),
+        IrExpr::Dot(expr, _, _) => is_simple_expr(expr),
+        IrExpr::Index(arr, idx, _) => is_simple_expr(arr) && is_simple_expr(idx),
+        IrExpr::Binary(_, left, right, _) => is_simple_expr(left) && is_simple_expr(right),
+        IrExpr::Unary(_, expr, _) => is_simple_expr(expr),
+        IrExpr::Call { func, args, .. } => is_simple_expr(func) && args.iter().all(is_simple_expr),
+        IrExpr::TailCall { func, args, .. } => is_simple_expr(func) && args.iter().all(is_simple_expr),
+        IrExpr::EffectCall(_, args, _) => args.iter().all(is_simple_expr),
+        // Let bindings, if expressions, matches, and lambdas are complex
+        IrExpr::Let { .. } => false,
+        IrExpr::If { .. } => false,
+        IrExpr::Match { .. } => false,
+        IrExpr::Lambda { .. } => false,
+        IrExpr::RespondJson(_, _) => false,
+    }
 }
 
 /// Convert HTTP method to handler function name
@@ -110,7 +167,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
     let indent_str = "  ".repeat(indent);
 
     match expr {
-        IrExpr::String(s, _) => Ok(format!("\"{}\"", s)),
+        IrExpr::String(s, _) => Ok(format!("\"{}\"", escape_js_string(s))),
         IrExpr::Number(n, _) => Ok(n.to_string()),
         IrExpr::Decimal(d, _) => Ok(format!("\"{}\"", d)),
         IrExpr::Boolean(b, _) => Ok(b.to_string()),
@@ -127,7 +184,7 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
                 .iter()
                 .map(|(k, v)| {
                     let v_js = compile_expr(v, 0)?;
-                    Ok(format!("\"{}\": {}", k, v_js))
+                    Ok(format!("\"{}\": {}", escape_js_string(k), v_js))
                 })
                 .collect();
             let fields_js = fields_js?;
@@ -207,27 +264,44 @@ fn compile_expr(expr: &IrExpr, indent: usize) -> Result<String, CompileError> {
             else_branch,
             ..
         } => {
-            let mut output = String::new();
-            output.push_str(&indent_str);
-            output.push_str("if (");
-            output.push_str(&compile_expr(condition, 0)?);
-            output.push_str(") {\n");
+            // Check if branches are simple expressions that can use ternary operator
+            if is_simple_expr(then_branch) && is_simple_expr(else_branch) {
+                // Use ternary operator for simple expressions
+                let cond_js = compile_expr(condition, 0)?;
+                let then_js = compile_expr(then_branch, 0)?;
+                let else_js = compile_expr(else_branch, 0)?;
+                Ok(format!("({}) ? ({}) : ({})", cond_js, then_js, else_js))
+            } else {
+                // Use IIFE for complex expressions with let bindings
+                let mut output = String::new();
+                output.push_str("(function() {\n");
+                output.push_str(&indent_str);
+                output.push_str("  if (");
+                output.push_str(&compile_expr(condition, 0)?);
+                output.push_str(") {\n");
 
-            let then_js = compile_expr(then_branch, indent + 1)?;
-            output.push_str(&then_js);
-            output.push('\n');
+                let then_js = compile_expr(then_branch, indent + 2)?;
+                output.push_str(&indent_str);
+                output.push_str("    return ");
+                output.push_str(&then_js);
+                output.push_str(";\n");
 
-            output.push_str(&indent_str);
-            output.push_str("} else {\n");
+                output.push_str(&indent_str);
+                output.push_str("  } else {\n");
 
-            let else_js = compile_expr(else_branch, indent + 1)?;
-            output.push_str(&else_js);
-            output.push('\n');
+                let else_js = compile_expr(else_branch, indent + 2)?;
+                output.push_str(&indent_str);
+                output.push_str("    return ");
+                output.push_str(&else_js);
+                output.push_str(";\n");
 
-            output.push_str(&indent_str);
-            output.push('}');
+                output.push_str(&indent_str);
+                output.push_str("  }\n");
+                output.push_str(&indent_str);
+                output.push_str("})()");
 
-            Ok(output)
+                Ok(output)
+            }
         }
 
         IrExpr::Match { expr, cases, .. } => {

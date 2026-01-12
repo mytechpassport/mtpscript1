@@ -9,16 +9,9 @@ function test_async_operations() {
         "promises_created": [promise, promise2],
         "async_operations": ["create", "wait"]
     }
-};
+}
 
 api GET "/async" uses { Async } {
-  const async_result = test_async_operations();
-  respond json({
-      "async_test": "completed",
-      "result": async_result
-  })
-}
-  }
   const async_result = test_async_operations();
   respond json({
       "async_test": "completed",

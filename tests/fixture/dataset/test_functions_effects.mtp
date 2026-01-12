@@ -1,5 +1,5 @@
 function log_message(msg: string) uses { Log } {
-  Log("info", msg, {});
+  const log_result = Log("info", msg, {});
   msg
 }
 

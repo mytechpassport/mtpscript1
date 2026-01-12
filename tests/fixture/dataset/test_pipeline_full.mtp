@@ -1,5 +1,5 @@
-function add1(x) { x + 1 }
-function mul2(x) { x * 2 }
+function add1(x: number) { x + 1 }
+function mul2(x: number) { x * 2 }
 
 api GET "/pipeline" uses {} {
   const result = 5 |> add1 |> mul2 |> add1;
