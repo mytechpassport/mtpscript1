@@ -3,7 +3,7 @@ use mtpscript_core::lexer::scanner::Scanner;
 use mtpscript_core::lexer::token::Token;
 
 fn lex_tokens(source: &str) -> Result<Vec<Token>, CompileError> {
-    let mut scanner = Scanner::new(source);
+    let mut scanner = Scanner::new(source)?;
     let tokens = scanner.scan_tokens()?;
     Ok(tokens.into_iter().map(|ti| ti.token).collect())
 }

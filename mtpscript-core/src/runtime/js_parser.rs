@@ -433,9 +433,9 @@ impl JsParser {
 
     fn check_forbidden_constructs(&self) -> Result<(), RuntimeError> {
         let forbidden = [
-            // "class",  // Allow class
+            "class", // Forbidden per TECHSPECV5.md §12
             "this",
-            // "eval",  // Temporarily allow eval
+            "eval", // Forbidden per TECHSPECV5.md §12
             "try",
             "catch",
             "new",

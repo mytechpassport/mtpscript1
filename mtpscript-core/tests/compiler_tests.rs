@@ -10,7 +10,7 @@ mod tests {
     use super::*;
 
     fn compile_source(src: &str) -> Result<String, CompileError> {
-        let mut scanner = Scanner::new(src);
+        let mut scanner = Scanner::new(src)?;
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(&tokens);
         let program = parser.parse()?;

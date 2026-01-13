@@ -4,7 +4,7 @@ use mtpscript_core::parser::ast::*;
 use mtpscript_core::parser::Parser;
 
 fn parse_source(source: &str) -> Result<Program, CompileError> {
-    let mut scanner = Scanner::new(source);
+    let mut scanner = Scanner::new(source)?;
     let tokens = scanner.scan_tokens()?;
     let mut parser = Parser::new(&tokens);
     parser.parse()

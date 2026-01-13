@@ -13,7 +13,7 @@ mod tests {
 
         // Test valid JSON
         let input = Value::String(r#"{"a":1,"b":2}"#.to_string());
-        let result = json_parse(input).unwrap();
+        let result = json_parse(vec![input]).unwrap();
 
         // Should return a Value representing the parsed JSON
         // The exact structure depends on implementation
@@ -27,7 +27,7 @@ mod tests {
 
         // Test stringifying a simple value
         let input = Value::String("hello".to_string());
-        let result = json_stringify(input).unwrap();
+        let result = json_stringify(vec![input]).unwrap();
 
         assert_eq!(result, Value::String(r#""hello""#.to_string()));
     }
@@ -39,7 +39,7 @@ mod tests {
 
         // Test valid decimal string
         let input = Value::String("123.45".to_string());
-        let result = decimal_from_string(input).unwrap();
+        let result = decimal_from_string(vec![input]).unwrap();
 
         assert!(matches!(result, Value::Decimal(_)));
     }
@@ -51,8 +51,8 @@ mod tests {
 
         // Test converting decimal back to string
         let input = Value::String("123.45".to_string());
-        let parsed = builtins.get("Decimal.fromString").unwrap()(input).unwrap();
-        let result = decimal_to_string(parsed).unwrap();
+        let parsed = builtins.get("Decimal.fromString").unwrap()(vec![input]).unwrap();
+        let result = decimal_to_string(vec![parsed]).unwrap();
 
         assert_eq!(result, Value::String("123.45".to_string()));
     }
@@ -64,17 +64,17 @@ mod tests {
 
         // Test hash function produces numbers
         let input = Value::String("hello".to_string());
-        let result = fnv1a64(input).unwrap();
+        let result = fnv1a64(vec![input]).unwrap();
         assert!(matches!(result, Value::Number(_)));
 
         // Different strings give different hashes
         let input2 = Value::String("world".to_string());
-        let result2 = fnv1a64(input2).unwrap();
+        let result2 = fnv1a64(vec![input2]).unwrap();
         assert_ne!(result, result2);
 
         // Same string gives same hash
         let input3 = Value::String("hello".to_string());
-        let result3 = fnv1a64(input3).unwrap();
+        let result3 = fnv1a64(vec![input3]).unwrap();
         assert_eq!(result, result3);
     }
 
@@ -85,7 +85,7 @@ mod tests {
 
         // Test hash of "hello"
         let input = Value::String("hello".to_string());
-        let result = fnv1a32(input).unwrap();
+        let result = fnv1a32(vec![input]).unwrap();
 
         // Check it's a number
         assert!(matches!(result, Value::Number(_)));
@@ -98,7 +98,7 @@ mod tests {
 
         // Test encoding a simple value
         let input = Value::String("hello".to_string());
-        let result = cbor_encode(input).unwrap();
+        let result = cbor_encode(vec![input]).unwrap();
 
         // Should return hex string
         assert!(matches!(result, Value::String(_)));

@@ -4,7 +4,7 @@ use mtpscript_core::lexer::scanner::Scanner;
 use mtpscript_core::parser::Parser;
 
 fn parse_and_check_effects(source: &str) -> Result<(), CompileError> {
-    let mut scanner = Scanner::new(source);
+    let mut scanner = Scanner::new(source)?;
     let tokens = scanner.scan_tokens()?;
     let mut parser = Parser::new(&tokens);
     let program = parser.parse()?;

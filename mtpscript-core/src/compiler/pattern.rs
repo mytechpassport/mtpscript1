@@ -121,31 +121,47 @@ impl PatternCompiler {
             bindings.push((temp_var.clone(), value_expr.clone()));
 
             for (i, sub_pattern) in sub_patterns.iter().enumerate() {
+                // For multi-argument constructors, access by index; for single arg, use directly
+                let sub_expr = if sub_patterns.len() == 1 {
+                    temp_var.clone()
+                } else {
+                    format!("{}[{}]", temp_var, i)
+                };
+
                 match sub_pattern {
                     IrPattern::Wildcard => {
-                        // No additional condition
+                        // No additional condition or binding needed
                     }
                     IrPattern::Var(var_name) => {
-                        // For single argument constructors like Some(x), bind x to the value
-                        if sub_patterns.len() == 1 {
-                            bindings.push((var_name.clone(), temp_var.clone()));
-                        } else {
-                            // For multiple arguments, this would be an array or tuple
-                            // For now, not implemented
-                            return Err(CompileError::CodeGenError(
-                                "Complex ADT patterns not yet supported".to_string(),
-                            ));
+                        // Bind the variable to the appropriate expression
+                        bindings.push((var_name.clone(), sub_expr));
+                    }
+                    IrPattern::Literal(lit_expr) => {
+                        // Compile literal and add equality check
+                        let lit_js = self.compile_expr(lit_expr, 0)?;
+                        conditions.push(format!("{} === {}", sub_expr, lit_js));
+                    }
+                    IrPattern::Variant(nested_name, nested_subs) => {
+                        // Recursively compile nested variant pattern
+                        let nested_temp = self.next_temp_var();
+                        bindings.push((nested_temp.clone(), sub_expr));
+                        let (nested_cond, nested_bindings) =
+                            self.compile_variant_pattern(nested_name, nested_subs, &nested_temp)?;
+                        if nested_cond != "true" {
+                            conditions.push(nested_cond);
                         }
+                        bindings.extend(nested_bindings);
                     }
-                    IrPattern::Literal(_) => {
-                        return Err(CompileError::CodeGenError(
-                            "Complex expressions in patterns not yet supported".to_string(),
-                        ));
-                    }
-                    IrPattern::Variant(_, _) | IrPattern::Record(_, _) => {
-                        return Err(CompileError::CodeGenError(
-                            "Nested patterns not yet supported".to_string(),
-                        ));
+                    IrPattern::Record(rec_name, rec_fields) => {
+                        // Recursively compile nested record pattern
+                        let nested_temp = self.next_temp_var();
+                        bindings.push((nested_temp.clone(), sub_expr));
+                        let (rec_cond, rec_bindings) =
+                            self.compile_record_pattern(rec_name, rec_fields, &nested_temp)?;
+                        if rec_cond != "true" {
+                            conditions.push(rec_cond);
+                        }
+                        bindings.extend(rec_bindings);
                     }
                 }
             }
@@ -267,6 +283,7 @@ impl PatternCompiler {
                 let expr_js = self.compile_expr_with_subs(expr, subs)?;
                 let op_js = match op {
                     crate::parser::ast::BinOp::Sub => "-", // -x
+                    crate::parser::ast::BinOp::Not => "!", // !x
                     _ => {
                         return Err(CompileError::CodeGenError(format!(
                             "Unsupported unary operator: {:?}",
@@ -276,9 +293,103 @@ impl PatternCompiler {
                 };
                 Ok(format!("{}{}", op_js, expr_js))
             }
-            _ => Err(CompileError::CodeGenError(
-                "Complex expressions in match arms not yet supported".to_string(),
-            )),
+            IrExpr::Call { func, args, .. } => {
+                let func_js = self.compile_expr_with_subs(func, subs)?;
+                let args_js: Result<Vec<String>, _> = args
+                    .iter()
+                    .map(|a| self.compile_expr_with_subs(a, subs))
+                    .collect();
+                Ok(format!("{}({})", func_js, args_js?.join(", ")))
+            }
+            IrExpr::TailCall { func, args, .. } => {
+                // TailCall compiles the same as Call at the JS level
+                let func_js = self.compile_expr_with_subs(func, subs)?;
+                let args_js: Result<Vec<String>, _> = args
+                    .iter()
+                    .map(|a| self.compile_expr_with_subs(a, subs))
+                    .collect();
+                Ok(format!("{}({})", func_js, args_js?.join(", ")))
+            }
+            IrExpr::If { condition, then_branch, else_branch, .. } => {
+                let cond_js = self.compile_expr_with_subs(condition, subs)?;
+                let then_js = self.compile_expr_with_subs(then_branch, subs)?;
+                let else_js = self.compile_expr_with_subs(else_branch, subs)?;
+                Ok(format!("({} ? {} : {})", cond_js, then_js, else_js))
+            }
+            IrExpr::Array(items, _) => {
+                let items_js: Result<Vec<String>, _> = items
+                    .iter()
+                    .map(|i| self.compile_expr_with_subs(i, subs))
+                    .collect();
+                Ok(format!("[{}]", items_js?.join(", ")))
+            }
+            IrExpr::Object(fields, _) => {
+                let fields_js: Result<Vec<String>, _> = fields
+                    .iter()
+                    .map(|(k, v)| {
+                        let v_js = self.compile_expr_with_subs(v, subs)?;
+                        Ok(format!("\"{}\": {}", k, v_js))
+                    })
+                    .collect();
+                Ok(format!("{{{}}}", fields_js?.join(", ")))
+            }
+            IrExpr::Let { name, value, body, .. } => {
+                let value_js = self.compile_expr_with_subs(value, subs)?;
+                // Create new subs map without the bound variable to avoid shadowing issues
+                let mut new_subs = subs.clone();
+                new_subs.remove(name);
+                let body_js = self.compile_expr_with_subs(body, &new_subs)?;
+                Ok(format!("(function() {{ const {} = {}; return {}; }})()", name, value_js, body_js))
+            }
+            IrExpr::Lambda { params, body, .. } => {
+                let params_str: Vec<String> = params.iter().map(|(n, _)| n.clone()).collect();
+                // Remove lambda params from substitutions
+                let mut new_subs = subs.clone();
+                for (param_name, _) in params {
+                    new_subs.remove(param_name);
+                }
+                let body_js = self.compile_expr_with_subs(body, &new_subs)?;
+                Ok(format!("function({}) {{ return {}; }}", params_str.join(", "), body_js))
+            }
+            IrExpr::Match { expr, cases, .. } => {
+                // Compile match as nested ternaries
+                let expr_js = self.compile_expr_with_subs(expr, subs)?;
+                let match_var = self.next_temp_var();
+                let mut result = format!("(function() {{ const {} = {}; return ", match_var, expr_js);
+
+                for (i, (pattern, case_body)) in cases.iter().enumerate() {
+                    let (condition, bindings) = self.compile_pattern_binding(pattern, &match_var)?;
+
+                    // Merge pattern bindings with existing subs
+                    let mut case_subs = subs.clone();
+                    for (var_name, var_expr) in &bindings {
+                        case_subs.insert(var_name.clone(), var_expr.clone());
+                    }
+
+                    let body_js = self.compile_expr_with_subs(case_body, &case_subs)?;
+
+                    if i == cases.len() - 1 {
+                        // Last case (should be wildcard or catch-all)
+                        result.push_str(&body_js);
+                    } else {
+                        result.push_str(&format!("{} ? {} : ", condition, body_js));
+                    }
+                }
+
+                result.push_str("; })()");
+                Ok(result)
+            }
+            IrExpr::EffectCall(effect_name, args, _) => {
+                let args_js: Result<Vec<String>, _> = args
+                    .iter()
+                    .map(|a| self.compile_expr_with_subs(a, subs))
+                    .collect();
+                Ok(format!("{}({})", effect_name, args_js?.join(", ")))
+            }
+            IrExpr::RespondJson(inner, _) => {
+                let inner_js = self.compile_expr_with_subs(inner, subs)?;
+                Ok(format!("JSON.stringifyCanonical({})", inner_js))
+            }
         }
     }
 

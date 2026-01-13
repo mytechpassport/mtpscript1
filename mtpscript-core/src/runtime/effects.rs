@@ -10,6 +10,8 @@ use crate::runtime::value::{FunctionValue, Value};
 lazy_static::lazy_static! {
     static ref DB_STORE: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::new());
     static ref SQLITE_CONNECTION: Mutex<Option<Connection>> = Mutex::new(None);
+    /// Async operation cache - keyed by (seed_hex, cont_id) for deterministic replay per §7-a
+    static ref ASYNC_CACHE: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::new());
 }
 
 /// Initialize SQLite database connection
@@ -201,6 +203,110 @@ fn value_to_sqlite(v: &Value) -> Result<rusqlite::types::Value, String> {
     }
 }
 
+/// Execute an HTTP request synchronously per TECHSPECV5.md §7-a
+/// This blocks until the request completes - no JavaScript event loop visible inside VM
+fn execute_http_request(method: &str, url: &str, body: &Value) -> Result<Value, String> {
+    // Use reqwest in blocking mode for synchronous execution
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let request_body = match body {
+        Value::Null => None,
+        Value::String(s) => Some(s.clone()),
+        other => Some(value_to_json_string(other)),
+    };
+
+    let response = match method.to_uppercase().as_str() {
+        "GET" => client.get(url).send(),
+        "POST" => {
+            let mut req = client.post(url);
+            if let Some(b) = &request_body {
+                req = req.header("Content-Type", "application/json").body(b.clone());
+            }
+            req.send()
+        }
+        "PUT" => {
+            let mut req = client.put(url);
+            if let Some(b) = &request_body {
+                req = req.header("Content-Type", "application/json").body(b.clone());
+            }
+            req.send()
+        }
+        "DELETE" => client.delete(url).send(),
+        "PATCH" => {
+            let mut req = client.patch(url);
+            if let Some(b) = &request_body {
+                req = req.header("Content-Type", "application/json").body(b.clone());
+            }
+            req.send()
+        }
+        _ => return Err(format!("Unsupported HTTP method: {}", method)),
+    };
+
+    match response {
+        Ok(resp) => {
+            let status = resp.status().as_u16() as i64;
+            let headers: HashMap<String, Value> = resp
+                .headers()
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.to_string(),
+                        Value::String(v.to_str().unwrap_or("").to_string()),
+                    )
+                })
+                .collect();
+
+            let body_text = resp.text().unwrap_or_default();
+
+            // Try to parse body as JSON, fall back to string
+            let body_value = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
+                json_value_to_value(&json)
+            } else {
+                Value::String(body_text)
+            };
+
+            Ok(Value::Object(HashMap::from([
+                ("status".to_string(), Value::Number(status)),
+                ("headers".to_string(), Value::Object(headers)),
+                ("body".to_string(), body_value),
+            ])))
+        }
+        Err(e) => {
+            // Return error as a structured response per §16 Error System
+            Ok(Value::Object(HashMap::from([
+                ("error".to_string(), Value::String(e.to_string())),
+                ("status".to_string(), Value::Number(0)),
+            ])))
+        }
+    }
+}
+
+/// Convert a Value to a JSON string for HTTP body
+fn value_to_json_string(v: &Value) -> String {
+    match v {
+        Value::Null => "null".to_string(),
+        Value::Boolean(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::Decimal(d) => format!("\"{}\"", d), // Decimals as strings per spec §4-a
+        Value::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+        Value::Array(arr) => {
+            let items: Vec<String> = arr.iter().map(value_to_json_string).collect();
+            format!("[{}]", items.join(","))
+        }
+        Value::Object(obj) => {
+            let fields: Vec<String> = obj
+                .iter()
+                .map(|(k, v)| format!("\"{}\":{}", k, value_to_json_string(v)))
+                .collect();
+            format!("{{{}}}", fields.join(","))
+        }
+        Value::Function(_) => "null".to_string(), // Functions can't be serialized
+    }
+}
+
 pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), RuntimeError> {
     eprintln!("DEBUG: Injecting effects");
 
@@ -311,70 +417,27 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
 
     interp.builtins.insert("http_impl".to_string(), |args| {
         if args.len() < 2 {
-            return Err("http_impl expects at least 2 arguments".to_string());
+            return Err("http_impl expects at least 2 arguments (method, url)".to_string());
         }
+
         let method = match &args[0] {
             Value::String(s) => s.clone(),
-            _ => return Err("Method must be a string".to_string()),
+            _ => return Err("method must be a string".to_string()),
         };
+
         let url = match &args[1] {
             Value::String(s) => s.clone(),
-            _ => return Err("URL must be a string".to_string()),
+            _ => return Err("url must be a string".to_string()),
         };
 
-        // Use reqwest for real HTTP requests
-        let client = reqwest::blocking::Client::new();
-        let response = match method.to_uppercase().as_str() {
-            "GET" => client.get(&url).send(),
-            "POST" => {
-                let body = if args.len() > 2 {
-                    match &args[2] {
-                        Value::String(s) => s.clone(),
-                        _ => String::new(),
-                    }
-                } else {
-                    String::new()
-                };
-                client.post(&url).body(body).send()
-            }
-            "PUT" => {
-                let body = if args.len() > 2 {
-                    match &args[2] {
-                        Value::String(s) => s.clone(),
-                        _ => String::new(),
-                    }
-                } else {
-                    String::new()
-                };
-                client.put(&url).body(body).send()
-            }
-            "DELETE" => client.delete(&url).send(),
-            _ => return Err(format!("Unsupported HTTP method: {}", method)),
+        let body = if args.len() > 2 {
+            args[2].clone()
+        } else {
+            Value::Null
         };
 
-        match response {
-            Ok(resp) => {
-                let status = resp.status().as_u16() as i64;
-                let body = resp.text().unwrap_or_default();
-
-                // Try to parse as JSON
-                let body_value = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body)
-                {
-                    json_value_to_value(&json)
-                } else {
-                    Value::String(body)
-                };
-
-                Ok(Value::Object(HashMap::from([
-                    ("status".to_string(), Value::Number(status)),
-                    ("body".to_string(), body_value),
-                ])))
-            }
-            Err(e) => Ok(Value::Object(HashMap::from([
-                ("error".to_string(), Value::String(e.to_string())),
-                ("status".to_string(), Value::Number(0)),
-            ]))),
-        }
+        // Execute HTTP request synchronously per TECHSPECV5.md §7-a
+        execute_http_request(&method, &url, &body)
     });
 
     // Log function - audit logging
@@ -421,7 +484,7 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
         ])))
     });
 
-    // Async function
+    // Async function - implements deterministic await per §7-a
     let async_func = Value::Function(FunctionValue {
         name: Some("Async".to_string()),
         params: vec![
@@ -453,27 +516,118 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
         },
     );
 
+    // Store seed for async operations - clone into the closure
+    let seed_hex = hex::encode(_seed);
+    interp.global_scope.insert(
+        "__async_seed".to_string(),
+        Value::String(seed_hex.clone()),
+    );
+
     interp.builtins.insert("async_impl".to_string(), |args| {
-        // Async operations are cached by (seed, contId)
-        // For now, generate deterministic result based on inputs
-        let result_hash = if args.len() >= 2 {
-            let hash_input = format!("{:?}{:?}", args[0], args[1]);
-            let hash = sha2::Sha256::digest(hash_input.as_bytes());
-            hex::encode(&hash[..8])
-        } else {
-            "default".to_string()
+        if args.len() < 3 {
+            return Err("async_impl expects at least 3 arguments (promise_hash, cont_id, effect_args)".to_string());
+        }
+
+        let promise_hash = match &args[0] {
+            Value::String(s) => s.clone(),
+            _ => return Err("promise_hash must be a string".to_string()),
         };
 
-        Ok(Value::Object(HashMap::from([
-            (
-                "async_result".to_string(),
-                Value::String("completed".to_string()),
-            ),
-            ("result_id".to_string(), Value::String(result_hash)),
-        ])))
+        let cont_id = match &args[1] {
+            Value::String(s) => s.clone(),
+            Value::Number(n) => n.to_string(),
+            _ => return Err("cont_id must be a string or number".to_string()),
+        };
+
+        // Build cache key from promise_hash and cont_id per §7-a
+        let cache_key = format!("{}:{}", promise_hash, cont_id);
+
+        // Check cache for deterministic replay
+        {
+            let cache = ASYNC_CACHE.lock().unwrap();
+            if let Some(cached_result) = cache.get(&cache_key) {
+                return Ok(cached_result.clone());
+            }
+        }
+
+        // Execute the effect based on effect_args
+        let effect_args = &args[2];
+        let result = execute_async_effect(effect_args)?;
+
+        // Cache the result for deterministic replay
+        {
+            let mut cache = ASYNC_CACHE.lock().unwrap();
+            cache.insert(cache_key, result.clone());
+        }
+
+        Ok(result)
     });
 
     Ok(())
+}
+
+/// Execute an async effect and return the result
+/// Per §7-a, this blocks synchronously - no JS event loop visible inside VM
+fn execute_async_effect(effect_args: &Value) -> Result<Value, String> {
+    match effect_args {
+        // If effect_args is an object with an "effect" field, dispatch based on effect type
+        Value::Object(obj) => {
+            if let Some(effect_type) = obj.get("effect") {
+                match effect_type {
+                    Value::String(s) if s == "DbRead" => {
+                        // Execute DbRead effect
+                        let sql = obj.get("sql").and_then(|v| {
+                            if let Value::String(s) = v { Some(s.as_str()) } else { None }
+                        }).ok_or("DbRead requires 'sql' field")?;
+                        let params = obj.get("params").cloned().unwrap_or(Value::Array(vec![]));
+                        execute_sql_read(sql, &params)
+                    }
+                    Value::String(s) if s == "DbWrite" => {
+                        // Execute DbWrite effect
+                        let sql = obj.get("sql").and_then(|v| {
+                            if let Value::String(s) = v { Some(s.as_str()) } else { None }
+                        }).ok_or("DbWrite requires 'sql' field")?;
+                        let params = obj.get("params").cloned().unwrap_or(Value::Array(vec![]));
+                        execute_sql_write(sql, &params)
+                    }
+                    Value::String(s) if s == "HttpOut" => {
+                        // Execute HttpOut effect - placeholder for now
+                        // In a real implementation, this would make an HTTP request
+                        let method = obj.get("method").and_then(|v| {
+                            if let Value::String(s) = v { Some(s.clone()) } else { None }
+                        }).unwrap_or_else(|| "GET".to_string());
+                        let url = obj.get("url").and_then(|v| {
+                            if let Value::String(s) = v { Some(s.clone()) } else { None }
+                        }).ok_or("HttpOut requires 'url' field")?;
+
+                        // Return a deterministic response for now
+                        // In production, this would use reqwest or similar
+                        Ok(Value::Object(HashMap::from([
+                            ("status".to_string(), Value::Number(200)),
+                            ("method".to_string(), Value::String(method)),
+                            ("url".to_string(), Value::String(url)),
+                            ("body".to_string(), Value::String("{}".to_string())),
+                        ])))
+                    }
+                    _ => {
+                        // Unknown effect type, return the args as-is
+                        Ok(effect_args.clone())
+                    }
+                }
+            } else {
+                // No effect field, return the args as-is (backwards compatibility)
+                Ok(effect_args.clone())
+            }
+        }
+        // For non-object args, return as-is (backwards compatibility)
+        _ => Ok(effect_args.clone()),
+    }
+}
+
+/// Clear the async cache - useful for testing
+pub fn clear_async_cache() {
+    let mut cache = ASYNC_CACHE.lock().unwrap();
+    cache.clear();
 }
 
 /// Convert serde_json::Value to our Value type

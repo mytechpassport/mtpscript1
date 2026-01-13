@@ -78,6 +78,8 @@ pub struct Interpreter {
     pub start_time: std::time::Instant,
     /// Whether this interpreter has handled PCI data and needs secure wipe
     pub pci_touched: bool,
+    /// Storage for async operation results - keyed by promise_hash
+    pub async_ops: HashMap<String, Value>,
 }
 
 impl Interpreter {
@@ -93,12 +95,21 @@ impl Interpreter {
             timeout_ms: 30_000, // 30 seconds default
             start_time: std::time::Instant::now(),
             pci_touched: false,
+            async_ops: HashMap::new(),
         };
 
         // Inject built-in objects (JSON, Decimal, etc.)
         interpreter.inject_builtin_objects();
 
         interpreter
+    }
+
+    pub fn poll_async_op(&mut self, promise_hash: &str) -> Result<Value, String> {
+        if let Some(result) = self.async_ops.get(promise_hash) {
+            Ok(result.clone())
+        } else {
+            Err(format!("Async operation {} not found", promise_hash))
+        }
     }
 
     fn inject_builtin_objects(&mut self) {
