@@ -1,0 +1,53 @@
+{
+  "$schema": "mtpscript-unsafe-manifest-v5.1",
+  "description": "Audit manifest for unsafe npm bridge adapters per TECHSPECV5.md §21",
+  "generatedAt": "2026-01-12T00:00:00.000Z",
+  "adapters": [
+    {
+      "name": "uuid",
+      "file": "uuid.js",
+      "exports": ["uuid"],
+      "description": "Deterministic UUID generation from seed",
+      "dependencies": [],
+      "signature": "pure (seed: Uint8Array, index?: number) => string"
+    },
+    {
+      "name": "crypto",
+      "file": "crypto.js",
+      "exports": ["randomBytes", "sha256", "hmacSha256"],
+      "description": "Deterministic cryptographic operations",
+      "dependencies": [
+        {
+          "name": "crypto",
+          "version": "builtin",
+          "type": "node-builtin",
+          "contentHash": "N/A (Node.js builtin module)"
+        }
+      ],
+      "signature": "pure (seed: Uint8Array, ...args: JsonValue[]) => JsonValue"
+    },
+    {
+      "name": "datetime",
+      "file": "datetime.js",
+      "exports": ["now", "toIsoString", "parseIso", "addMs"],
+      "description": "Deterministic datetime operations (no wall-clock)",
+      "dependencies": [],
+      "signature": "pure (seed: Uint8Array, ...args: JsonValue[]) => JsonValue"
+    }
+  ],
+  "unsafeDeps": [],
+  "compliance": {
+    "deterministicSeed": true,
+    "noWallClock": true,
+    "noSharedState": true,
+    "noExternalNetwork": true,
+    "noFileSystem": true
+  },
+  "securityNotes": [
+    "All adapters receive 32-byte seed per §0-b for determinism",
+    "No adapter uses real wall-clock time",
+    "No adapter maintains state between calls",
+    "All outputs are deterministic given same inputs",
+    "Exceptions are converted to structured errors, never escape"
+  ]
+}
