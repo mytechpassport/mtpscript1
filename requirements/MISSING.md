@@ -550,3 +550,60 @@ IrExpr::Const(name, value, body, _) => {
 | 4. respond.rs expressions | `respond.rs` | 24 | High | ✅ COMPLETED |
 | 5. Real async I/O | `effects.rs` | 441-456 | Medium | ✅ COMPLETED |
 | 6. Pattern expr compilation | `pattern.rs` | 279-281 | Medium | ✅ COMPLETED |
+
+---
+
+## Additional Fixes (January 2026)
+
+### 7. Fix execute_async_effect HttpOut Implementation ✅ COMPLETED
+
+| Field | Value |
+|-------|-------|
+| **File** | `mtpscript-core/src/runtime/effects.rs` |
+| **Line** | 593-604 |
+| **Issue** | `execute_async_effect` was returning a placeholder response for HttpOut instead of actually making HTTP requests |
+| **Fix** | Updated to call `execute_http_request()` properly, ensuring HTTP requests are executed synchronously per TECHSPECV5.md §7-a |
+
+### 8. Complete values_equal Function ✅ COMPLETED
+
+| Field | Value |
+|-------|-------|
+| **File** | `mtpscript-core/src/runtime/interpreter.rs` |
+| **Line** | 1193-1220 |
+| **Issue** | `values_equal` helper function only handled Null, Boolean, Number, String - missing Decimal, Array, Object |
+| **Fix** | Implemented full structural equality per TECHSPECV5.md §5 - structural, total equality with recursive Array/Object comparison |
+
+### 9. Remove DEBUG Statements ✅ COMPLETED
+
+| Field | Value |
+|-------|-------|
+| **Files** | `interpreter.rs`, `effects.rs`, `js_parser.rs` |
+| **Issue** | Production code contained `eprintln!("DEBUG: ...")` statements |
+| **Fix** | Removed all DEBUG eprintln statements from runtime code |
+
+### 10. Fix FunctionValue Structural Equality (§5 Violation) ✅ COMPLETED
+
+| Field | Value |
+|-------|-------|
+| **File** | `mtpscript-core/src/runtime/value.rs` |
+| **Line** | 29-34 |
+| **Issue** | `FunctionValue::eq` always returned `false`, violating §5 requirement: "Closure environments are included in structural equality" |
+| **Fix** | Updated to compare `name`, `params`, AND `closure` fields for proper structural equality |
+
+### 11. Clean Up Compiler Warnings ✅ COMPLETED
+
+| Field | Value |
+|-------|-------|
+| **Files** | Multiple files across runtime/, effects/, types/, modules/, lambda/, security/ |
+| **Issue** | ~21 compiler warnings for unused imports, dead code, unused variables |
+| **Fix** | Removed unused imports, dead code, added `#[allow(dead_code)]` for intentionally unused helpers, prefixed unused variables with underscore |
+
+---
+
+## Known Issues
+
+### Test Isolation (Pre-existing)
+
+The SQLite tests (`test_sqlite_memory` and `test_sqlite_write`) share a global `SQLITE_CONNECTION` and can fail when run in parallel due to race conditions. Tests pass when run with `--test-threads=1`.
+
+**Recommended fix:** Use `serial_test` crate or create isolated database connections per test.

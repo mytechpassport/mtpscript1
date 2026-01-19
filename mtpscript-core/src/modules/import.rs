@@ -80,7 +80,7 @@ impl ImportResolver {
     /// Verify module cryptographic signature
     fn verify_module_signature(
         &self,
-        import: &ImportDecl,
+        _import: &ImportDecl,
         module_path: &str,
     ) -> Result<(), MtpError> {
         // Look for signature file
@@ -104,7 +104,7 @@ impl ImportResolver {
             error: "Io".to_string(),
             message: format!("Failed to read module content: {}", e),
         })?;
-        let content_hash = Sha256::digest(content.as_bytes());
+        let _content_hash = Sha256::digest(content.as_bytes());
 
         // Verify signature (placeholder - would use actual public key)
         // In real implementation, would load trusted public keys

@@ -27,8 +27,9 @@ pub struct FunctionValue {
 }
 
 impl PartialEq for FunctionValue {
-    fn eq(&self, _other: &Self) -> bool {
-        false // Functions are not comparable
+    /// Per TECHSPECV5.md §5: Closure environments are included in structural equality
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.params == other.params && self.closure == other.closure
     }
 }
 

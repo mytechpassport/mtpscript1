@@ -36,6 +36,7 @@ mod fuzz_tests {
 }
 
 /// Create a minimal valid snapshot for testing
+#[allow(dead_code)]
 fn create_test_snapshot() -> Vec<u8> {
     let mut snapshot = Vec::new();
 

@@ -4,9 +4,6 @@ use crate::security::sign::verify_ecdsa_p256;
 use crc32fast;
 use std::env;
 
-// Default public key for signature verification (can be overridden by MTP_SIGNING_CERT env var)
-const DEFAULT_PUBLIC_KEY: &str = "";
-
 /// Verify snapshot integrity and signature
 fn verify_snapshot(snapshot: &[u8]) -> Result<(), RuntimeError> {
     if snapshot.len() < 52 {

@@ -1,5 +1,4 @@
-use rusqlite::{params, Connection};
-use sha2::{Digest, Sha256};
+use rusqlite::Connection;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -308,7 +307,6 @@ fn value_to_json_string(v: &Value) -> String {
 }
 
 pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), RuntimeError> {
-    eprintln!("DEBUG: Injecting effects");
 
     // Initialize in-memory SQLite if not already done
     {
@@ -591,23 +589,17 @@ fn execute_async_effect(effect_args: &Value) -> Result<Value, String> {
                         execute_sql_write(sql, &params)
                     }
                     Value::String(s) if s == "HttpOut" => {
-                        // Execute HttpOut effect - placeholder for now
-                        // In a real implementation, this would make an HTTP request
+                        // Execute HttpOut effect using the real HTTP client
                         let method = obj.get("method").and_then(|v| {
                             if let Value::String(s) = v { Some(s.clone()) } else { None }
                         }).unwrap_or_else(|| "GET".to_string());
                         let url = obj.get("url").and_then(|v| {
                             if let Value::String(s) = v { Some(s.clone()) } else { None }
                         }).ok_or("HttpOut requires 'url' field")?;
+                        let body = obj.get("body").cloned().unwrap_or(Value::Null);
 
-                        // Return a deterministic response for now
-                        // In production, this would use reqwest or similar
-                        Ok(Value::Object(HashMap::from([
-                            ("status".to_string(), Value::Number(200)),
-                            ("method".to_string(), Value::String(method)),
-                            ("url".to_string(), Value::String(url)),
-                            ("body".to_string(), Value::String("{}".to_string())),
-                        ])))
+                        // Execute HTTP request synchronously per TECHSPECV5.md §7-a
+                        execute_http_request(&method, &url, &body)
                     }
                     _ => {
                         // Unknown effect type, return the args as-is
@@ -654,11 +646,6 @@ fn json_value_to_value(json: &serde_json::Value) -> Value {
                 .collect(),
         ),
     }
-}
-
-fn generate_deterministic_async_result(seed: &[u8; 32]) -> Value {
-    let promise_id = format!("promise_{}", hex::encode(&sha2::Sha256::digest(seed)[..8]));
-    Value::String(promise_id)
 }
 
 #[cfg(test)]

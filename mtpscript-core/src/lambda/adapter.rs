@@ -1,5 +1,4 @@
 use crate::errors::MtpError;
-use crate::runtime::value::Value;
 use crate::runtime::Interpreter;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -61,7 +60,7 @@ impl LambdaAdapter {
         use std::collections::HashMap;
 
         // Allowed environment variables for Lambda
-        let allowed_vars = vec![
+        let _allowed_vars = vec![
             "AWS_LAMBDA_FUNCTION_NAME",
             "AWS_LAMBDA_FUNCTION_VERSION",
             "AWS_LAMBDA_FUNCTION_MEMORY_SIZE",

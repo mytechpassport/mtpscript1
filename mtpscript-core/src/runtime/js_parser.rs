@@ -75,6 +75,7 @@ pub enum JsToken {
 
 /// Lexer for JS subset
 pub struct JsLexer<'a> {
+    #[allow(dead_code)]
     source: &'a str,
     chars: std::iter::Peekable<std::str::CharIndices<'a>>,
     current_pos: usize,
@@ -376,17 +377,19 @@ impl JsParser {
     }
 
     fn advance(&mut self) -> &JsToken {
-        let token = self.current().clone();
+        let _token = self.current().clone();
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
         self.tokens.get(self.pos - 1).unwrap_or(&JsToken::Eof)
     }
 
+    #[allow(dead_code)]
     fn peek(&self) -> &JsToken {
         self.tokens.get(self.pos).unwrap_or(&JsToken::Eof)
     }
 
+    #[allow(dead_code)]
     fn peek_next(&self) -> &JsToken {
         self.tokens.get(self.pos + 1).unwrap_or(&JsToken::Eof)
     }
@@ -462,7 +465,6 @@ impl JsParser {
 
         for token in &self.tokens {
             if let JsToken::Ident(name) = token {
-                eprintln!("DEBUG: Checking token: {}", name);
                 if forbidden.contains(&name.as_str()) {
                     return Err(RuntimeError::ValueError(format!(
                         "Forbidden JS construct: {}",

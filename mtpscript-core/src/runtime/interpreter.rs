@@ -254,9 +254,7 @@ impl Interpreter {
                     } else {
                         return_part
                     };
-                    eprintln!("DEBUG: Return expression: {}", return_expr);
                     result = self.evaluate_expression(return_expr, &variables)?;
-                    eprintln!("DEBUG: Return result: {:?}", result);
                 }
                 break;
             }
@@ -273,9 +271,7 @@ impl Interpreter {
                         .unwrap_or(var_name_raw)
                         .trim();
                     let expr = parts[1].trim().strip_suffix(";").unwrap_or(parts[1].trim());
-                    eprintln!("DEBUG: Assignment {} = {}", var_name, expr);
                     let value = self.evaluate_expression(expr, &variables)?;
-                    eprintln!("DEBUG: Assigned value: {:?}", value);
                     variables.insert(var_name.to_string(), value);
                 }
                 continue;
@@ -591,7 +587,7 @@ impl Interpreter {
 
     /// Parse function definitions from JS code and store them
     fn parse_function_definitions(&mut self, js_code: &str) -> Result<(), RuntimeError> {
-        let mut chars = js_code.chars().peekable();
+        let _chars = js_code.chars().peekable();
         let mut pos = 0;
         let code_len = js_code.len();
 
@@ -706,37 +702,6 @@ impl Interpreter {
         }
 
         Ok(Value::Null)
-    }
-
-    fn evaluate_array_access(
-        &mut self,
-        arr_name: &str,
-        index_str: &str,
-        variables: &HashMap<String, Value>,
-    ) -> Result<Value, RuntimeError> {
-        // Get array
-        let arr = if let Some(Value::Array(a)) = variables.get(arr_name) {
-            a.clone()
-        } else {
-            return Ok(Value::Null);
-        };
-
-        // Get index
-        let index = if let Ok(i) = index_str.parse::<usize>() {
-            i
-        } else if let Some(Value::Number(i)) = variables.get(index_str) {
-            *i as usize
-        } else {
-            return Ok(Value::Null);
-        };
-
-        // Check bounds
-        if index >= arr.len() {
-            // Return special error value that will be caught
-            return Ok(Value::String("ARRAY_BOUNDS_ERROR".to_string()));
-        }
-
-        Ok(arr[index].clone())
     }
 
     fn parse_object(
@@ -1191,12 +1156,30 @@ impl Drop for Interpreter {
 }
 
 /// Helper function to compare two values for equality
+/// Per TECHSPECV5.md §5: structural, total equality, no reference identity
 fn values_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Null, Value::Null) => true,
         (Value::Boolean(a), Value::Boolean(b)) => a == b,
         (Value::Number(a), Value::Number(b)) => a == b,
         (Value::String(a), Value::String(b)) => a == b,
+        (Value::Decimal(a), Value::Decimal(b)) => a == b,
+        (Value::Array(a), Value::Array(b)) => {
+            if a.len() != b.len() {
+                return false;
+            }
+            a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y))
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            if a.len() != b.len() {
+                return false;
+            }
+            a.iter().all(|(k, v)| {
+                b.get(k).map_or(false, |bv| values_equal(v, bv))
+            })
+        }
+        // Functions are excluded from structural equality per spec §5
+        (Value::Function(_), Value::Function(_)) => false,
         _ => false,
     }
 }

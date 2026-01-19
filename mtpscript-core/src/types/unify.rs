@@ -1,7 +1,7 @@
 // Type unification for generic type parameters
 // Implements Robinson's unification algorithm with occurs check
 
-use crate::types::{AdtType, RecordType, Type};
+use crate::types::{RecordType, Type};
 use std::collections::HashMap;
 
 /// Substitution map from type variables to types
@@ -130,7 +130,7 @@ pub fn apply_substitution(ty: &Type, subs: &Substitution) -> Type {
             params.iter().map(|p| apply_substitution(p, subs)).collect(),
             Box::new(apply_substitution(ret, subs)),
         ),
-        Type::Adt(adt) => {
+        Type::Adt(_adt) => {
             // For ADT, we don't substitute type params directly
             // as they are stored as strings
             ty.clone()
@@ -171,7 +171,7 @@ fn collect_type_vars(ty: &Type, subs: &mut Substitution, prefix: &str, counter: 
             }
             collect_type_vars(ret, subs, prefix, counter);
         }
-        Type::Adt(adt) => {
+        Type::Adt(_adt) => {
             // Type params in ADTs are strings, not Type instances
             // We could instantiate them here if needed
         }

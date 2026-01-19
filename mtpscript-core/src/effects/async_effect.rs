@@ -1,5 +1,5 @@
 use crate::errors::compile::CompileError;
-use crate::parser::ast::{BinOp, Expr, ModuleDecl, Pattern, Program};
+use crate::parser::ast::{Expr, ModuleDecl, Pattern, Program};
 use sha2::{Digest, Sha256};
 
 /// Desugars await expressions to Async.await calls

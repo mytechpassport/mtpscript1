@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MtpError {
+    /// Per TECHSPECV5.md §0-c - camelCase names required for JSON output
+    #[allow(non_snake_case)]
     GasExhausted {
         error: String,
         gasLimit: u64,
