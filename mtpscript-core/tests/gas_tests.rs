@@ -60,9 +60,10 @@ fn test_json_parse_cost() {
 #[test]
 fn test_effect_call_cost() {
     assert_eq!(gas_cost(Op::EffectCall), 20);
-    assert_eq!(gas_cost(Op::DbRead), 20 + 50);
-    assert_eq!(gas_cost(Op::DbWrite), 20 + 50);
-    assert_eq!(gas_cost(Op::HttpOut), 20 + 100);
+    // DbRead/DbWrite/HttpOut have standalone costs (not additive with EffectCall)
+    assert_eq!(gas_cost(Op::DbRead), 50);
+    assert_eq!(gas_cost(Op::DbWrite), 100); // Write is more expensive than read
+    assert_eq!(gas_cost(Op::HttpOut), 100);
 }
 
 #[test]

@@ -199,7 +199,22 @@ impl TypeChecker {
                 let left_type = self.typecheck_expr(left, context)?;
                 let right_type = self.typecheck_expr(right, context)?;
                 match op {
-                    ast::BinOp::Add | ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div => {
+                    ast::BinOp::Add => {
+                        // Allow both number and string addition
+                        if left_type == Type::Number && right_type == Type::Number {
+                            Ok(Type::Number)
+                        } else if left_type == Type::String && right_type == Type::String {
+                            Ok(Type::String)
+                        } else if left_type == Type::String || right_type == Type::String {
+                            // String concatenation with any type
+                            Ok(Type::String)
+                        } else {
+                            Err(CompileError::TypeError(
+                                "Addition requires numbers or strings".to_string(),
+                            ))
+                        }
+                    }
+                    ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div => {
                         if left_type == Type::Number && right_type == Type::Number {
                             Ok(Type::Number)
                         } else {
