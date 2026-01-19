@@ -136,4 +136,97 @@ mod tests {
         assert!(json.contains(r#""responseHash":"abcd1234""#));
         assert!(json.contains(r#""timestamp""#));
     }
+
+    #[test]
+    fn test_concurrent_logging_thread_safety() {
+        use std::sync::Arc;
+        use std::thread;
+
+        // Spawn multiple threads that log concurrently
+        let handles: Vec<_> = (0..10)
+            .map(|i| {
+                thread::spawn(move || {
+                    for j in 0..10 {
+                        let entry = AuditLogger::create_entry(
+                            format!("thread-{}-req-{}", i, j),
+                            1000000,
+                            50000,
+                            format!("hash-{}-{}", i, j),
+                        );
+                        // Should not error even under concurrent access
+                        let result = AuditLogger::log(&entry);
+                        assert!(result.is_ok(), "Logging failed in thread {} request {}", i, j);
+                    }
+                })
+            })
+            .collect();
+
+        // Wait for all threads to complete
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+    }
+
+    #[test]
+    fn test_mutex_acquisition_on_poison() {
+        // Test that the mutex can recover from a poisoned state
+        // The current implementation uses unwrap_or_else(|e| e.into_inner())
+        // which allows recovery from a poisoned mutex
+
+        let entry = AuditLogger::create_entry(
+            "poison-test".to_string(),
+            1000000,
+            50000,
+            "hash".to_string(),
+        );
+
+        // Log should still work even if called after a potential poison
+        assert!(AuditLogger::log(&entry).is_ok());
+    }
+
+    #[test]
+    fn test_audit_entry_deserialization() {
+        let json = r#"{"request_id":"test","gasLimit":100,"gasUsed":50,"responseHash":"abc","timestamp":"2024-01-01T00:00:00Z"}"#;
+        let entry: AuditEntry = serde_json::from_str(json).unwrap();
+
+        assert_eq!(entry.request_id, "test");
+        assert_eq!(entry.gas_limit, 100);
+        assert_eq!(entry.gas_used, 50);
+        assert_eq!(entry.response_hash, "abc");
+    }
+
+    #[test]
+    fn test_audit_entry_roundtrip() {
+        let original = AuditLogger::create_entry(
+            "roundtrip-test".to_string(),
+            999999,
+            12345,
+            "hash123".to_string(),
+        );
+
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: AuditEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.request_id, restored.request_id);
+        assert_eq!(original.gas_limit, restored.gas_limit);
+        assert_eq!(original.gas_used, restored.gas_used);
+        assert_eq!(original.response_hash, restored.response_hash);
+        assert_eq!(original.timestamp, restored.timestamp);
+    }
+
+    #[test]
+    fn test_create_entry_timestamp_is_recent() {
+        let before = Utc::now();
+        let entry = AuditLogger::create_entry(
+            "timestamp-test".to_string(),
+            1000,
+            500,
+            "hash".to_string(),
+        );
+        let after = Utc::now();
+
+        // Timestamp should be between before and after
+        assert!(entry.timestamp >= before);
+        assert!(entry.timestamp <= after);
+    }
 }

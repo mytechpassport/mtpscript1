@@ -283,6 +283,12 @@ impl Interpreter {
                 result = self.evaluate_function_call(call, &variables)?;
                 continue;
             }
+
+            // Handle simple expression statements (like "42;" or "true;")
+            let expr = line.strip_suffix(";").unwrap_or(line);
+            if !expr.is_empty() {
+                result = self.evaluate_expression(expr, &variables)?;
+            }
         }
 
         // Handle special error cases for array bounds
@@ -311,16 +317,52 @@ impl Interpreter {
     ) -> Result<Value, RuntimeError> {
         let expr = expr.trim();
 
-        // Handle literals
-        if expr.starts_with("\"") && expr.ends_with("\"") {
-            return Ok(Value::String(expr[1..expr.len() - 1].to_string()));
+        // Handle boolean literals
+        if expr == "true" {
+            return Ok(Value::Boolean(true));
         }
-        if expr.starts_with("{") && expr.ends_with("}") {
-            // Simple object parsing
-            return self.parse_object(expr, variables);
+        if expr == "false" {
+            return Ok(Value::Boolean(false));
         }
+        // Handle null literal
+        if expr == "null" {
+            return Ok(Value::Null);
+        }
+
+        // Handle number literals
         if let Ok(num) = expr.parse::<i64>() {
             return Ok(Value::Number(num));
+        }
+
+        // Handle ternary expressions: cond ? then : else
+        if let Some(ternary_result) = self.try_evaluate_ternary(expr, variables)? {
+            return Ok(ternary_result);
+        }
+
+        // Handle binary operations (BEFORE checking for string/object literals
+        // to handle cases like "hello" + "world")
+        if let Some(binary_result) = self.try_evaluate_binary(expr, variables)? {
+            return Ok(binary_result);
+        }
+
+        // Handle string literals (single string, no operators)
+        if expr.starts_with("\"") && expr.ends_with("\"") && expr.len() >= 2 {
+            // Make sure there's no unquoted content
+            let inner = &expr[1..expr.len() - 1];
+            // Check if this is actually a complete string literal
+            if !inner.contains("\" ") {
+                return Ok(Value::String(inner.to_string()));
+            }
+        }
+
+        // Handle object literals
+        if expr.starts_with("{") && expr.ends_with("}") {
+            return self.parse_object(expr, variables);
+        }
+
+        // Handle arrays
+        if expr.starts_with("[") && expr.ends_with("]") {
+            return self.parse_array(expr, variables);
         }
 
         // Handle variables
@@ -332,28 +374,63 @@ impl Interpreter {
             return Ok(value.clone());
         }
 
-        // Handle ternary expressions: cond ? then : else
-        if let Some(ternary_result) = self.try_evaluate_ternary(expr, variables)? {
-            return Ok(ternary_result);
-        }
-
-        // Handle binary operations
-        if let Some(binary_result) = self.try_evaluate_binary(expr, variables)? {
-            return Ok(binary_result);
-        }
-
         // Handle function calls
         if expr.contains("(") && expr.ends_with(")") {
             return self.evaluate_function_call(expr, variables);
         }
 
-        // Handle arrays (simplified)
-        if expr.starts_with("[") && expr.ends_with("]") {
-            return self.parse_array(expr, variables);
+        // Handle member access (obj.field)
+        if expr.contains(".") && !expr.starts_with("\"") {
+            return self.evaluate_member_access(expr, variables);
         }
 
-        // Default to string
+        // Default to string for unknown expressions
         Ok(Value::String(expr.to_string()))
+    }
+
+    fn evaluate_member_access(
+        &mut self,
+        expr: &str,
+        variables: &HashMap<String, Value>,
+    ) -> Result<Value, RuntimeError> {
+        // Find the last dot at top level (not inside parens or strings)
+        let chars: Vec<char> = expr.chars().collect();
+        let mut paren_depth = 0;
+        let mut in_string = false;
+        let mut last_dot_pos = None;
+
+        for (i, &c) in chars.iter().enumerate() {
+            if c == '"' {
+                in_string = !in_string;
+            } else if !in_string {
+                match c {
+                    '(' | '[' => paren_depth += 1,
+                    ')' | ']' => paren_depth -= 1,
+                    '.' if paren_depth == 0 => {
+                        last_dot_pos = Some(i);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if let Some(dot_pos) = last_dot_pos {
+            let obj_expr = &expr[..dot_pos];
+            let field = &expr[dot_pos + 1..];
+            let obj_val = self.evaluate_expression(obj_expr, variables)?;
+
+            match obj_val {
+                Value::Object(map) => {
+                    if let Some(val) = map.get(field) {
+                        return Ok(val.clone());
+                    }
+                    return Ok(Value::Null);
+                }
+                _ => return Ok(Value::Null),
+            }
+        }
+
+        Ok(Value::Null)
     }
 
     /// Try to evaluate a ternary expression
@@ -421,83 +498,271 @@ impl Interpreter {
         Ok(None)
     }
 
-    /// Try to evaluate binary operations
+    /// Try to evaluate binary operations with proper precedence
     fn try_evaluate_binary(
         &mut self,
         expr: &str,
         variables: &HashMap<String, Value>,
     ) -> Result<Option<Value>, RuntimeError> {
-        // Handle === comparison
-        if let Some(pos) = expr.find(" === ") {
-            let left = expr[..pos].trim();
-            let right = expr[pos + 5..].trim();
-            let left_val = self.evaluate_expression(left, variables)?;
-            let right_val = self.evaluate_expression(right, variables)?;
-            return Ok(Some(Value::Boolean(values_equal(&left_val, &right_val))));
-        }
-
-        // Handle + (addition) - be careful with parenthesized expressions
-        // Only match + at the top level (not inside parens)
-        let mut paren_depth = 0;
-        let mut add_pos = None;
-        for (i, c) in expr.chars().enumerate() {
-            match c {
-                '(' => paren_depth += 1,
-                ')' => paren_depth -= 1,
-                '+' if paren_depth == 0 && i > 0 => {
-                    add_pos = Some(i);
-                    break;
+        // Handle parenthesized expression first
+        if expr.starts_with("(") && expr.ends_with(")") {
+            // Check if the parens are balanced and wrap the whole expression
+            let inner = &expr[1..expr.len() - 1];
+            let mut depth = 0;
+            let mut balanced = true;
+            for c in inner.chars() {
+                match c {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth < 0 {
+                            balanced = false;
+                            break;
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
-        }
-        if let Some(pos) = add_pos {
-            let left = expr[..pos].trim();
-            let right = expr[pos + 1..].trim();
-            let left_val = self.evaluate_expression(left, variables)?;
-            let right_val = self.evaluate_expression(right, variables)?;
-            if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
-                return Ok(Some(Value::Number(l + r)));
+            if balanced && depth == 0 {
+                return Ok(Some(self.evaluate_expression(inner, variables)?));
             }
         }
 
-        // Handle - (subtraction) at top level
+        // Handle logical operators (lowest precedence) - || first
+        if let Some(result) = self.try_binary_op(expr, " || ", variables, |l, r| {
+            let lb = match l {
+                Value::Boolean(b) => b,
+                Value::Number(n) => n != 0,
+                Value::Null => false,
+                _ => true,
+            };
+            let rb = match r {
+                Value::Boolean(b) => b,
+                Value::Number(n) => n != 0,
+                Value::Null => false,
+                _ => true,
+            };
+            Ok(Value::Boolean(lb || rb))
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle && (higher precedence than ||)
+        if let Some(result) = self.try_binary_op(expr, " && ", variables, |l, r| {
+            let lb = match l {
+                Value::Boolean(b) => b,
+                Value::Number(n) => n != 0,
+                Value::Null => false,
+                _ => true,
+            };
+            let rb = match r {
+                Value::Boolean(b) => b,
+                Value::Number(n) => n != 0,
+                Value::Null => false,
+                _ => true,
+            };
+            Ok(Value::Boolean(lb && rb))
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle === comparison
+        if let Some(result) = self.try_binary_op(expr, " === ", variables, |l, r| {
+            Ok(Value::Boolean(values_equal(&l, &r)))
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle !== comparison
+        if let Some(result) = self.try_binary_op(expr, " !== ", variables, |l, r| {
+            Ok(Value::Boolean(!values_equal(&l, &r)))
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle <= comparison (before < to avoid partial match)
+        if let Some(result) = self.try_binary_op(expr, " <= ", variables, |l, r| {
+            if let (Value::Number(ln), Value::Number(rn)) = (&l, &r) {
+                Ok(Value::Boolean(ln <= rn))
+            } else {
+                Ok(Value::Boolean(false))
+            }
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle >= comparison (before > to avoid partial match)
+        if let Some(result) = self.try_binary_op(expr, " >= ", variables, |l, r| {
+            if let (Value::Number(ln), Value::Number(rn)) = (&l, &r) {
+                Ok(Value::Boolean(ln >= rn))
+            } else {
+                Ok(Value::Boolean(false))
+            }
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle < comparison
+        if let Some(result) = self.try_binary_op(expr, " < ", variables, |l, r| {
+            if let (Value::Number(ln), Value::Number(rn)) = (&l, &r) {
+                Ok(Value::Boolean(ln < rn))
+            } else {
+                Ok(Value::Boolean(false))
+            }
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle > comparison
+        if let Some(result) = self.try_binary_op(expr, " > ", variables, |l, r| {
+            if let (Value::Number(ln), Value::Number(rn)) = (&l, &r) {
+                Ok(Value::Boolean(ln > rn))
+            } else {
+                Ok(Value::Boolean(false))
+            }
+        })? {
+            return Ok(Some(result));
+        }
+
+        // Handle + and - (addition/subtraction - lower precedence than * /)
+        // Find rightmost + or - at top level for left-to-right evaluation
         let mut paren_depth = 0;
-        let mut sub_pos = None;
-        for (i, c) in expr.chars().enumerate() {
+        let mut last_add_sub_pos: Option<(usize, char)> = None;
+        let chars: Vec<char> = expr.chars().collect();
+        for (i, &c) in chars.iter().enumerate() {
             match c {
                 '(' => paren_depth += 1,
                 ')' => paren_depth -= 1,
-                '-' if paren_depth == 0 && i > 0 => {
-                    // Make sure it's not part of a number literal
-                    let prev_char = expr.chars().nth(i - 1);
-                    if prev_char
-                        .map(|c| !c.is_whitespace() && c != '(' && c != ',')
-                        .unwrap_or(false)
-                    {
-                        sub_pos = Some(i);
-                        break;
+                '+' | '-' if paren_depth == 0 && i > 0 => {
+                    // Make sure it's not a unary operator
+                    let prev = chars.get(i.saturating_sub(1));
+                    if prev.map(|&p| !matches!(p, '(' | ',' | '+' | '-' | '*' | '/' | ' ')).unwrap_or(false)
+                       || (prev == Some(&' ') && i > 1) {
+                        last_add_sub_pos = Some((i, c));
                     }
                 }
                 _ => {}
             }
         }
-        if let Some(pos) = sub_pos {
+
+        if let Some((pos, op)) = last_add_sub_pos {
             let left = expr[..pos].trim();
             let right = expr[pos + 1..].trim();
-            let left_val = self.evaluate_expression(left, variables)?;
-            let right_val = self.evaluate_expression(right, variables)?;
-            if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
-                return Ok(Some(Value::Number(l - r)));
+            if !left.is_empty() && !right.is_empty() {
+                let left_val = self.evaluate_expression(left, variables)?;
+                let right_val = self.evaluate_expression(right, variables)?;
+                match op {
+                    '+' => {
+                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
+                            return Ok(Some(Value::Number(l + r)));
+                        }
+                        // String concatenation
+                        if let (Value::String(l), Value::String(r)) = (&left_val, &right_val) {
+                            return Ok(Some(Value::String(format!("{}{}", l, r))));
+                        }
+                    }
+                    '-' => {
+                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
+                            return Ok(Some(Value::Number(l - r)));
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
 
-        // Handle parenthesized expression
-        if expr.starts_with("(") && expr.ends_with(")") {
-            let inner = &expr[1..expr.len() - 1];
-            return Ok(Some(self.evaluate_expression(inner, variables)?));
+        // Handle * and / (multiplication/division - higher precedence)
+        let mut paren_depth = 0;
+        let mut last_mul_div_pos: Option<(usize, char)> = None;
+        for (i, &c) in chars.iter().enumerate() {
+            match c {
+                '(' => paren_depth += 1,
+                ')' => paren_depth -= 1,
+                '*' | '/' if paren_depth == 0 => {
+                    last_mul_div_pos = Some((i, c));
+                }
+                _ => {}
+            }
         }
 
+        if let Some((pos, op)) = last_mul_div_pos {
+            let left = expr[..pos].trim();
+            let right = expr[pos + 1..].trim();
+            if !left.is_empty() && !right.is_empty() {
+                let left_val = self.evaluate_expression(left, variables)?;
+                let right_val = self.evaluate_expression(right, variables)?;
+                match op {
+                    '*' => {
+                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
+                            return Ok(Some(Value::Number(l * r)));
+                        }
+                    }
+                    '/' => {
+                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
+                            if *r == 0 {
+                                return Err(RuntimeError::ValueError("Division by zero".to_string()));
+                            }
+                            return Ok(Some(Value::Number(l / r)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Handle unary ! (logical not)
+        if expr.starts_with("!") {
+            let inner = expr[1..].trim();
+            let val = self.evaluate_expression(inner, variables)?;
+            let bool_val = match val {
+                Value::Boolean(b) => b,
+                Value::Number(n) => n != 0,
+                Value::Null => false,
+                _ => true,
+            };
+            return Ok(Some(Value::Boolean(!bool_val)));
+        }
+
+        Ok(None)
+    }
+
+    /// Helper to try a binary operator at top level
+    fn try_binary_op<F>(
+        &mut self,
+        expr: &str,
+        op: &str,
+        variables: &HashMap<String, Value>,
+        f: F,
+    ) -> Result<Option<Value>, RuntimeError>
+    where
+        F: Fn(Value, Value) -> Result<Value, RuntimeError>,
+    {
+        let mut paren_depth = 0;
+        let chars: Vec<char> = expr.chars().collect();
+        let op_chars: Vec<char> = op.chars().collect();
+
+        for i in 0..chars.len() {
+            match chars[i] {
+                '(' => paren_depth += 1,
+                ')' => paren_depth -= 1,
+                _ if paren_depth == 0 => {
+                    // Check if operator matches at this position
+                    if i + op_chars.len() <= chars.len() {
+                        let slice: String = chars[i..i + op_chars.len()].iter().collect();
+                        if slice == op {
+                            let left = expr[..i].trim();
+                            let right = expr[i + op.len()..].trim();
+                            if !left.is_empty() && !right.is_empty() {
+                                let left_val = self.evaluate_expression(left, variables)?;
+                                let right_val = self.evaluate_expression(right, variables)?;
+                                return Ok(Some(f(left_val, right_val)?));
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         Ok(None)
     }
 

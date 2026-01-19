@@ -233,4 +233,263 @@ mod tests {
             assert_eq!(canonical, expected);
         }
     }
+
+    // Comprehensive determinism verification tests (#25)
+
+    #[test]
+    fn test_determinism_different_insertion_orders() {
+        // Create objects with same keys but different insertion orders
+        let keys = vec!["alpha", "beta", "gamma", "delta", "epsilon"];
+
+        // Forward order
+        let mut obj1 = std::collections::HashMap::new();
+        for (i, key) in keys.iter().enumerate() {
+            obj1.insert(key.to_string(), Json::Int(i as i64));
+        }
+
+        // Reverse order
+        let mut obj2 = std::collections::HashMap::new();
+        for (i, key) in keys.iter().rev().enumerate() {
+            obj2.insert(key.to_string(), Json::Int((keys.len() - 1 - i) as i64));
+        }
+
+        let result1 = serialize_canonical(&Json::Object(obj1)).unwrap();
+        let result2 = serialize_canonical(&Json::Object(obj2)).unwrap();
+
+        assert_eq!(result1, result2, "Insertion order should not affect canonical output");
+    }
+
+    #[test]
+    fn test_determinism_deeply_nested() {
+        // Create deeply nested object
+        let mut inner = Json::Int(42);
+        for i in 0..10 {
+            let mut obj = std::collections::HashMap::new();
+            obj.insert(format!("level_{}", i), inner);
+            inner = Json::Object(obj);
+        }
+
+        let result1 = serialize_canonical(&inner).unwrap();
+        let result2 = serialize_canonical(&inner).unwrap();
+
+        assert_eq!(result1, result2);
+
+        // Verify structure is correct
+        assert!(result1.starts_with('{'));
+        assert!(result1.contains("level_9"));
+        assert!(result1.contains("42"));
+    }
+
+    #[test]
+    fn test_determinism_many_keys() {
+        // Test with many keys to stress the sorting algorithm
+        let mut obj = std::collections::HashMap::new();
+        for i in 0..100 {
+            obj.insert(format!("key_{:03}", i), Json::Int(i));
+        }
+
+        let json = Json::Object(obj);
+        let first_result = serialize_canonical(&json).unwrap();
+
+        // Run 50 times to verify consistent ordering
+        for _ in 0..50 {
+            let result = serialize_canonical(&json).unwrap();
+            assert_eq!(result, first_result, "Output must be deterministic with many keys");
+        }
+    }
+
+    #[test]
+    fn test_determinism_unicode_keys() {
+        let mut obj = std::collections::HashMap::new();
+        obj.insert("日本語".to_string(), Json::Int(1));
+        obj.insert("中文".to_string(), Json::Int(2));
+        obj.insert("한국어".to_string(), Json::Int(3));
+        obj.insert("العربية".to_string(), Json::Int(4));
+        obj.insert("emoji🎉".to_string(), Json::Int(5));
+
+        let json = Json::Object(obj);
+        let first_result = serialize_canonical(&json).unwrap();
+
+        for _ in 0..100 {
+            let result = serialize_canonical(&json).unwrap();
+            assert_eq!(result, first_result, "Unicode keys must have deterministic order");
+        }
+    }
+
+    #[test]
+    fn test_determinism_special_characters_in_values() {
+        let mut obj = std::collections::HashMap::new();
+        obj.insert("escape".to_string(), Json::String("line1\nline2\ttab".to_string()));
+        obj.insert("quote".to_string(), Json::String("he said \"hello\"".to_string()));
+        obj.insert("backslash".to_string(), Json::String("path\\to\\file".to_string()));
+        obj.insert("control".to_string(), Json::String("\x00\x1f".to_string()));
+
+        let json = Json::Object(obj);
+        let first_result = serialize_canonical(&json).unwrap();
+
+        // Verify escapes are correct
+        assert!(first_result.contains("\\n"));
+        assert!(first_result.contains("\\t"));
+        assert!(first_result.contains("\\\""));
+        assert!(first_result.contains("\\\\"));
+        assert!(first_result.contains("\\u0000"));
+
+        // Verify determinism
+        for _ in 0..100 {
+            let result = serialize_canonical(&json).unwrap();
+            assert_eq!(result, first_result);
+        }
+    }
+
+    #[test]
+    fn test_determinism_empty_structures() {
+        let empty_obj = Json::Object(std::collections::HashMap::new());
+        let empty_arr = Json::Array(vec![]);
+        let empty_str = Json::String(String::new());
+
+        assert_eq!(serialize_canonical(&empty_obj).unwrap(), "{}");
+        assert_eq!(serialize_canonical(&empty_arr).unwrap(), "[]");
+        assert_eq!(serialize_canonical(&empty_str).unwrap(), "\"\"");
+    }
+
+    #[test]
+    fn test_determinism_mixed_types_array() {
+        let arr = Json::Array(vec![
+            Json::Null,
+            Json::Bool(true),
+            Json::Bool(false),
+            Json::Int(0),
+            Json::Int(-42),
+            Json::Int(9999999999),
+            Json::String("test".to_string()),
+            Json::Array(vec![Json::Int(1), Json::Int(2)]),
+            Json::Object({
+                let mut m = std::collections::HashMap::new();
+                m.insert("nested".to_string(), Json::Bool(true));
+                m
+            }),
+        ]);
+
+        let first_result = serialize_canonical(&arr).unwrap();
+
+        // Array order must be preserved (not sorted)
+        assert!(first_result.starts_with("[null,true,false,0,-42"));
+
+        // Verify determinism
+        for _ in 0..100 {
+            let result = serialize_canonical(&arr).unwrap();
+            assert_eq!(result, first_result);
+        }
+    }
+
+    #[test]
+    fn test_determinism_hash_collision_tiebreak() {
+        // Test many similar keys to increase chance of exercising CBOR tiebreak
+        let prefixes = vec!["a", "b", "c", "d", "e"];
+        let suffixes = vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+
+        let mut obj = std::collections::HashMap::new();
+        for prefix in &prefixes {
+            for suffix in &suffixes {
+                let key = format!("{}{}", prefix, suffix);
+                obj.insert(key, Json::Bool(true));
+            }
+        }
+
+        let json = Json::Object(obj);
+        let first_result = serialize_canonical(&json).unwrap();
+
+        for _ in 0..100 {
+            let result = serialize_canonical(&json).unwrap();
+            assert_eq!(result, first_result, "Hash collision tiebreak must be deterministic");
+        }
+    }
+
+    #[test]
+    fn test_determinism_numeric_string_keys() {
+        // Keys that look like numbers but are strings
+        let mut obj = std::collections::HashMap::new();
+        obj.insert("1".to_string(), Json::Int(1));
+        obj.insert("10".to_string(), Json::Int(10));
+        obj.insert("2".to_string(), Json::Int(2));
+        obj.insert("20".to_string(), Json::Int(20));
+        obj.insert("100".to_string(), Json::Int(100));
+
+        let json = Json::Object(obj);
+        let first_result = serialize_canonical(&json).unwrap();
+
+        for _ in 0..100 {
+            let result = serialize_canonical(&json).unwrap();
+            assert_eq!(result, first_result);
+        }
+    }
+
+    #[test]
+    fn test_rfc8785_no_whitespace() {
+        // RFC 8785 requires no unnecessary whitespace
+        let mut obj = std::collections::HashMap::new();
+        obj.insert("a".to_string(), Json::Int(1));
+        obj.insert("b".to_string(), Json::Array(vec![Json::Int(1), Json::Int(2)]));
+
+        let result = serialize_canonical(&Json::Object(obj)).unwrap();
+
+        // Should have no spaces around colons or commas
+        assert!(!result.contains(" :"));
+        assert!(!result.contains(": "));
+        assert!(!result.contains(" ,"));
+        assert!(!result.contains(", "));
+    }
+
+    #[test]
+    fn test_cbor_encoding_lengths() {
+        // Test CBOR encoding for various string lengths (0-23, 24-255, 256-65535)
+        let short_key = "a"; // length 1, uses 0x60 | len
+        let medium_key = "x".repeat(30); // length 30, uses 0x78 prefix
+        let longer_key = "y".repeat(300); // length 300, uses 0x79 prefix
+
+        let mut obj = std::collections::HashMap::new();
+        obj.insert(short_key.to_string(), Json::Int(1));
+        obj.insert(medium_key.clone(), Json::Int(2));
+        obj.insert(longer_key.clone(), Json::Int(3));
+
+        let json = Json::Object(obj);
+        let first_result = serialize_canonical(&json).unwrap();
+
+        // Verify all keys are present
+        assert!(first_result.contains("\"a\""));
+        assert!(first_result.contains(&format!("\"{}\"", medium_key)));
+        assert!(first_result.contains(&format!("\"{}\"", longer_key)));
+
+        // Verify determinism
+        for _ in 0..100 {
+            let result = serialize_canonical(&json).unwrap();
+            assert_eq!(result, first_result);
+        }
+    }
+
+    #[test]
+    fn test_determinism_across_fresh_instances() {
+        // Create the same data structure multiple times from scratch
+        // to ensure no hidden state affects output
+        fn create_test_object() -> Json {
+            let mut inner = std::collections::HashMap::new();
+            inner.insert("x".to_string(), Json::Int(1));
+
+            let mut obj = std::collections::HashMap::new();
+            obj.insert("first".to_string(), Json::Object(inner));
+            obj.insert("second".to_string(), Json::Array(vec![Json::Bool(true)]));
+            obj.insert("third".to_string(), Json::String("value".to_string()));
+
+            Json::Object(obj)
+        }
+
+        let results: Vec<String> = (0..10)
+            .map(|_| serialize_canonical(&create_test_object()).unwrap())
+            .collect();
+
+        // All results should be identical
+        for result in &results[1..] {
+            assert_eq!(result, &results[0], "Fresh instances must produce identical output");
+        }
+    }
 }

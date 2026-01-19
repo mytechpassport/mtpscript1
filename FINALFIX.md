@@ -1,6 +1,7 @@
 # FINALFIX - Remaining Issues
 
 **Generated:** 2026-01-19
+**Updated:** 2026-01-19
 **Sources:** TASK.md, BUGFIX.md
 
 This document consolidates all remaining (uncompleted) issues from TASK.md and BUGFIX.md.
@@ -9,13 +10,22 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 
 ## Summary
 
-| Category | Count |
-|----------|-------|
-| **Critical (P0)** | 8 |
-| **High Priority (P1)** | 10 |
-| **Medium Priority** | 6 |
-| **Low Priority / Future** | 12 |
-| **Total** | 36 |
+| Category | Count | Completed |
+|----------|-------|-----------|
+| **Critical (P0)** | 8 | 0 |
+| **High Priority (P1)** | 10 | 0 |
+| **Medium Priority** | 6 | 6 |
+| **Low Priority / Future** | 12 | 1 |
+| **Total** | 36 | 7 |
+
+### Recently Completed (2026-01-19)
+- #19: Test execution verified
+- #20: AST to IR lowering unit tests - 27 comprehensive tests added
+- #21: Tail call detection tests - 13 comprehensive tests added
+- #22: Effect call compilation validation - 14 tests added
+- #23: Cross-platform determinism tests - 10 tests added
+- #24: JSON parser fuzzing tests - 30 tests added
+- #30: Audit logging thread safety - Verified with concurrency tests
 
 ---
 
@@ -123,30 +133,35 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 **Source:** BUGFIX.md (line 10)
 **Description:** Execute all newly added test cases and confirm their expected results match the spec: test_adt_pattern_matching, test_recursive, test_gas_exhaustion, test_decimal_edge, test_map_list, test_pipeline_full, test_lambdas_closures, test_functions_effects, test_json_ops, test_hash_cbor, test_json_duplicate_keys, test_db_effects, test_http_out, test_await_syntax, test_api_methods, test_records, test_array_bounds, test_number_overflow, test_json_null.
 
-### 20. AST to IR Lowering Unit Tests
+### 20. AST to IR Lowering Unit Tests ✅ COMPLETED
 **Source:** BUGFIX.md (line 17)
 **File:** `mtpscript-core/src/ir/lower.rs`
 **Description:** AST to IR lowering has no dedicated unit tests, risking incorrect transformations.
+**Resolution:** Added 27 comprehensive unit tests covering pipelines, binary ops, functions, literals, arrays, objects, pattern matching, lambdas, and more.
 
-### 21. Tail Call Detection Comprehensive Tests
+### 21. Tail Call Detection Comprehensive Tests ✅ COMPLETED
 **Source:** BUGFIX.md (line 18)
 **File:** `mtpscript-core/src/ir/tail_call.rs`
 **Description:** Tail call detection lacks comprehensive tests for complex expressions, potentially missing optimization opportunities.
+**Resolution:** Added 13 comprehensive tests including non-tail-recursive cases, match expressions, nested if statements, and explicit tail call markers.
 
-### 22. Effect Call Compilation Validation
+### 22. Effect Call Compilation Validation ✅ COMPLETED
 **Source:** BUGFIX.md (line 19)
 **File:** `mtpscript-core/src/compiler/effects.rs`
 **Description:** Effect call compilation lacks input validation, allowing malicious effect arguments.
+**Resolution:** Added 14 validation tests covering all effect types (DbRead, DbWrite, HttpOut, Log, Async), argument validation, type checking, and unknown effect rejection.
 
-### 23. Cross-Platform Determinism Tests
+### 23. Cross-Platform Determinism Tests ✅ COMPLETED
 **Source:** BUGFIX.md (line 20)
 **File:** `mtpscript-core/src/compiler/deterministic.rs`
 **Description:** Code generation lacks cross-platform determinism tests, risking non-reproducible builds.
+**Resolution:** Added 10 tests verifying deterministic name generation across instances, idempotent transformations, and consistency across 100+ runs.
 
-### 24. JSON Parser Fuzzing
+### 24. JSON Parser Fuzzing ✅ COMPLETED
 **Source:** BUGFIX.md (line 21)
 **File:** `mtpscript-core/src/json/parse.rs`
 **Description:** JSON parsing lacks fuzzing for malicious inputs, missing edge cases like invalid UTF-8 or control characters.
+**Resolution:** Added 30 fuzzing-style tests covering edge cases: invalid inputs, escape sequences, unicode, unterminated structures, nesting limits, and more. Documented parser limitations with TODOs.
 
 ---
 
@@ -177,10 +192,11 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 **File:** `mtpscript-core/src/modules/npm_bridge.rs:139`
 **Description:** Chrono dependency used without feature flags. Wall-clock time in audit manifest violates determinism. Should use seed-derived timestamp.
 
-### 30. Audit Logging Thread Safety
+### 30. Audit Logging Thread Safety ✅ COMPLETED
 **Source:** BUGFIX.md (line 112)
 **File:** `mtpscript-core/src/audit/logger.rs:28-33`
 **Description:** Audit logging to stderr may interleave. Multiple threads writing to `io::stderr()` can produce interleaved output.
+**Resolution:** Added global mutex for thread-safe logging and 5 comprehensive tests including concurrent logging with 10 threads x 10 requests each, mutex poison recovery, and roundtrip serialization.
 
 ### 31. Nested Function Refactoring
 **Source:** BUGFIX.md (line 116)

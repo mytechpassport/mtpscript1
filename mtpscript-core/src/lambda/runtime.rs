@@ -301,6 +301,8 @@ impl LambdaRuntime {
 pub struct PreloadedRuntime {
     snapshot_data: Vec<u8>,
     runtime: LambdaRuntime,
+    /// Shared shutdown flag that can be set externally
+    shutdown: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PreloadedRuntime {
@@ -312,7 +314,29 @@ impl PreloadedRuntime {
         Ok(Self {
             snapshot_data,
             runtime,
+            shutdown: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
+    }
+
+    /// Get a handle to the shutdown flag for external control
+    ///
+    /// This allows signal handlers or other components to trigger graceful shutdown.
+    pub fn shutdown_handle(&self) -> std::sync::Arc<std::sync::atomic::AtomicBool> {
+        self.shutdown.clone()
+    }
+
+    /// Request graceful shutdown
+    ///
+    /// This signals the runtime to stop accepting new invocations and exit cleanly.
+    pub fn stop(&self) {
+        use std::sync::atomic::Ordering;
+        self.shutdown.store(true, Ordering::SeqCst);
+    }
+
+    /// Check if shutdown has been requested
+    pub fn is_shutdown_requested(&self) -> bool {
+        use std::sync::atomic::Ordering;
+        self.shutdown.load(Ordering::SeqCst)
     }
 
     /// Run with preloaded snapshot
@@ -320,19 +344,17 @@ impl PreloadedRuntime {
     /// This method respects Lambda's context deadline and will exit gracefully
     /// when a shutdown signal is received or the deadline expires.
     pub fn run(&self) -> Result<(), MtpError> {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
+        use std::sync::atomic::Ordering;
 
         // Use preloaded data instead of reading from disk each time
         let runtime = self.runtime.clone();
 
-        // Setup shutdown flag
-        let shutdown = Arc::new(AtomicBool::new(false));
+        // The shutdown flag can be set externally via shutdown_handle() or stop()
+        // In production, you would register a SIGTERM handler like:
+        //   let handle = runtime.shutdown_handle();
+        //   signal_hook::flag::register(SIGTERM, handle)?;
 
-        // Note: In production, you would register a SIGTERM handler here
-        // For now, we check the deadline on each invocation
-
-        while !shutdown.load(Ordering::SeqCst) {
+        while !self.shutdown.load(Ordering::SeqCst) {
             // Get next invocation
             let invocation = match runtime.get_next_invocation() {
                 Ok(inv) => inv,
@@ -501,5 +523,136 @@ mod tests {
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("200"));
         assert!(json.contains("application/json"));
+    }
+
+    // Graceful shutdown tests (#28)
+
+    #[test]
+    fn test_preloaded_runtime_shutdown_flag() {
+        use std::io::Write;
+        use std::sync::atomic::Ordering;
+        use tempfile::NamedTempFile;
+
+        // Create a temporary snapshot file
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let js_content = "function main() { return 42; }";
+        temp_file.write_all(js_content.as_bytes()).unwrap();
+        let snapshot_path = temp_file.path().to_str().unwrap().to_string();
+
+        let runtime = PreloadedRuntime::new(snapshot_path).unwrap();
+
+        // Initially not shutdown
+        assert!(!runtime.is_shutdown_requested());
+
+        // Request shutdown
+        runtime.stop();
+
+        // Now should be shutdown
+        assert!(runtime.is_shutdown_requested());
+    }
+
+    #[test]
+    fn test_shutdown_handle_can_be_set_externally() {
+        use std::io::Write;
+        use std::sync::atomic::Ordering;
+        use tempfile::NamedTempFile;
+
+        // Create a temporary snapshot file
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let js_content = "function main() { return 42; }";
+        temp_file.write_all(js_content.as_bytes()).unwrap();
+        let snapshot_path = temp_file.path().to_str().unwrap().to_string();
+
+        let runtime = PreloadedRuntime::new(snapshot_path).unwrap();
+        let handle = runtime.shutdown_handle();
+
+        // Initially not shutdown
+        assert!(!runtime.is_shutdown_requested());
+
+        // Set via handle
+        handle.store(true, Ordering::SeqCst);
+
+        // Should now be shutdown
+        assert!(runtime.is_shutdown_requested());
+    }
+
+    #[test]
+    fn test_shutdown_handle_is_shared() {
+        use std::io::Write;
+        use std::sync::atomic::Ordering;
+        use tempfile::NamedTempFile;
+
+        // Create a temporary snapshot file
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let js_content = "function main() { return 42; }";
+        temp_file.write_all(js_content.as_bytes()).unwrap();
+        let snapshot_path = temp_file.path().to_str().unwrap().to_string();
+
+        let runtime = PreloadedRuntime::new(snapshot_path).unwrap();
+
+        // Get multiple handles
+        let handle1 = runtime.shutdown_handle();
+        let handle2 = runtime.shutdown_handle();
+
+        // They should all point to the same flag
+        assert!(!handle1.load(Ordering::SeqCst));
+        assert!(!handle2.load(Ordering::SeqCst));
+
+        // Setting via one affects all
+        handle1.store(true, Ordering::SeqCst);
+
+        assert!(handle2.load(Ordering::SeqCst));
+        assert!(runtime.is_shutdown_requested());
+    }
+
+    #[test]
+    fn test_shutdown_from_another_thread() {
+        use std::io::Write;
+        use std::thread;
+        use std::time::Duration;
+        use tempfile::NamedTempFile;
+
+        // Create a temporary snapshot file
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let js_content = "function main() { return 42; }";
+        temp_file.write_all(js_content.as_bytes()).unwrap();
+        let snapshot_path = temp_file.path().to_str().unwrap().to_string();
+
+        let runtime = PreloadedRuntime::new(snapshot_path).unwrap();
+        let handle = runtime.shutdown_handle();
+
+        // Spawn thread that will trigger shutdown
+        let shutdown_thread = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(10));
+            handle.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+
+        // Wait for thread
+        shutdown_thread.join().unwrap();
+
+        // Should be shutdown
+        assert!(runtime.is_shutdown_requested());
+    }
+
+    #[test]
+    fn test_deadline_calculation() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Test that we can properly calculate remaining time from deadline
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        // Deadline 1 second in the future
+        let deadline_ms = now_ms + 1000;
+        let remaining = deadline_ms.saturating_sub(now_ms);
+
+        assert!(remaining >= 990 && remaining <= 1010, "Remaining time should be ~1000ms, got {}ms", remaining);
+
+        // Deadline in the past
+        let past_deadline = now_ms.saturating_sub(1000);
+        let past_remaining = past_deadline.saturating_sub(now_ms);
+        assert_eq!(past_remaining, 0, "Past deadline should have 0 remaining time");
     }
 }

@@ -758,4 +758,246 @@ mod tests {
         };
         assert!(!detect_tail_calls(&non_tail, "factorial"));
     }
+
+    #[test]
+    fn test_nested_pipeline() {
+        // Test chained pipeline: x |> f |> g ≡ g(f(x))
+        let ast = Expr::Pipeline(
+            Box::new(Expr::Pipeline(
+                Box::new(Expr::Number(5)),
+                Box::new(Expr::Ident("double".to_string())),
+            )),
+            Box::new(Expr::Ident("inc".to_string())),
+        );
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        // Should be inc(double(5))
+        match ir {
+            IrExpr::Call { func, args, .. } => {
+                assert!(matches!(*func, IrExpr::Var(ref name, _) if name == "inc"));
+                assert_eq!(args.len(), 1);
+                // First arg should be double(5)
+                match &args[0] {
+                    IrExpr::Call {
+                        func: inner_func,
+                        args: inner_args,
+                        ..
+                    } => {
+                        assert!(matches!(**inner_func, IrExpr::Var(ref name, _) if name == "double"));
+                        assert_eq!(inner_args.len(), 1);
+                        assert!(matches!(inner_args[0], IrExpr::Number(5, _)));
+                    }
+                    _ => panic!("Expected inner Call"),
+                }
+            }
+            _ => panic!("Expected outer Call"),
+        }
+    }
+
+    #[test]
+    fn test_deeply_nested_arithmetic() {
+        // Test (1 + 2) * (3 + 4)
+        let ast = Expr::Binary(
+            BinOp::Mul,
+            Box::new(Expr::Binary(
+                BinOp::Add,
+                Box::new(Expr::Number(1)),
+                Box::new(Expr::Number(2)),
+            )),
+            Box::new(Expr::Binary(
+                BinOp::Add,
+                Box::new(Expr::Number(3)),
+                Box::new(Expr::Number(4)),
+            )),
+        );
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::Binary(op, left, right, _) => {
+                assert_eq!(op, BinOp::Mul);
+                // Left should be 1 + 2
+                match *left {
+                    IrExpr::Binary(inner_op, inner_left, inner_right, _) => {
+                        assert_eq!(inner_op, BinOp::Add);
+                        assert!(matches!(*inner_left, IrExpr::Number(1, _)));
+                        assert!(matches!(*inner_right, IrExpr::Number(2, _)));
+                    }
+                    _ => panic!("Expected left Binary"),
+                }
+                // Right should be 3 + 4
+                match *right {
+                    IrExpr::Binary(inner_op, inner_left, inner_right, _) => {
+                        assert_eq!(inner_op, BinOp::Add);
+                        assert!(matches!(*inner_left, IrExpr::Number(3, _)));
+                        assert!(matches!(*inner_right, IrExpr::Number(4, _)));
+                    }
+                    _ => panic!("Expected right Binary"),
+                }
+            }
+            _ => panic!("Expected Binary"),
+        }
+    }
+
+    #[test]
+    fn test_lower_nested_const() {
+        // Test nested let bindings: const x = 1; const y = 2; x + y
+        let ast = Expr::Const {
+            name: "x".to_string(),
+            value: Box::new(Expr::Number(1)),
+            body: Box::new(Expr::Const {
+                name: "y".to_string(),
+                value: Box::new(Expr::Number(2)),
+                body: Box::new(Expr::Binary(
+                    BinOp::Add,
+                    Box::new(Expr::Ident("x".to_string())),
+                    Box::new(Expr::Ident("y".to_string())),
+                )),
+            }),
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::Let {
+                name, value, body, ..
+            } => {
+                assert_eq!(name, "x");
+                assert!(matches!(*value, IrExpr::Number(1, _)));
+                // Body should be another let
+                match *body {
+                    IrExpr::Let {
+                        name: inner_name,
+                        value: inner_value,
+                        body: inner_body,
+                        ..
+                    } => {
+                        assert_eq!(inner_name, "y");
+                        assert!(matches!(*inner_value, IrExpr::Number(2, _)));
+                        // Inner body should be x + y
+                        match *inner_body {
+                            IrExpr::Binary(op, left, right, _) => {
+                                assert_eq!(op, BinOp::Add);
+                                assert!(matches!(*left, IrExpr::Var(ref n, _) if n == "x"));
+                                assert!(matches!(*right, IrExpr::Var(ref n, _) if n == "y"));
+                            }
+                            _ => panic!("Expected Binary in inner body"),
+                        }
+                    }
+                    _ => panic!("Expected inner Let"),
+                }
+            }
+            _ => panic!("Expected Let"),
+        }
+    }
+
+    #[test]
+    fn test_lambda_multiple_params_with_types() {
+        // Test lambda with multiple typed parameters
+        let ast = Expr::Lambda {
+            params: vec![
+                ("a".to_string(), TypeExpr::Ident("number".to_string())),
+                ("b".to_string(), TypeExpr::Ident("string".to_string())),
+                ("c".to_string(), TypeExpr::Ident("boolean".to_string())),
+            ],
+            body: Box::new(Expr::Ident("a".to_string())),
+        };
+        let ir = lower_expr(&ast, &Type::Var("func".to_string())).unwrap();
+
+        match ir {
+            IrExpr::Lambda { params, body, .. } => {
+                assert_eq!(params.len(), 3);
+                assert_eq!(params[0], ("a".to_string(), Type::Number));
+                assert_eq!(params[1], ("b".to_string(), Type::String));
+                assert_eq!(params[2], ("c".to_string(), Type::Boolean));
+                assert!(matches!(*body, IrExpr::Var(ref n, _) if n == "a"));
+            }
+            _ => panic!("Expected Lambda"),
+        }
+    }
+
+    #[test]
+    fn test_call_with_complex_args() {
+        // Test function call with expressions as arguments
+        let ast = Expr::Call {
+            func: Box::new(Expr::Ident("f".to_string())),
+            args: vec![
+                Expr::Binary(BinOp::Add, Box::new(Expr::Number(1)), Box::new(Expr::Number(2))),
+                Expr::String("hello".to_string()),
+                Expr::Boolean(true),
+            ],
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::Call { func, args, .. } => {
+                assert!(matches!(*func, IrExpr::Var(ref n, _) if n == "f"));
+                assert_eq!(args.len(), 3);
+                // First arg should be 1 + 2
+                assert!(matches!(&args[0], IrExpr::Binary(BinOp::Add, _, _, _)));
+                assert!(matches!(&args[1], IrExpr::String(s, _) if s == "hello"));
+                assert!(matches!(&args[2], IrExpr::Boolean(true, _)));
+            }
+            _ => panic!("Expected Call"),
+        }
+    }
+
+    #[test]
+    fn test_pattern_variable_binding() {
+        // Test that pattern matching with variable captures works
+        let ast = Expr::Match {
+            expr: Box::new(Expr::Number(42)),
+            cases: vec![
+                (AstPattern::Ident("n".to_string()), Expr::Ident("n".to_string())),
+            ],
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::Match { expr, cases, .. } => {
+                assert!(matches!(*expr, IrExpr::Number(42, _)));
+                assert_eq!(cases.len(), 1);
+                // The variable pattern should create a binding
+                match &cases[0].0 {
+                    IrPattern::Var(name) => assert_eq!(name, "n"),
+                    _ => panic!("Expected variable pattern"),
+                }
+            }
+            _ => panic!("Expected Match"),
+        }
+    }
+
+    #[test]
+    fn test_if_with_complex_branches() {
+        // Test if with complex expressions in branches
+        let ast = Expr::If {
+            condition: Box::new(Expr::Binary(
+                BinOp::Gt,
+                Box::new(Expr::Ident("x".to_string())),
+                Box::new(Expr::Number(0)),
+            )),
+            then_branch: Box::new(Expr::Binary(
+                BinOp::Mul,
+                Box::new(Expr::Ident("x".to_string())),
+                Box::new(Expr::Number(2)),
+            )),
+            else_branch: Box::new(Expr::Unary(BinOp::Sub, Box::new(Expr::Ident("x".to_string())))),
+        };
+        let ir = lower_expr(&ast, &Type::Number).unwrap();
+
+        match ir {
+            IrExpr::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                // Condition should be x > 0
+                assert!(matches!(*condition, IrExpr::Binary(BinOp::Gt, _, _, _)));
+                // Then should be x * 2
+                assert!(matches!(*then_branch, IrExpr::Binary(BinOp::Mul, _, _, _)));
+                // Else should be unary minus x
+                assert!(matches!(*else_branch, IrExpr::Unary(BinOp::Sub, _, _)));
+            }
+            _ => panic!("Expected If"),
+        }
+    }
 }
