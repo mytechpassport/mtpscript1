@@ -1,0 +1,1 @@
+{"not_found":{"code":404,"message":"Not found: user/123"},"server_error":{"code":500,"message":"Server error: database connection failed"},"unauthorized":{"code":401,"message":"Unauthorized"},"validation":{"code":400,"message":"Validation failed: email is required"}}

@@ -1,0 +1,211 @@
+// Test: Option and Result Types (TECHSPEC §4.2, §4.3)
+// MTPScript has no null/undefined - uses Option<T> and Result<T, E> instead
+
+api GET "/option-basic" uses {} {
+  const some_val = Some(42);
+  const none_val = None;
+  const unwrap_some = match some_val {
+    Some(x) => x
+    None => 0
+  };
+  const unwrap_none = match none_val {
+    Some(x) => x
+    None => -1
+  };
+  respond json({
+    "some_value": unwrap_some,
+    "none_value": unwrap_none
+  })
+}
+
+api GET "/option-with-types" uses {} {
+  const opt_string = Some("hello");
+  const opt_number = Some(123);
+  const opt_bool = Some(true);
+  const opt_array = Some([1, 2, 3]);
+  const opt_object = Some({ "key": "value" });
+  respond json({
+    "string": match opt_string { Some(s) => s None => "" },
+    "number": match opt_number { Some(n) => n None => 0 },
+    "boolean": match opt_bool { Some(b) => b None => false },
+    "array": match opt_array { Some(a) => a None => [] },
+    "object": match opt_object { Some(o) => o None => {} }
+  })
+}
+
+api GET "/option-chaining" uses {} {
+  // Simulate optional chaining with nested Options
+  function get_user(id: number) {
+    if (id == 1) { Some({ "name": "Alice", "email": Some("alice@example.com") }) }
+    else { if (id == 2) { Some({ "name": "Bob", "email": None }) }
+    else { None } }
+  }
+  const user1 = get_user(1);
+  const user2 = get_user(2);
+  const user3 = get_user(3);
+  const email1 = match user1 {
+    Some(u) => match u["email"] {
+      Some(e) => e
+      None => "no email"
+    }
+    None => "no user"
+  };
+  const email2 = match user2 {
+    Some(u) => match u["email"] {
+      Some(e) => e
+      None => "no email"
+    }
+    None => "no user"
+  };
+  const email3 = match user3 {
+    Some(u) => match u["email"] {
+      Some(e) => e
+      None => "no email"
+    }
+    None => "no user"
+  };
+  respond json({
+    "user1_email": email1,
+    "user2_email": email2,
+    "user3_email": email3
+  })
+}
+
+api GET "/result-basic" uses {} {
+  const ok_val = Ok(100);
+  const err_val = Err("something went wrong");
+  const unwrap_ok = match ok_val {
+    Ok(v) => v
+    Err(_) => 0
+  };
+  const unwrap_err = match err_val {
+    Ok(_) => "success"
+    Err(e) => e
+  };
+  respond json({
+    "ok_value": unwrap_ok,
+    "err_value": unwrap_err
+  })
+}
+
+api GET "/result-with-types" uses {} {
+  const res_string = Ok("success");
+  const res_number = Ok(42);
+  const res_complex = Ok({ "data": [1, 2, 3], "status": "ok" });
+  const res_error = Err({ "code": 404, "message": "Not found" });
+  respond json({
+    "string_result": match res_string { Ok(v) => { "ok": v } Err(e) => { "err": e } },
+    "number_result": match res_number { Ok(v) => { "ok": v } Err(e) => { "err": e } },
+    "complex_result": match res_complex { Ok(v) => { "ok": v } Err(e) => { "err": e } },
+    "error_result": match res_error { Ok(v) => { "ok": v } Err(e) => { "err": e } }
+  })
+}
+
+api GET "/result-chaining" uses {} {
+  // Result chaining for error propagation
+  function divide(a: number, b: number) {
+    if (b == 0) { Err("division by zero") }
+    else { Ok(a / b) }
+  }
+  function chain_divide(x: number) {
+    const step1 = divide(x, 2);
+    match step1 {
+      Ok(v1) => {
+        const step2 = divide(v1, 3);
+        match step2 {
+          Ok(v2) => Ok(v2)
+          Err(e) => Err(e)
+        }
+      }
+      Err(e) => Err(e)
+    }
+  }
+  const success = chain_divide(60);
+  const failure = divide(10, 0);
+  respond json({
+    "chained_success": match success { Ok(v) => { "value": v } Err(e) => { "error": e } },
+    "division_by_zero": match failure { Ok(v) => { "value": v } Err(e) => { "error": e } }
+  })
+}
+
+api GET "/option-map" uses {} {
+  // Mapping over Option values
+  function map_option(opt: Option<number>, f: function(number): number) {
+    match opt {
+      Some(x) => Some(f(x))
+      None => None
+    }
+  }
+  const doubled = map_option(Some(21), function(x) { x * 2 });
+  const none_mapped = map_option(None, function(x) { x * 2 });
+  respond json({
+    "doubled": match doubled { Some(v) => v None => "none" },
+    "none_mapped": match none_mapped { Some(v) => v None => "none" }
+  })
+}
+
+api GET "/result-map" uses {} {
+  // Mapping over Result values
+  function map_result(res: Result<number, string>, f: function(number): number) {
+    match res {
+      Ok(x) => Ok(f(x))
+      Err(e) => Err(e)
+    }
+  }
+  function map_error(res: Result<number, string>, f: function(string): string) {
+    match res {
+      Ok(x) => Ok(x)
+      Err(e) => Err(f(e))
+    }
+  }
+  const ok_mapped = map_result(Ok(10), function(x) { x * 10 });
+  const err_mapped = map_error(Err("error"), function(e) { "wrapped: " + e });
+  respond json({
+    "ok_mapped": match ok_mapped { Ok(v) => v Err(_) => 0 },
+    "err_mapped": match err_mapped { Ok(_) => "" Err(e) => e }
+  })
+}
+
+api GET "/option-flatten" uses {} {
+  // Flattening nested Options
+  const nested_some = Some(Some(42));
+  const nested_none = Some(None);
+  const outer_none = None;
+  function flatten(opt: Option<Option<number>>) {
+    match opt {
+      Some(inner) => match inner {
+        Some(v) => Some(v)
+        None => None
+      }
+      None => None
+    }
+  }
+  respond json({
+    "flatten_some_some": match flatten(nested_some) { Some(v) => v None => "none" },
+    "flatten_some_none": match flatten(nested_none) { Some(v) => v None => "none" },
+    "flatten_none": match flatten(outer_none) { Some(v) => v None => "none" }
+  })
+}
+
+api GET "/result-and-then" uses {} {
+  // Result.andThen / flatMap pattern
+  function parse_int(s: string) {
+    if (s == "42") { Ok(42) }
+    else { if (s == "100") { Ok(100) }
+    else { Err("parse error: " + s) } }
+  }
+  function double_if_positive(n: number) {
+    if (n > 0) { Ok(n * 2) }
+    else { Err("not positive") }
+  }
+  function and_then(res: Result<string, string>) {
+    match parse_int(match res { Ok(v) => v Err(_) => "" }) {
+      Ok(n) => double_if_positive(n)
+      Err(e) => Err(e)
+    }
+  }
+  respond json({
+    "success_chain": match and_then(Ok("42")) { Ok(v) => v Err(e) => e },
+    "parse_fail": match and_then(Ok("invalid")) { Ok(v) => v Err(e) => e }
+  })
+}

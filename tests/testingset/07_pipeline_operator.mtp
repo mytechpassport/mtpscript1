@@ -1,0 +1,105 @@
+// Test: Pipeline Operator (TECHSPEC §3.2, §25)
+// Tests left-associative pipeline: a |> b |> c === (a |> b) |> c
+
+function double(x: number) { x * 2 }
+function add_ten(x: number) { x + 10 }
+function square(x: number) { x * x }
+function negate(x: number) { 0 - x }
+function to_string(x: number) { "number: " + x }
+function wrap_array(x: number) { [x] }
+function stringify_json(obj: Json) { Json.stringify(obj) }
+
+api GET "/pipeline-basic" uses {} {
+  // Simple pipeline: 5 |> double = 10
+  const simple = 5 |> double;
+  // Chained pipeline: 5 |> double |> add_ten = (5 |> double) |> add_ten = 10 |> add_ten = 20
+  const chained = 5 |> double |> add_ten;
+  // Longer chain
+  const long_chain = 3 |> double |> add_ten |> square;
+  respond json({
+    "simple_5_double": simple,
+    "chained_5_double_add10": chained,
+    "long_3_double_add10_square": long_chain
+  })
+}
+
+api GET "/pipeline-associativity" uses {} {
+  // Verify left associativity: a |> b |> c == (a |> b) |> c
+  const left_assoc = 2 |> double |> square;
+  const explicit_left = (2 |> double) |> square;
+  // These should be equal: (2 |> double) = 4, 4 |> square = 16
+  respond json({
+    "implicit_assoc": left_assoc,
+    "explicit_left_assoc": explicit_left,
+    "are_equal": left_assoc == explicit_left
+  })
+}
+
+api GET "/pipeline-complex" uses {} {
+  // Pipeline with multiple transformations
+  const transform = 5
+    |> double        // 10
+    |> add_ten       // 20
+    |> square        // 400
+    |> negate        // -400
+    |> add_ten;      // -390
+  // Pipeline ending with string conversion
+  const to_str = 42 |> double |> to_string;
+  // Pipeline with object wrapping
+  const wrapped = 7 |> double |> wrap_array;
+  respond json({
+    "complex_transform": transform,
+    "to_string_result": to_str,
+    "wrapped_in_array": wrapped
+  })
+}
+
+api GET "/pipeline-with-lambdas" uses {} {
+  // Pipeline with inline lambdas
+  const result1 = 10 |> function(x) { x * 3 };
+  const result2 = 5 |> function(x) { x + 1 } |> function(y) { y * y };
+  const result3 = [1, 2, 3] |> function(arr) { arr[0] + arr[1] + arr[2] };
+  respond json({
+    "lambda_triple": result1,
+    "lambda_chain": result2,
+    "lambda_sum_array": result3
+  })
+}
+
+api GET "/pipeline-json" uses {} {
+  // Pipeline for JSON transformations
+  const data = { "value": 100, "name": "test" };
+  const json_str = data |> Json.stringify;
+  const parsed = "{\"a\":1,\"b\":2}" |> Json.parse;
+  respond json({
+    "stringified": json_str,
+    "parsed": match parsed {
+      Ok(v) => v
+      Err(_) => { "error": true }
+    }
+  })
+}
+
+api GET "/pipeline-nested" uses {} {
+  // Nested pipeline expressions
+  const outer = (5 |> double) + (3 |> square);
+  // Pipeline as function argument
+  function process(a: number, b: number) { a * b }
+  const with_args = process(10 |> double, 5 |> add_ten);
+  respond json({
+    "nested_sum": outer,
+    "pipeline_as_args": with_args
+  })
+}
+
+api GET "/pipeline-result-chain" uses {} {
+  // Pipeline with Result type handling
+  const val = "123" |> Json.parse;
+  const processed = match val {
+    Ok(v) => v |> function(x) { { "parsed": x, "valid": true } }
+    Err(e) => { "error": e, "valid": false }
+  };
+  respond json({
+    "result_chain": processed
+  })
+}

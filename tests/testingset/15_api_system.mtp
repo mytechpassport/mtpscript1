@@ -1,0 +1,113 @@
+// Test: API System (TECHSPEC §8)
+// Tests first-class API declarations with all HTTP methods
+
+api GET "/api-get" uses {} {
+  respond json({
+    "method": "GET",
+    "path": "/api-get",
+    "data": { "id": 1, "name": "test" }
+  })
+}
+
+api POST "/api-post" uses {} {
+  respond json({
+    "method": "POST",
+    "path": "/api-post",
+    "created": true,
+    "id": 123
+  })
+}
+
+api PUT "/api-put" uses {} {
+  respond json({
+    "method": "PUT",
+    "path": "/api-put",
+    "updated": true
+  })
+}
+
+api DELETE "/api-delete" uses {} {
+  respond json({
+    "method": "DELETE",
+    "path": "/api-delete",
+    "deleted": true
+  })
+}
+
+api PATCH "/api-patch" uses {} {
+  respond json({
+    "method": "PATCH",
+    "path": "/api-patch",
+    "patched": true
+  })
+}
+
+api GET "/api-with-effects" uses { Log, DbRead } {
+  Log("info", "API called", { "path": "/api-with-effects" });
+  const data = DbRead("SELECT * FROM config LIMIT 1", []);
+  respond json({
+    "method": "GET",
+    "effects_used": ["Log", "DbRead"],
+    "data": data
+  })
+}
+
+api POST "/api-complex-response" uses {} {
+  const response = {
+    "status": "success",
+    "code": 200,
+    "data": {
+      "items": [
+        { "id": 1, "name": "Item 1", "price": 1000 },
+        { "id": 2, "name": "Item 2", "price": 2000 },
+        { "id": 3, "name": "Item 3", "price": 3000 }
+      ],
+      "pagination": {
+        "page": 1,
+        "per_page": 10,
+        "total": 3,
+        "has_more": false
+      }
+    },
+    "meta": {
+      "request_id": "abc123",
+      "timestamp": "2024-01-01T00:00:00Z"
+    }
+  };
+  respond json(response)
+}
+
+api GET "/api-computed-response" uses {} {
+  function calculate_total(items: List<{ id: number, price: number }>, idx: number, acc: number) {
+    if (idx >= items.length) { acc }
+    else { calculate_total(items, idx + 1, acc + items[idx]["price"]) }
+  }
+  const items = [
+    { "id": 1, "price": 100 },
+    { "id": 2, "price": 200 },
+    { "id": 3, "price": 300 }
+  ];
+  const total = calculate_total(items, 0, 0);
+  const tax = total * 8 / 100;
+  respond json({
+    "items": items,
+    "subtotal": total,
+    "tax": tax,
+    "total": total + tax
+  })
+}
+
+api POST "/api-conditional" uses {} {
+  const input = { "type": "premium", "quantity": 5 };
+  const base_price = 100;
+  const multiplier = if (input["type"] == "premium") { 2 } else { 1 };
+  const discount = if (input["quantity"] > 3) { 10 } else { 0 };
+  const price = base_price * multiplier * input["quantity"] - discount;
+  respond json({
+    "input": input,
+    "base_price": base_price,
+    "multiplier": multiplier,
+    "discount": discount,
+    "final_price": price
+  })
+}

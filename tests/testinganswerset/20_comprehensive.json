@@ -1,0 +1,1 @@
+{"created_user":{"email":"alice@example.com","id":1,"name":"Alice","role":"Admin","settings":{"language":"en","notifications":true,"theme":"dark"}},"display":"User: Alice","insert_status":{"rows_affected":1},"verification":{"email":"alice@example.com","id":1,"name":"Alice","role":"Admin"}}

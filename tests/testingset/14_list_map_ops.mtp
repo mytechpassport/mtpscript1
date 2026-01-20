@@ -1,0 +1,178 @@
+// Test: List and Map Operations (TECHSPEC §4.1, §4.2)
+// Tests List<T> and Map<K,V> composite types
+
+api GET "/list-basic" uses {} {
+  const empty_list = [];
+  const number_list = [1, 2, 3, 4, 5];
+  const string_list = ["a", "b", "c"];
+  const mixed_list = [1, "two", true, { "key": "value" }];
+  respond json({
+    "empty_length": empty_list.length,
+    "number_length": number_list.length,
+    "string_length": string_list.length,
+    "mixed_length": mixed_list.length,
+    "first_number": number_list[0],
+    "last_number": number_list[4],
+    "first_string": string_list[0]
+  })
+}
+
+api GET "/list-operations" uses {} {
+  const list = [10, 20, 30];
+  const pushed = list.push(40);
+  const prepended = list.unshift(0);
+  const concatenated = list.concat([40, 50]);
+  const sliced = [1, 2, 3, 4, 5].slice(1, 4);
+  respond json({
+    "original": list,
+    "pushed": pushed,
+    "prepended": prepended,
+    "concatenated": concatenated,
+    "sliced": sliced
+  })
+}
+
+api GET "/list-iteration" uses {} {
+  // Manual iteration via recursion
+  function sum(arr: List<number>, idx: number, acc: number) {
+    if (idx >= arr.length) { acc } else { sum(arr, idx + 1, acc + arr[idx]) }
+  }
+  function product(arr: List<number>, idx: number, acc: number) {
+    if (idx >= arr.length) { acc } else { product(arr, idx + 1, acc * arr[idx]) }
+  }
+  function filter_even(arr: List<number>, idx: number, result: List<number>) {
+    if (idx >= arr.length) { result }
+    else {
+      if (arr[idx] - (arr[idx] / 2) * 2 == 0) {
+        filter_even(arr, idx + 1, result.push(arr[idx]))
+      } else {
+        filter_even(arr, idx + 1, result)
+      }
+    }
+  }
+  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  respond json({
+    "sum": sum(numbers, 0, 0),
+    "product": product([1, 2, 3, 4, 5], 0, 1),
+    "evens": filter_even(numbers, 0, [])
+  })
+}
+
+api GET "/map-basic" uses {} {
+  const empty_map = {};
+  const string_keys = { "a": 1, "b": 2, "c": 3 };
+  const nested_map = {
+    "user": { "name": "Alice", "age": 30 },
+    "settings": { "theme": "dark", "lang": "en" }
+  };
+  respond json({
+    "empty": empty_map,
+    "string_keys": string_keys,
+    "nested": nested_map,
+    "access_a": string_keys["a"],
+    "access_user_name": nested_map["user"]["name"]
+  })
+}
+
+api GET "/map-operations" uses {} {
+  const original = { "x": 1, "y": 2 };
+  const with_z = { "x": original["x"], "y": original["y"], "z": 3 };
+  const merged = {
+    "x": original["x"],
+    "y": original["y"],
+    "a": 10,
+    "b": 20
+  };
+  // Check key existence via pattern match
+  function has_key(map: Map<string, number>, key: string) {
+    match map[key] {
+      Some(v) => true
+      None => false
+    }
+  }
+  respond json({
+    "original": original,
+    "with_z": with_z,
+    "merged": merged
+  })
+}
+
+api GET "/map-iteration" uses {} {
+  // Iterate over map keys/values
+  const data = { "a": 10, "b": 20, "c": 30 };
+  const keys = Map.keys(data);
+  const values = Map.values(data);
+  function sum_values(vals: List<number>, idx: number, acc: number) {
+    if (idx >= vals.length) { acc } else { sum_values(vals, idx + 1, acc + vals[idx]) }
+  }
+  respond json({
+    "keys": keys,
+    "values": values,
+    "sum_of_values": sum_values(values, 0, 0)
+  })
+}
+
+api GET "/list-nested" uses {} {
+  // Nested lists
+  const matrix = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+  ];
+  const access_center = matrix[1][1];
+  const first_row = matrix[0];
+  const last_elem = matrix[2][2];
+  // Flatten nested list
+  function flatten(mat: List<List<number>>, i: number, j: number, result: List<number>) {
+    if (i >= mat.length) { result }
+    else {
+      if (j >= mat[i].length) {
+        flatten(mat, i + 1, 0, result)
+      } else {
+        flatten(mat, i, j + 1, result.push(mat[i][j]))
+      }
+    }
+  }
+  respond json({
+    "matrix": matrix,
+    "center": access_center,
+    "first_row": first_row,
+    "last_elem": last_elem,
+    "flattened": flatten(matrix, 0, 0, [])
+  })
+}
+
+api GET "/map-nested-deep" uses {} {
+  // Deeply nested maps
+  const config = {
+    "database": {
+      "primary": {
+        "host": "localhost",
+        "port": 5432,
+        "credentials": {
+          "user": "admin",
+          "password": "secret"
+        }
+      },
+      "replica": {
+        "host": "replica.local",
+        "port": 5432
+      }
+    },
+    "cache": {
+      "redis": {
+        "host": "cache.local",
+        "port": 6379
+      }
+    }
+  };
+  const db_host = config["database"]["primary"]["host"];
+  const db_user = config["database"]["primary"]["credentials"]["user"];
+  const cache_port = config["cache"]["redis"]["port"];
+  respond json({
+    "config": config,
+    "db_host": db_host,
+    "db_user": db_user,
+    "cache_port": cache_port
+  })
+}

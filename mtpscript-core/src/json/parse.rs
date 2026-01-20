@@ -157,8 +157,11 @@ impl<'a> JsonParser<'a> {
                 }
             } else if self.peek() == Some(']') {
                 // No trailing comma - this is fine
+            } else if let Some(c) = self.peek() {
+                return Err(ParseError::UnexpectedChar(c, self.pos));
             } else {
-                return Err(ParseError::UnexpectedChar(self.peek().unwrap(), self.pos));
+                // Unterminated array - reached end of input
+                return Err(ParseError::UnexpectedEnd);
             }
         }
         Ok(Json::Array(elements))
@@ -191,8 +194,11 @@ impl<'a> JsonParser<'a> {
                 }
             } else if self.peek() == Some('}') {
                 // No trailing comma - this is fine
+            } else if let Some(c) = self.peek() {
+                return Err(ParseError::UnexpectedChar(c, self.pos));
             } else {
-                return Err(ParseError::UnexpectedChar(self.peek().unwrap(), self.pos));
+                // Unterminated object - reached end of input
+                return Err(ParseError::UnexpectedEnd);
             }
         }
         Ok(Json::Object(object))
@@ -396,24 +402,18 @@ mod tests {
 
     #[test]
     fn test_unterminated_array() {
-        // TODO: Parser panics on unterminated arrays instead of returning error
-        // This test documents the current behavior - these should be errors
-        let result = std::panic::catch_unwind(|| parse_json("[1, 2"));
-        // Either error or panic is acceptable for invalid input
-        assert!(result.is_err() || result.unwrap().is_err());
-
-        let result = std::panic::catch_unwind(|| parse_json("["));
-        assert!(result.is_err() || result.unwrap().is_err());
+        // Parser now properly returns errors for unterminated arrays
+        assert!(parse_json("[1, 2").is_err());
+        assert!(parse_json("[").is_err());
+        assert!(parse_json("[1, [2, 3").is_err()); // Nested unterminated
     }
 
     #[test]
     fn test_unterminated_object() {
-        // TODO: Parser panics on unterminated objects instead of returning error
-        let result = std::panic::catch_unwind(|| parse_json(r#"{"key": "value""#));
-        assert!(result.is_err() || result.unwrap().is_err());
-
-        let result = std::panic::catch_unwind(|| parse_json("{"));
-        assert!(result.is_err() || result.unwrap().is_err());
+        // Parser now properly returns errors for unterminated objects
+        assert!(parse_json(r#"{"key": "value""#).is_err());
+        assert!(parse_json("{").is_err());
+        assert!(parse_json(r#"{"outer": {"inner": 1}"#).is_err()); // Nested unterminated
     }
 
     #[test]

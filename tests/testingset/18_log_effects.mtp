@@ -1,0 +1,72 @@
+// Test: Log Effects (TECHSPEC §7, §7-b)
+// Tests structured logging with Log effect
+
+api POST "/log-basic" uses { Log } {
+  Log("info", "Simple info message", {});
+  Log("warn", "Warning message", {});
+  Log("error", "Error message", {});
+  Log("debug", "Debug message", {});
+  respond json({
+    "logged": true,
+    "log_levels": ["info", "warn", "error", "debug"]
+  })
+}
+
+api POST "/log-with-data" uses { Log } {
+  const user_data = { "id": 123, "name": "Alice", "email": "alice@example.com" };
+  const request_data = { "method": "POST", "path": "/log-with-data", "timestamp": "2024-01-01T00:00:00Z" };
+  Log("info", "User logged in", user_data);
+  Log("info", "Request received", request_data);
+  respond json({
+    "user_logged": user_data,
+    "request_logged": request_data
+  })
+}
+
+api POST "/log-nested-data" uses { Log } {
+  const nested = {
+    "request": {
+      "headers": { "Authorization": "Bearer ***", "Content-Type": "application/json" },
+      "body": { "action": "create", "data": { "name": "test" } }
+    },
+    "response": {
+      "status": 200,
+      "body": { "success": true }
+    }
+  };
+  Log("info", "API transaction", nested);
+  respond json({
+    "logged_nested": nested
+  })
+}
+
+api POST "/log-in-workflow" uses { Log, DbRead, DbWrite } {
+  Log("info", "Starting workflow", { "step": 1 });
+  const read_result = DbRead("SELECT * FROM users LIMIT 5", []);
+  Log("info", "Read completed", { "step": 2, "count": 5 });
+  const write_result = DbWrite("INSERT INTO audit_log (action) VALUES (?)", ["workflow_executed"]);
+  Log("info", "Write completed", { "step": 3 });
+  Log("info", "Workflow finished", { "step": 4, "success": true });
+  respond json({
+    "workflow_completed": true,
+    "steps_logged": 4
+  })
+}
+
+api POST "/log-error-context" uses { Log } {
+  const error_context = {
+    "error_code": "ERR_001",
+    "message": "Database connection failed",
+    "stack": ["connect()", "query()", "execute()"],
+    "metadata": {
+      "host": "db.example.com",
+      "port": 5432,
+      "attempt": 3
+    }
+  };
+  Log("error", "Database error occurred", error_context);
+  respond json({
+    "error_logged": true,
+    "context": error_context
+  })
+}

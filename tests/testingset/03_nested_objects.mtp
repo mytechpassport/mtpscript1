@@ -1,0 +1,87 @@
+// Test: Deeply Nested Objects (TECHSPEC §4.2, §9, §23)
+// Tests nested record types, JSON objects, and canonical serialization
+
+type Address {
+  street: string
+  city: string
+  country: string
+  zip: string
+}
+
+type Contact {
+  phone: string
+  email: string
+  address: Address
+}
+
+type Company {
+  name: string
+  industry: string
+  employees: number
+}
+
+type Person {
+  id: number
+  name: string
+  contact: Contact
+  employer: Company
+}
+
+api GET "/nested-simple" uses {} {
+  const addr = { "street": "123 Main St", "city": "New York", "country": "USA", "zip": "10001" };
+  const contact = { "phone": "+1-555-1234", "email": "john@example.com", "address": addr };
+  const company = { "name": "TechCorp", "industry": "Technology", "employees": 500 };
+  const person = { "id": 1, "name": "John Doe", "contact": contact, "employer": company };
+  respond json(person)
+}
+
+api GET "/nested-deep" uses {} {
+  const level5 = { "value": "deepest", "level": 5 };
+  const level4 = { "data": level5, "level": 4, "items": [1, 2, 3] };
+  const level3 = { "nested": level4, "level": 3, "flag": true };
+  const level2 = { "child": level3, "level": 2, "name": "mid" };
+  const level1 = { "inner": level2, "level": 1, "root": true };
+  respond json({
+    "structure": level1,
+    "access_deep": level1["inner"]["child"]["nested"]["data"]["value"],
+    "depth_check": 5
+  })
+}
+
+api GET "/nested-array-objects" uses {} {
+  const users = [
+    { "id": 1, "name": "Alice", "roles": ["admin", "user"], "metadata": { "created": "2024-01-01", "active": true } },
+    { "id": 2, "name": "Bob", "roles": ["user"], "metadata": { "created": "2024-01-02", "active": false } },
+    { "id": 3, "name": "Charlie", "roles": ["user", "moderator"], "metadata": { "created": "2024-01-03", "active": true } }
+  ];
+  const settings = {
+    "global": { "theme": "dark", "language": "en" },
+    "permissions": { "read": true, "write": false, "admin": false },
+    "nested_arrays": [[1, 2], [3, 4], [5, 6]]
+  };
+  respond json({
+    "users": users,
+    "settings": settings,
+    "first_user_first_role": users[0]["roles"][0],
+    "nested_access": settings["nested_arrays"][1][0]
+  })
+}
+
+api GET "/nested-mixed-types" uses {} {
+  const mixed = {
+    "string_field": "hello",
+    "number_field": 42,
+    "boolean_field": true,
+    "array_field": [1, "two", true, { "inner": "obj" }],
+    "object_field": {
+      "sub_string": "nested",
+      "sub_array": [10, 20, 30],
+      "sub_object": { "deep": { "deeper": { "deepest": "value" } } }
+    }
+  };
+  respond json({
+    "data": mixed,
+    "deep_access": mixed["object_field"]["sub_object"]["deep"]["deeper"]["deepest"],
+    "array_obj_access": mixed["array_field"][3]["inner"]
+  })
+}

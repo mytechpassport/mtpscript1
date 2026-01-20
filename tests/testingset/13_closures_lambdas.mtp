@@ -1,0 +1,123 @@
+// Test: Closures and Lambdas (TECHSPEC §6-a)
+// Tests immutable closures, pure lambdas, and environment capture
+
+api GET "/lambda-basic" uses {} {
+  // Simple lambdas
+  const add = function(a: number, b: number) { a + b };
+  const multiply = function(x: number, y: number) { x * y };
+  const identity = function(x: number) { x };
+  respond json({
+    "add_3_4": add(3, 4),
+    "multiply_5_6": multiply(5, 6),
+    "identity_42": identity(42)
+  })
+}
+
+api GET "/closure-capture" uses {} {
+  // Closures capture environment immutably
+  const multiplier = 10;
+  const offset = 5;
+  const scale = function(x: number) { x * multiplier };
+  const shift = function(x: number) { x + offset };
+  const combined = function(x: number) { scale(x) + offset };
+  respond json({
+    "scale_7": scale(7),
+    "shift_7": shift(7),
+    "combined_7": combined(7)
+  })
+}
+
+api GET "/closure-nested" uses {} {
+  // Nested closure environments
+  const outer = 100;
+  const make_adder = function(base: number) {
+    function(x: number) { base + x + outer }
+  };
+  const add_from_10 = make_adder(10);
+  const add_from_20 = make_adder(20);
+  respond json({
+    "add_from_10_5": add_from_10(5),
+    "add_from_20_5": add_from_20(5)
+  })
+}
+
+api GET "/closure-composition" uses {} {
+  // Function composition using closures
+  function compose(f: function(number): number, g: function(number): number) {
+    function(x: number) { f(g(x)) }
+  }
+  const double = function(x: number) { x * 2 };
+  const add_one = function(x: number) { x + 1 };
+  const double_then_add = compose(add_one, double);
+  const add_then_double = compose(double, add_one);
+  respond json({
+    "double_then_add_5": double_then_add(5),
+    "add_then_double_5": add_then_double(5)
+  })
+}
+
+api GET "/closure-in-recursion" uses {} {
+  // Closures used in recursive functions
+  const factor = 2;
+  function scale_list(arr: List<number>, idx: number, result: List<number>) {
+    if (idx >= arr.length) { result }
+    else { scale_list(arr, idx + 1, result.push(arr[idx] * factor)) }
+  }
+  const scaled = scale_list([1, 2, 3, 4, 5], 0, []);
+  respond json({
+    "scaled_by_2": scaled
+  })
+}
+
+api GET "/lambda-higher-order" uses {} {
+  // Higher-order functions with lambdas
+  function apply_twice(f: function(number): number, x: number) {
+    f(f(x))
+  }
+  function apply_n_times(f: function(number): number, x: number, n: number) {
+    if (n <= 0) { x } else { apply_n_times(f, f(x), n - 1) }
+  }
+  const double = function(x: number) { x * 2 };
+  const increment = function(x: number) { x + 1 };
+  respond json({
+    "double_twice_3": apply_twice(double, 3),
+    "increment_5_times": apply_n_times(increment, 0, 5)
+  })
+}
+
+api GET "/closure-structural-equality" uses {} {
+  // Closure environments included in structural equality per TECHSPEC §5
+  const base1 = 10;
+  const base2 = 10;
+  const base3 = 20;
+  const fn1 = function(x: number) { x + base1 };
+  const fn2 = function(x: number) { x + base2 };
+  const fn3 = function(x: number) { x + base3 };
+  // fn1 and fn2 should be equal (same env), fn3 different
+  respond json({
+    "fn1_result_5": fn1(5),
+    "fn2_result_5": fn2(5),
+    "fn3_result_5": fn3(5),
+    "results_match_1_2": fn1(5) == fn2(5),
+    "results_differ_1_3": fn1(5) != fn3(5)
+  })
+}
+
+api GET "/lambda-as-value" uses {} {
+  // Lambdas as first-class values
+  const functions = [
+    function(x: number) { x + 1 },
+    function(x: number) { x * 2 },
+    function(x: number) { x * x }
+  ];
+  const input = 5;
+  const results = [
+    functions[0](input),
+    functions[1](input),
+    functions[2](input)
+  ];
+  respond json({
+    "input": input,
+    "results": results
+  })
+}

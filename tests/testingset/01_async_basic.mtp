@@ -1,0 +1,22 @@
+// Test: Basic Async Effect Usage (TECHSPEC §7-a)
+// Tests deterministic await with Async effect
+
+api POST "/async-basic" uses { Async } {
+  const simple_await = await httpGet("https://api.example.com/data");
+  const chained_await = await httpGet("https://api.example.com/users");
+  respond json({
+    "status": "completed",
+    "first_call": simple_await,
+    "second_call": chained_await
+  })
+}
+
+api GET "/async-sequential" uses { Async } {
+  const step1 = await httpGet("https://api.example.com/step1");
+  const step2 = await httpGet("https://api.example.com/step2");
+  const step3 = await httpGet("https://api.example.com/step3");
+  respond json({
+    "steps_completed": 3,
+    "results": [step1, step2, step3]
+  })
+}

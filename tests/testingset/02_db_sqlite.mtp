@@ -1,0 +1,37 @@
+// Test: Database Effects (TECHSPEC §7)
+// Tests DbRead and DbWrite effects for SQLite operations
+
+api POST "/db-insert-select" uses { DbRead, DbWrite } {
+  const create_table = DbWrite("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)", []);
+  const insert1 = DbWrite("INSERT INTO users (id, name, email) VALUES (?, ?, ?)", [1, "Alice", "alice@example.com"]);
+  const insert2 = DbWrite("INSERT INTO users (id, name, email) VALUES (?, ?, ?)", [2, "Bob", "bob@example.com"]);
+  const insert3 = DbWrite("INSERT INTO users (id, name, email) VALUES (?, ?, ?)", [3, "Charlie", "charlie@example.com"]);
+  const select_all = DbRead("SELECT * FROM users ORDER BY id", []);
+  const select_one = DbRead("SELECT name, email FROM users WHERE id = ?", [2]);
+  respond json({
+    "table_created": true,
+    "inserted_count": 3,
+    "all_users": select_all,
+    "user_bob": select_one
+  })
+}
+
+api PUT "/db-update-delete" uses { DbRead, DbWrite } {
+  const update_result = DbWrite("UPDATE users SET email = ? WHERE id = ?", ["alice.new@example.com", 1]);
+  const delete_result = DbWrite("DELETE FROM users WHERE id = ?", [3]);
+  const remaining = DbRead("SELECT COUNT(*) as count FROM users", []);
+  respond json({
+    "updated": update_result,
+    "deleted": delete_result,
+    "remaining_count": remaining
+  })
+}
+
+api GET "/db-complex-query" uses { DbRead } {
+  const join_query = DbRead("SELECT u.name, o.amount FROM users u JOIN orders o ON u.id = o.user_id WHERE o.amount > ?", [100]);
+  const aggregate = DbRead("SELECT user_id, SUM(amount) as total FROM orders GROUP BY user_id HAVING total > ?", [50]);
+  respond json({
+    "join_results": join_query,
+    "aggregates": aggregate
+  })
+}

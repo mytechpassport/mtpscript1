@@ -1,0 +1,76 @@
+// Test: HTTP Effects (TECHSPEC §7, §7-b)
+// Tests HttpOut effect for outbound HTTP requests
+
+api POST "/http-get" uses { HttpOut } {
+  const response = HttpOut("GET", "https://api.example.com/users", null);
+  respond json({
+    "method": "GET",
+    "response": response
+  })
+}
+
+api POST "/http-post" uses { HttpOut } {
+  const body = { "name": "Alice", "email": "alice@example.com" };
+  const response = HttpOut("POST", "https://api.example.com/users", body);
+  respond json({
+    "method": "POST",
+    "body_sent": body,
+    "response": response
+  })
+}
+
+api PUT "/http-put" uses { HttpOut } {
+  const update = { "id": 1, "name": "Alice Updated", "email": "alice.new@example.com" };
+  const response = HttpOut("PUT", "https://api.example.com/users/1", update);
+  respond json({
+    "method": "PUT",
+    "update": update,
+    "response": response
+  })
+}
+
+api DELETE "/http-delete" uses { HttpOut } {
+  const response = HttpOut("DELETE", "https://api.example.com/users/1", null);
+  respond json({
+    "method": "DELETE",
+    "response": response
+  })
+}
+
+api POST "/http-with-headers" uses { HttpOut } {
+  const options = {
+    "headers": {
+      "Authorization": "Bearer token123",
+      "Content-Type": "application/json",
+      "X-Custom-Header": "custom-value"
+    }
+  };
+  const response = HttpOut("GET", "https://api.example.com/protected", options);
+  respond json({
+    "headers_sent": options["headers"],
+    "response": response
+  })
+}
+
+api POST "/http-sequential" uses { HttpOut } {
+  // Multiple sequential HTTP calls
+  const user_response = HttpOut("GET", "https://api.example.com/users/1", null);
+  const order_response = HttpOut("GET", "https://api.example.com/users/1/orders", null);
+  const profile_response = HttpOut("GET", "https://api.example.com/users/1/profile", null);
+  respond json({
+    "user": user_response,
+    "orders": order_response,
+    "profile": profile_response
+  })
+}
+
+api POST "/http-error-handling" uses { HttpOut } {
+  const response = HttpOut("GET", "https://api.example.com/not-found", null);
+  const handled = match response {
+    Ok(data) => { "status": "success", "data": data }
+    Err(error) => { "status": "error", "error": error }
+  };
+  respond json({
+    "result": handled
+  })
+}

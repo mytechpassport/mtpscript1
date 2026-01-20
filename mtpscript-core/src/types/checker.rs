@@ -46,7 +46,7 @@ impl TypeChecker {
             ModuleDecl::Type(type_decl) => self.typecheck_type_decl(type_decl),
             ModuleDecl::Func(func_decl) => self.typecheck_func_decl(func_decl),
             ModuleDecl::Api(api_decl) => self.typecheck_api_decl(api_decl),
-            ModuleDecl::Import(_) => Ok(()), // Imports not implemented yet
+            ModuleDecl::Import(import_decl) => self.typecheck_import(import_decl),
         }
     }
 
@@ -116,11 +116,12 @@ impl TypeChecker {
             .map(|(_, param_type_expr)| self.resolve_type_expr(param_type_expr))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Register the function in context first (for recursive calls)
-        // Using Number as placeholder return type for now
+        // Register the function in context first with placeholder return type
+        // This enables recursive call type checking
+        let placeholder_return = Type::TypeVar(format!("{}$return", decl.name));
         self.context.insert(
             decl.name.clone(),
-            Type::Function(param_types.clone(), Box::new(Type::Number)),
+            Type::Function(param_types.clone(), Box::new(placeholder_return)),
         );
 
         // Add parameters to local context
@@ -130,11 +131,15 @@ impl TypeChecker {
             local_context.insert(param_name.clone(), param_type);
         }
 
-        // Typecheck body
-        let _body_type = self.typecheck_expr(&decl.body, &local_context)?;
+        // Typecheck body and infer return type
+        let body_type = self.typecheck_expr(&decl.body, &local_context)?;
 
-        // For now, assume functions return the type of their body
-        // In full implementation, would check return type annotation
+        // Update the function's type with the inferred return type
+        self.context.insert(
+            decl.name.clone(),
+            Type::Function(param_types, Box::new(body_type)),
+        );
+
         Ok(())
     }
 
@@ -142,6 +147,41 @@ impl TypeChecker {
         // Similar to func, but API bodies should return something compatible with respond
         let _body_type = self.typecheck_expr(&decl.body, &self.context)?;
         // Check that body uses respond or similar
+        Ok(())
+    }
+
+    fn typecheck_import(&mut self, import: &ast::ImportDecl) -> Result<(), CompileError> {
+        // Validate import path format
+        if import.path.is_empty() {
+            return Err(CompileError::TypeError(
+                "Import path cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate alias is a valid identifier
+        if import.alias.is_empty() {
+            return Err(CompileError::TypeError(
+                "Import alias cannot be empty".to_string(),
+            ));
+        }
+
+        // Check for reserved names
+        let reserved = ["number", "string", "boolean", "void", "any", "null"];
+        if reserved.contains(&import.alias.as_str()) {
+            return Err(CompileError::TypeError(format!(
+                "Cannot use reserved type name '{}' as import alias",
+                import.alias
+            )));
+        }
+
+        // Register the import alias in context as a module type
+        // Module resolution would happen at a later compilation stage
+        // For now, register as an opaque type to enable basic name resolution
+        self.context.insert(
+            import.alias.clone(),
+            Type::TypeVar(format!("module:{}", import.path)),
+        );
+
         Ok(())
     }
 
@@ -190,10 +230,25 @@ impl TypeChecker {
                     )),
                 }
             }
-            Expr::Call { func, args: _ } => {
-                let _func_type = self.typecheck_expr(func, context)?;
-                // For now, assume functions return something
-                Ok(Type::Number) // Placeholder
+            Expr::Call { func, args } => {
+                let func_type = self.typecheck_expr(func, context)?;
+                // Typecheck arguments
+                for arg in args {
+                    let _ = self.typecheck_expr(arg, context)?;
+                }
+                // Extract return type from function type
+                match func_type {
+                    Type::Function(_, return_type) => Ok(*return_type),
+                    Type::TypeVar(_) => {
+                        // Unknown function type (e.g., from recursive call before inference)
+                        // Return a type variable placeholder
+                        Ok(Type::TypeVar("call$return".to_string()))
+                    }
+                    _ => Err(CompileError::TypeError(format!(
+                        "Cannot call non-function type: {:?}",
+                        func_type
+                    ))),
+                }
             }
             Expr::Binary(op, left, right) => {
                 let left_type = self.typecheck_expr(left, context)?;
@@ -294,7 +349,98 @@ impl TypeChecker {
                     ))
                 }
             }
-            _ => Ok(Type::Number), // Placeholder for unimplemented
+            Expr::Index(arr, _index) => {
+                // Array/object indexing - return element type or unknown
+                let arr_type = self.typecheck_expr(arr, context)?;
+                // For now, return the array's element type if known, otherwise Number
+                match arr_type {
+                    // Ideally would track Array<T> and return T
+                    _ => Ok(Type::Number), // Placeholder - proper array types not yet implemented
+                }
+            }
+            Expr::Pipeline(left, right) => {
+                // Pipeline: left |> right means right(left)
+                // Type of pipeline is the return type of right applied to left
+                let _left_type = self.typecheck_expr(left, context)?;
+                let right_type = self.typecheck_expr(right, context)?;
+                match right_type {
+                    Type::Function(_, return_type) => Ok(*return_type),
+                    _ => Err(CompileError::TypeError(
+                        "Pipeline right side must be a function".to_string(),
+                    )),
+                }
+            }
+            Expr::Match { expr, cases } => {
+                // Match expression - all case bodies must return same type
+                let _scrutinee_type = self.typecheck_expr(expr, context)?;
+                if cases.is_empty() {
+                    return Err(CompileError::TypeError(
+                        "Match expression must have at least one case".to_string(),
+                    ));
+                }
+                let first_type = self.typecheck_expr(&cases[0].1, context)?;
+                for (_, case_body) in &cases[1..] {
+                    let case_type = self.typecheck_expr(case_body, context)?;
+                    if case_type != first_type {
+                        return Err(CompileError::TypeError(
+                            "All match arms must return same type".to_string(),
+                        ));
+                    }
+                }
+                Ok(first_type)
+            }
+            Expr::Const { name, value, body } => {
+                // Const binding: const x = value in body
+                let value_type = self.typecheck_expr(value, context)?;
+                let mut local_context = context.clone();
+                local_context.insert(name.clone(), value_type);
+                self.typecheck_expr(body, &local_context)
+            }
+            Expr::Lambda { params, body } => {
+                // Lambda expression
+                let mut local_context = context.clone();
+                let mut param_types = Vec::new();
+                for (param_name, param_type_expr) in params {
+                    let param_type = self.resolve_type_expr_const(param_type_expr)?;
+                    local_context.insert(param_name.clone(), param_type.clone());
+                    param_types.push(param_type);
+                }
+                let body_type = self.typecheck_expr(body, &local_context)?;
+                Ok(Type::Function(param_types, Box::new(body_type)))
+            }
+            Expr::Await(inner) => {
+                // Await unwraps async values - for now, just check inner type
+                self.typecheck_expr(inner, context)
+            }
+            Expr::RespondJson(inner) => {
+                // respond_json should accept any JSON-serializable type
+                let _inner_type = self.typecheck_expr(inner, context)?;
+                // Response type is typically void/unit, but use String for JSON output
+                Ok(Type::String)
+            }
+            Expr::Group(inner) => {
+                // Grouping doesn't change type
+                self.typecheck_expr(inner, context)
+            }
+        }
+    }
+
+    // Non-mutable version of resolve_type_expr for use in typecheck_expr
+    fn resolve_type_expr_const(&self, type_expr: &TypeExpr) -> Result<Type, CompileError> {
+        match type_expr {
+            TypeExpr::Ident(name) => {
+                if let Some(t) = self.context.lookup(name) {
+                    Ok(t.clone())
+                } else if let Some(t) = self.type_vars.get(name) {
+                    Ok(t.clone())
+                } else {
+                    Err(CompileError::TypeError(format!("Undefined type: {}", name)))
+                }
+            }
+            TypeExpr::Generic(base, _args) => {
+                // Simplified: just return the base type for now
+                self.resolve_type_expr_const(&TypeExpr::Ident(base.clone()))
+            }
         }
     }
 

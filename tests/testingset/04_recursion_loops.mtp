@@ -1,0 +1,114 @@
+// Test: Recursion (Loops via Recursion) (TECHSPEC §6, §6-a)
+// MTPScript uses recursion instead of loops, with tail-call optimization
+
+// Factorial - standard recursion
+function factorial(n: number) {
+  if (n <= 1) { 1 } else { n * factorial(n - 1) }
+}
+
+// Factorial - tail recursive (costs 0 gas per §6)
+function factorial_tail(n: number, acc: number) {
+  if (n <= 1) { acc } else { factorial_tail(n - 1, n * acc) }
+}
+
+// Fibonacci - standard recursion (exponential)
+function fibonacci(n: number) {
+  if (n <= 1) { n } else { fibonacci(n - 1) + fibonacci(n - 2) }
+}
+
+// Fibonacci - tail recursive (linear)
+function fibonacci_tail(n: number, a: number, b: number) {
+  if (n == 0) { a } else { fibonacci_tail(n - 1, b, a + b) }
+}
+
+// Sum of array elements via recursion
+function sum_array(arr: List<number>, idx: number, acc: number) {
+  if (idx >= arr.length) { acc } else { sum_array(arr, idx + 1, acc + arr[idx]) }
+}
+
+// Map operation via recursion
+function map_double(arr: List<number>, idx: number, result: List<number>) {
+  if (idx >= arr.length) { result } else { map_double(arr, idx + 1, result.push(arr[idx] * 2)) }
+}
+
+// Filter operation via recursion
+function filter_positive(arr: List<number>, idx: number, result: List<number>) {
+  if (idx >= arr.length) {
+    result
+  } else {
+    if (arr[idx] > 0) {
+      filter_positive(arr, idx + 1, result.push(arr[idx]))
+    } else {
+      filter_positive(arr, idx + 1, result)
+    }
+  }
+}
+
+// Count down - simulates for loop
+function countdown(n: number, result: List<number>) {
+  if (n <= 0) { result } else { countdown(n - 1, result.push(n)) }
+}
+
+// Range generation
+function range(start: number, end: number, result: List<number>) {
+  if (start >= end) { result } else { range(start + 1, end, result.push(start)) }
+}
+
+// GCD using Euclidean algorithm
+function gcd(a: number, b: number) {
+  if (b == 0) { a } else { gcd(b, a - (a / b) * b) }
+}
+
+api GET "/recursion-basic" uses {} {
+  const fact5 = factorial(5);
+  const fact_tail5 = factorial_tail(5, 1);
+  const fib10 = fibonacci(10);
+  const fib_tail10 = fibonacci_tail(10, 0, 1);
+  respond json({
+    "factorial_5": fact5,
+    "factorial_tail_5": fact_tail5,
+    "fibonacci_10": fib10,
+    "fibonacci_tail_10": fib_tail10
+  })
+}
+
+api GET "/recursion-arrays" uses {} {
+  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const sum = sum_array(numbers, 0, 0);
+  const doubled = map_double(numbers, 0, []);
+  const mixed = [-3, -1, 0, 2, 4, -5, 6];
+  const positives = filter_positive(mixed, 0, []);
+  respond json({
+    "sum_1_to_10": sum,
+    "doubled": doubled,
+    "positives_only": positives
+  })
+}
+
+api GET "/recursion-utility" uses {} {
+  const down_from_5 = countdown(5, []);
+  const range_1_10 = range(1, 11, []);
+  const gcd_result = gcd(48, 18);
+  respond json({
+    "countdown_5": down_from_5,
+    "range_1_to_10": range_1_10,
+    "gcd_48_18": gcd_result
+  })
+}
+
+api GET "/recursion-nested" uses {} {
+  // Nested recursion - ackermann function (limited)
+  function ack(m: number, n: number) {
+    if (m == 0) { n + 1 }
+    else { if (n == 0) { ack(m - 1, 1) }
+    else { ack(m - 1, ack(m, n - 1)) } }
+  }
+  const ack_2_2 = ack(2, 2);
+  const ack_2_3 = ack(2, 3);
+  const ack_3_2 = ack(3, 2);
+  respond json({
+    "ackermann_2_2": ack_2_2,
+    "ackermann_2_3": ack_2_3,
+    "ackermann_3_2": ack_3_2
+  })
+}

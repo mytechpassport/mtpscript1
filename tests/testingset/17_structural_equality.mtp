@@ -1,0 +1,160 @@
+// Test: Structural Equality (TECHSPEC §5)
+// Tests structural, total equality with no reference identity
+
+api GET "/equality-primitives" uses {} {
+  const num_eq = 42 == 42;
+  const num_neq = 42 == 43;
+  const str_eq = "hello" == "hello";
+  const str_neq = "hello" == "world";
+  const bool_eq = true == true;
+  const bool_neq = true == false;
+  respond json({
+    "num_eq": num_eq,
+    "num_neq": num_neq,
+    "str_eq": str_eq,
+    "str_neq": str_neq,
+    "bool_eq": bool_eq,
+    "bool_neq": bool_neq
+  })
+}
+
+api GET "/equality-arrays" uses {} {
+  const arr1 = [1, 2, 3];
+  const arr2 = [1, 2, 3];
+  const arr3 = [1, 2, 4];
+  const arr4 = [1, 2];
+  const empty1 = [];
+  const empty2 = [];
+  respond json({
+    "same_contents": arr1 == arr2,
+    "different_elem": arr1 == arr3,
+    "different_length": arr1 == arr4,
+    "empty_arrays": empty1 == empty2
+  })
+}
+
+api GET "/equality-objects" uses {} {
+  const obj1 = { "a": 1, "b": 2 };
+  const obj2 = { "a": 1, "b": 2 };
+  const obj3 = { "b": 2, "a": 1 };
+  const obj4 = { "a": 1, "b": 3 };
+  const obj5 = { "a": 1 };
+  respond json({
+    "same_contents": obj1 == obj2,
+    "different_order_same_keys": obj1 == obj3,
+    "different_value": obj1 == obj4,
+    "different_keys": obj1 == obj5
+  })
+}
+
+api GET "/equality-nested" uses {} {
+  const nested1 = {
+    "outer": {
+      "inner": {
+        "value": [1, 2, 3]
+      }
+    }
+  };
+  const nested2 = {
+    "outer": {
+      "inner": {
+        "value": [1, 2, 3]
+      }
+    }
+  };
+  const nested3 = {
+    "outer": {
+      "inner": {
+        "value": [1, 2, 4]
+      }
+    }
+  };
+  respond json({
+    "deep_equal": nested1 == nested2,
+    "deep_not_equal": nested1 == nested3
+  })
+}
+
+api GET "/equality-adt" uses {} {
+  const some1 = Some(42);
+  const some2 = Some(42);
+  const some3 = Some(43);
+  const none1 = None;
+  const none2 = None;
+  const ok1 = Ok("success");
+  const ok2 = Ok("success");
+  const ok3 = Ok("failure");
+  const err1 = Err("error");
+  const err2 = Err("error");
+  respond json({
+    "some_equal": some1 == some2,
+    "some_not_equal": some1 == some3,
+    "none_equal": none1 == none2,
+    "ok_equal": ok1 == ok2,
+    "ok_not_equal": ok1 == ok3,
+    "err_equal": err1 == err2,
+    "some_vs_none": some1 == none1,
+    "ok_vs_err": ok1 == err1
+  })
+}
+
+api GET "/equality-custom-types" uses {} {
+  type Point { x: number y: number }
+  type Color = Red | Green | Blue | RGB(number, number, number)
+  const p1 = { "x": 10, "y": 20 };
+  const p2 = { "x": 10, "y": 20 };
+  const p3 = { "x": 10, "y": 30 };
+  const c1 = RGB(255, 0, 0);
+  const c2 = RGB(255, 0, 0);
+  const c3 = Red;
+  respond json({
+    "point_equal": p1 == p2,
+    "point_not_equal": p1 == p3,
+    "rgb_equal": c1 == c2,
+    "rgb_vs_red": c1 == c3
+  })
+}
+
+api GET "/ordering-numbers" uses {} {
+  // Ordering only defined for number and string per TECHSPEC §5
+  const num_lt = 10 < 20;
+  const num_gt = 20 > 10;
+  const num_lte = 10 <= 10;
+  const num_gte = 20 >= 20;
+  const neg_order = -10 < 0;
+  respond json({
+    "10_lt_20": num_lt,
+    "20_gt_10": num_gt,
+    "10_lte_10": num_lte,
+    "20_gte_20": num_gte,
+    "neg10_lt_0": neg_order
+  })
+}
+
+api GET "/ordering-strings" uses {} {
+  // String ordering (lexicographic)
+  const abc_lt_abd = "abc" < "abd";
+  const abc_lt_abcd = "abc" < "abcd";
+  const aaa_lt_aab = "aaa" < "aab";
+  const empty_lt_a = "" < "a";
+  respond json({
+    "abc_lt_abd": abc_lt_abd,
+    "abc_lt_abcd": abc_lt_abcd,
+    "aaa_lt_aab": aaa_lt_aab,
+    "empty_lt_a": empty_lt_a
+  })
+}
+
+api GET "/equality-mixed" uses {} {
+  // Mixed type comparisons should be false
+  const num_str = 42 == "42";
+  const num_bool = 1 == true;
+  const str_bool = "true" == true;
+  const arr_obj = [1, 2] == { "0": 1, "1": 2 };
+  respond json({
+    "num_vs_str": num_str,
+    "num_vs_bool": num_bool,
+    "str_vs_bool": str_bool,
+    "arr_vs_obj": arr_obj
+  })
+}

@@ -7,24 +7,45 @@ pub fn compile_effect_call(effect_name: &str, args: &[IrExpr]) -> Result<String,
 
     let mut js_args = Vec::new();
     for arg in args {
-        let js_arg = match arg {
-            IrExpr::String(s, _) => format!("\"{}\"", s),
-            IrExpr::Number(n, _) => n.to_string(),
-            IrExpr::Boolean(b, _) => b.to_string(),
-            IrExpr::Array(_, _) => {
-                // For arrays like params
-                // Simplified: assume JSON serialization
-                "{}".to_string() // Placeholder
-            }
-            IrExpr::Object(_, _) => {
-                // For objects
-                "{}".to_string() // Placeholder
-            }
-            _ => return Err(format!("Unsupported effect argument type: {:?}", arg)),
-        };
+        let js_arg = ir_expr_to_js(arg)?;
         js_args.push(js_arg);
     }
     Ok(format!("{}({})", effect_name, js_args.join(", ")))
+}
+
+/// Convert an IR expression to JavaScript/JSON representation
+fn ir_expr_to_js(expr: &IrExpr) -> Result<String, String> {
+    match expr {
+        IrExpr::String(s, _) => Ok(format!("\"{}\"", escape_json_string(s))),
+        IrExpr::Number(n, _) => Ok(n.to_string()),
+        IrExpr::Boolean(b, _) => Ok(b.to_string()),
+        IrExpr::Array(elements, _) => {
+            let items: Result<Vec<String>, String> = elements.iter().map(ir_expr_to_js).collect();
+            Ok(format!("[{}]", items?.join(", ")))
+        }
+        IrExpr::Object(fields, _) => {
+            let items: Result<Vec<String>, String> = fields
+                .iter()
+                .map(|(k, v)| {
+                    let value = ir_expr_to_js(v)?;
+                    Ok(format!("\"{}\": {}", escape_json_string(k), value))
+                })
+                .collect();
+            Ok(format!("{{{}}}", items?.join(", ")))
+        }
+        IrExpr::Var(name, _) => Ok(name.clone()), // Variable reference
+        IrExpr::Decimal(d, _) => Ok(format!("\"{}\"", d)), // Decimals as strings per spec
+        _ => Err(format!("Unsupported effect argument type: {:?}", expr)),
+    }
+}
+
+/// Escape special characters for JSON string
+fn escape_json_string(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
 }
 
 fn validate_effect_args(effect_name: &str, args: &[IrExpr]) -> Result<(), String> {

@@ -1,0 +1,88 @@
+// Test: Hashing and CBOR (TECHSPEC §5, §7-c)
+// Tests FNV-1a hashing and deterministic CBOR encoding
+
+api GET "/hash-fnv1a" uses {} {
+  // FNV-1a 32-bit hashing
+  const hash32_empty = fnv1a32("");
+  const hash32_hello = fnv1a32("hello");
+  const hash32_world = fnv1a32("world");
+  const hash32_same = fnv1a32("hello");
+  // FNV-1a 64-bit hashing
+  const hash64_empty = fnv1a64("");
+  const hash64_hello = fnv1a64("hello");
+  const hash64_world = fnv1a64("world");
+  respond json({
+    "fnv32_empty": hash32_empty,
+    "fnv32_hello": hash32_hello,
+    "fnv32_world": hash32_world,
+    "fnv32_deterministic": hash32_hello == hash32_same,
+    "fnv64_empty": hash64_empty,
+    "fnv64_hello": hash64_hello,
+    "fnv64_world": hash64_world
+  })
+}
+
+api GET "/hash-collision-resistance" uses {} {
+  // Verify different inputs produce different hashes
+  const hashes = [
+    fnv1a64("a"),
+    fnv1a64("b"),
+    fnv1a64("aa"),
+    fnv1a64("ab"),
+    fnv1a64("ba"),
+    fnv1a64("bb")
+  ];
+  // Check all are unique
+  const unique = hashes[0] != hashes[1] &&
+                 hashes[1] != hashes[2] &&
+                 hashes[2] != hashes[3] &&
+                 hashes[3] != hashes[4] &&
+                 hashes[4] != hashes[5];
+  respond json({
+    "hashes": hashes,
+    "all_unique": unique
+  })
+}
+
+api GET "/cbor-encode" uses {} {
+  // Deterministic CBOR encoding per RFC 7049 §3.9
+  const simple_obj = { "key": "value" };
+  const nested_obj = { "outer": { "inner": 42 } };
+  const array_val = [1, 2, 3, "four"];
+  const mixed = { "num": 123, "str": "test", "bool": true, "arr": [1, 2] };
+  respond json({
+    "simple_cbor": cborEncode(simple_obj),
+    "nested_cbor": cborEncode(nested_obj),
+    "array_cbor": cborEncode(array_val),
+    "mixed_cbor": cborEncode(mixed)
+  })
+}
+
+api GET "/cbor-determinism" uses {} {
+  // Same data should always produce same CBOR
+  const data = { "z": 1, "a": 2, "m": 3 };
+  const cbor1 = cborEncode(data);
+  const cbor2 = cborEncode(data);
+  const cbor3 = cborEncode({ "a": 2, "z": 1, "m": 3 });
+  respond json({
+    "cbor1": cbor1,
+    "cbor2": cbor2,
+    "cbor3": cbor3,
+    "same_input_same_output": cbor1 == cbor2,
+    "canonical_ordering": cbor1 == cbor3
+  })
+}
+
+api GET "/map-key-ordering" uses {} {
+  // Map key order per TECHSPEC §5: type tag, hash, CBOR byte-wise
+  const map1 = { "alpha": 1, "beta": 2, "gamma": 3 };
+  const map2 = { "gamma": 3, "alpha": 1, "beta": 2 };
+  // Both should serialize to same canonical order
+  const json1 = Json.stringify(map1);
+  const json2 = Json.stringify(map2);
+  respond json({
+    "map1_canonical": json1,
+    "map2_canonical": json2,
+    "canonical_equal": json1 == json2
+  })
+}

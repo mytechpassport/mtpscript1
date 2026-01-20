@@ -1,0 +1,126 @@
+// Test: Gas Metering (TECHSPEC §6, §0-c, Annex A)
+// Tests gas consumption, limits, and exhaustion behavior
+
+// Simple operations with known gas costs
+api GET "/gas-basic-ops" uses {} {
+  // Literal number: 1 gas
+  const num = 42;
+  // Literal string: 1 gas
+  const str = "hello";
+  // Binary op: 2 gas each
+  const add_result = 10 + 20;
+  const mul_result = 5 * 6;
+  // Comparison: 1 gas
+  const cmp_result = 10 < 20;
+  respond json({
+    "number": num,
+    "string": str,
+    "addition": add_result,
+    "multiplication": mul_result,
+    "comparison": cmp_result
+  })
+}
+
+// Function calls have gas cost
+api GET "/gas-function-calls" uses {} {
+  // Function call: 5 gas per call
+  function simple_fn(x: number) { x + 1 }
+  function nested_fn(x: number) { simple_fn(simple_fn(x)) }
+  const result1 = simple_fn(10);
+  const result2 = nested_fn(10);
+  respond json({
+    "simple_call": result1,
+    "nested_calls": result2
+  })
+}
+
+// Recursion gas: tail calls cost 0, non-tail cost 2
+api GET "/gas-recursion" uses {} {
+  // Non-tail recursive: 2 gas per recursion
+  function countdown_nontail(n: number) {
+    if (n <= 0) { 0 } else { 1 + countdown_nontail(n - 1) }
+  }
+  // Tail recursive: 0 gas per recursion
+  function countdown_tail(n: number, acc: number) {
+    if (n <= 0) { acc } else { countdown_tail(n - 1, acc + 1) }
+  }
+  const nontail_result = countdown_nontail(100);
+  const tail_result = countdown_tail(100, 0);
+  respond json({
+    "non_tail_100": nontail_result,
+    "tail_100": tail_result
+  })
+}
+
+// Pattern matching gas: 3 gas per case
+api GET "/gas-pattern-match" uses {} {
+  const opt1 = Some(42);
+  const opt2 = None;
+  // Pattern match costs 3 gas per case evaluated
+  const matched1 = match opt1 {
+    Some(x) => x * 2
+    None => 0
+  };
+  const matched2 = match opt2 {
+    Some(x) => x
+    None => -1
+  };
+  respond json({
+    "matched_some": matched1,
+    "matched_none": matched2
+  })
+}
+
+// Effect calls have higher gas costs
+api GET "/gas-effects" uses { Log } {
+  // Effect call base: 20 gas + effect-specific
+  // Log: 20 + log cost
+  Log("info", "test message", { "key": "value" });
+  respond json({
+    "logged": true
+  })
+}
+
+// Compute-intensive operation to test gas limits
+api GET "/gas-intensive" uses {} {
+  // This should consume significant gas
+  function fib(n: number) {
+    if (n <= 1) { n } else { fib(n - 1) + fib(n - 2) }
+  }
+  // fib(20) does many recursive calls
+  const fib_result = fib(20);
+  respond json({
+    "fib_20": fib_result
+  })
+}
+
+// Test that gas exhaustion produces deterministic error
+api GET "/gas-exhaustion-test" uses {} {
+  // This function will exhaust gas if limit is low
+  function infinite_loop(n: number) {
+    // Will keep recursing until gas runs out
+    infinite_loop(n + 1)
+  }
+  // Should produce GasExhausted error per TECHSPEC §0-c
+  const result = infinite_loop(0);
+  respond json({
+    "should_not_reach": result
+  })
+}
+
+// Verify gas costs per Annex A
+api GET "/gas-cost-verification" uses {} {
+  // Object access: 1 gas
+  const obj = { "a": 1, "b": 2 };
+  const access = obj["a"];
+  // Array access: 1 gas
+  const arr = [10, 20, 30];
+  const elem = arr[1];
+  // If statement: 1 gas
+  const cond = if (true) { "yes" } else { "no" };
+  respond json({
+    "object_access": access,
+    "array_access": elem,
+    "conditional": cond
+  })
+}

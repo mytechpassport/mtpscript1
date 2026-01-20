@@ -1,0 +1,114 @@
+// Test: Number Overflow (TECHSPEC §4.1)
+// Tests signed 64-bit numbers with checked overflow
+
+api GET "/number-basic" uses {} {
+  const positive = 9223372036854775807;
+  const negative = -9223372036854775808;
+  const zero = 0;
+  const small = 42;
+  respond json({
+    "max_int64": positive,
+    "min_int64": negative,
+    "zero": zero,
+    "small": small
+  })
+}
+
+api GET "/number-arithmetic" uses {} {
+  const a = 1000000000000;
+  const b = 2000000000000;
+  const sum = a + b;
+  const diff = b - a;
+  const product = 1000000 * 1000000;
+  const quotient = 1000000000000 / 1000;
+  respond json({
+    "a": a,
+    "b": b,
+    "sum": sum,
+    "difference": diff,
+    "product": product,
+    "quotient": quotient
+  })
+}
+
+api GET "/number-overflow-add" uses {} {
+  // Overflow detection on addition
+  const max = 9223372036854775807;
+  const result = match checked_add(max, 1) {
+    Ok(v) => { "value": v, "overflowed": false }
+    Err(e) => { "error": e, "overflowed": true }
+  };
+  respond json({
+    "max_plus_1": result
+  })
+}
+
+api GET "/number-overflow-sub" uses {} {
+  // Overflow detection on subtraction
+  const min = -9223372036854775808;
+  const result = match checked_sub(min, 1) {
+    Ok(v) => { "value": v, "overflowed": false }
+    Err(e) => { "error": e, "overflowed": true }
+  };
+  respond json({
+    "min_minus_1": result
+  })
+}
+
+api GET "/number-overflow-mul" uses {} {
+  // Overflow detection on multiplication
+  const large = 9223372036854775;
+  const result = match checked_mul(large, 1000) {
+    Ok(v) => { "value": v, "overflowed": false }
+    Err(e) => { "error": e, "overflowed": true }
+  };
+  respond json({
+    "large_times_1000": result
+  })
+}
+
+api GET "/number-division" uses {} {
+  // Division and modulo
+  const a = 17;
+  const b = 5;
+  const quotient = a / b;
+  const remainder = a - (quotient * b);
+  // Division by zero
+  const div_zero = match checked_div(10, 0) {
+    Ok(v) => { "value": v }
+    Err(e) => { "error": e }
+  };
+  respond json({
+    "17_div_5": quotient,
+    "17_mod_5": remainder,
+    "div_by_zero": div_zero
+  })
+}
+
+api GET "/number-comparison" uses {} {
+  const comparisons = {
+    "10_lt_20": 10 < 20,
+    "20_gt_10": 20 > 10,
+    "10_lte_10": 10 <= 10,
+    "10_gte_10": 10 >= 10,
+    "10_eq_10": 10 == 10,
+    "10_neq_20": 10 != 20,
+    "neg_lt_pos": -5 < 5,
+    "large_comparison": 9223372036854775806 < 9223372036854775807
+  };
+  respond json(comparisons)
+}
+
+api GET "/number-edge-cases" uses {} {
+  // Edge cases around zero
+  const neg_zero = 0 - 0;
+  const neg_times_neg = -10 * -10;
+  const neg_div_neg = -100 / -10;
+  const neg_div_pos = -100 / 10;
+  respond json({
+    "zero_minus_zero": neg_zero,
+    "neg_times_neg": neg_times_neg,
+    "neg_div_neg": neg_div_neg,
+    "neg_div_pos": neg_div_pos
+  })
+}

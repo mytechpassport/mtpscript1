@@ -1,0 +1,268 @@
+// Test: Comprehensive Integration (All TECHSPEC features combined)
+// Tests multiple features working together in realistic scenarios
+
+type User {
+  id: number
+  name: string
+  email: string
+  role: UserRole
+  settings: UserSettings
+}
+
+type UserRole = Admin | Moderator | User
+
+type UserSettings {
+  theme: string
+  notifications: boolean
+  language: string
+}
+
+type Invoice {
+  id: number
+  user_id: number
+  items: List<InvoiceItem>
+  total: Decimal
+  status: InvoiceStatus
+}
+
+type InvoiceItem {
+  name: string
+  quantity: number
+  unit_price: Decimal
+}
+
+type InvoiceStatus = Draft | Pending | Paid | Cancelled
+
+api POST "/comprehensive-user-workflow" uses { DbRead, DbWrite, Log, Async } {
+  // 1. Create user with nested settings
+  const user_settings = {
+    "theme": "dark",
+    "notifications": true,
+    "language": "en"
+  };
+  const new_user = {
+    "id": 1,
+    "name": "Alice",
+    "email": "alice@example.com",
+    "role": "Admin",
+    "settings": user_settings
+  };
+
+  // 2. Log the action
+  Log("info", "Creating user", { "user_id": new_user["id"] });
+
+  // 3. Insert into database
+  const insert_result = DbWrite(
+    "INSERT INTO users (id, name, email, role, settings) VALUES (?, ?, ?, ?, ?)",
+    [new_user["id"], new_user["name"], new_user["email"], new_user["role"], Json.stringify(new_user["settings"])]
+  );
+
+  // 4. Verify insertion
+  const verify_result = DbRead("SELECT * FROM users WHERE id = ?", [1]);
+
+  // 5. Transform using pipeline
+  const display_name = new_user["name"] |> function(n) { "User: " + n };
+
+  respond json({
+    "created_user": new_user,
+    "insert_status": insert_result,
+    "verification": verify_result,
+    "display": display_name
+  })
+}
+
+api POST "/comprehensive-invoice" uses { DbRead, DbWrite, Log } {
+  // Create invoice with Decimal calculations
+  const items = [
+    { "name": "Widget A", "quantity": 5, "unit_price": "19.99" },
+    { "name": "Widget B", "quantity": 3, "unit_price": "29.99" },
+    { "name": "Service Fee", "quantity": 1, "unit_price": "50.00" }
+  ];
+
+  // Calculate totals using recursion
+  function calculate_line_total(item: { name: string, quantity: number, unit_price: string }) {
+    const price = match Decimal.fromString(item["unit_price"]) {
+      Ok(p) => p
+      Err(_) => Decimal.zero()
+    };
+    match Decimal.multiply(price, Decimal.fromString(item["quantity"] |> function(q) { "" + q }) |> match { Ok(d) => d Err(_) => Decimal.zero() }) {
+      Ok(total) => total
+      Err(_) => Decimal.zero()
+    }
+  }
+
+  function sum_items(items: List<{ name: string, quantity: number, unit_price: string }>, idx: number, acc: Decimal) {
+    if (idx >= items.length) { acc }
+    else {
+      const line_total = calculate_line_total(items[idx]);
+      const new_acc = match Decimal.add(acc, line_total) {
+        Ok(s) => s
+        Err(_) => acc
+      };
+      sum_items(items, idx + 1, new_acc)
+    }
+  }
+
+  const subtotal = sum_items(items, 0, Decimal.zero());
+  const tax_rate = match Decimal.fromString("0.0825") { Ok(d) => d Err(_) => Decimal.zero() };
+  const tax = match Decimal.multiply(subtotal, tax_rate) { Ok(t) => t Err(_) => Decimal.zero() };
+  const total = match Decimal.add(subtotal, tax) { Ok(t) => t Err(_) => subtotal };
+
+  const invoice = {
+    "id": 1001,
+    "user_id": 1,
+    "items": items,
+    "subtotal": Decimal.toString(subtotal),
+    "tax": Decimal.toString(tax),
+    "total": Decimal.toString(total),
+    "status": "Pending"
+  };
+
+  Log("info", "Invoice created", { "invoice_id": invoice["id"], "total": invoice["total"] });
+
+  respond json(invoice)
+}
+
+api GET "/comprehensive-query" uses { DbRead } {
+  // Complex nested query with pattern matching
+  const users_result = DbRead("SELECT * FROM users WHERE role = ?", ["Admin"]);
+  const orders_result = DbRead("SELECT * FROM orders WHERE status = ?", ["pending"]);
+
+  // Process results with pattern matching
+  const user_summary = match users_result {
+    Ok(users) => {
+      "count": users.length,
+      "users": users
+    }
+    Err(e) => {
+      "count": 0,
+      "error": e
+    }
+  };
+
+  const order_summary = match orders_result {
+    Ok(orders) => {
+      "count": orders.length,
+      "orders": orders
+    }
+    Err(e) => {
+      "count": 0,
+      "error": e
+    }
+  };
+
+  respond json({
+    "users": user_summary,
+    "orders": order_summary,
+    "combined": {
+      "total_records": user_summary["count"] + order_summary["count"]
+    }
+  })
+}
+
+api POST "/comprehensive-async-pipeline" uses { Async, Log } {
+  // Async operations with pipeline transformations
+  Log("info", "Starting async pipeline", {});
+
+  const step1 = await httpGet("https://api.example.com/config");
+  const step2 = step1 |> function(data) {
+    { "config": data, "processed": true }
+  };
+
+  const step3 = await httpGet("https://api.example.com/users");
+  const combined = {
+    "config": step2,
+    "users": step3,
+    "timestamp": "2024-01-01T00:00:00Z"
+  };
+
+  Log("info", "Async pipeline completed", { "steps": 3 });
+
+  respond json(combined)
+}
+
+api GET "/comprehensive-recursion-tree" uses {} {
+  // Build and process tree structure with recursion
+  type TreeNode = Leaf(number) | Branch(TreeNode, TreeNode)
+
+  const tree = Branch(
+    Branch(Leaf(1), Leaf(2)),
+    Branch(
+      Leaf(3),
+      Branch(Leaf(4), Leaf(5))
+    )
+  );
+
+  function tree_sum(node: TreeNode) {
+    match node {
+      Leaf(n) => n
+      Branch(left, right) => tree_sum(left) + tree_sum(right)
+    }
+  }
+
+  function tree_max(node: TreeNode) {
+    match node {
+      Leaf(n) => n
+      Branch(left, right) => {
+        const l = tree_max(left);
+        const r = tree_max(right);
+        if (l > r) { l } else { r }
+      }
+    }
+  }
+
+  function tree_depth(node: TreeNode) {
+    match node {
+      Leaf(_) => 1
+      Branch(left, right) => {
+        const l = tree_depth(left);
+        const r = tree_depth(right);
+        1 + (if (l > r) { l } else { r })
+      }
+    }
+  }
+
+  function tree_to_list(node: TreeNode, result: List<number>) {
+    match node {
+      Leaf(n) => result.push(n)
+      Branch(left, right) => {
+        const left_list = tree_to_list(left, result);
+        tree_to_list(right, left_list)
+      }
+    }
+  }
+
+  respond json({
+    "sum": tree_sum(tree),
+    "max": tree_max(tree),
+    "depth": tree_depth(tree),
+    "values": tree_to_list(tree, [])
+  })
+}
+
+api GET "/comprehensive-json-transform" uses {} {
+  // Complex JSON parsing and transformation
+  const input_json = "{\"users\":[{\"id\":1,\"name\":\"Alice\",\"active\":true},{\"id\":2,\"name\":\"Bob\",\"active\":false}],\"metadata\":{\"version\":\"1.0\",\"generated\":\"2024-01-01\"}}";
+
+  const parsed = Json.parse(input_json);
+
+  const transformed = match parsed {
+    Ok(data) => {
+      const users = data["users"];
+      const active_count = match users {
+        Some(u) => u.length
+        None => 0
+      };
+      {
+        "original": data,
+        "user_count": active_count,
+        "canonical": Json.stringify(data)
+      }
+    }
+    Err(e) => {
+      "error": e
+    }
+  };
+
+  respond json(transformed)
+}

@@ -1,0 +1,136 @@
+// Test: Decimal/Money Types (TECHSPEC §4-a)
+// Tests deterministic fixed-point arithmetic with round-half-even
+
+api GET "/decimal-basic" uses {} {
+  const d1 = Decimal.fromString("123.45");
+  const d2 = Decimal.fromString("67.89");
+  const sum = match d1 {
+    Ok(v1) => match d2 {
+      Ok(v2) => Decimal.add(v1, v2)
+      Err(_) => Err("parse error")
+    }
+    Err(_) => Err("parse error")
+  };
+  const diff = match d1 {
+    Ok(v1) => match d2 {
+      Ok(v2) => Decimal.subtract(v1, v2)
+      Err(_) => Err("parse error")
+    }
+    Err(_) => Err("parse error")
+  };
+  respond json({
+    "d1": match d1 { Ok(v) => Decimal.toString(v) Err(_) => "error" },
+    "d2": match d2 { Ok(v) => Decimal.toString(v) Err(_) => "error" },
+    "sum": match sum { Ok(v) => Decimal.toString(v) Err(_) => "error" },
+    "diff": match diff { Ok(v) => Decimal.toString(v) Err(_) => "error" }
+  })
+}
+
+api GET "/decimal-multiplication" uses {} {
+  const price = Decimal.fromString("19.99");
+  const quantity = Decimal.fromString("3");
+  const tax_rate = Decimal.fromString("0.0825");
+  const subtotal = match price {
+    Ok(p) => match quantity {
+      Ok(q) => Decimal.multiply(p, q)
+      Err(_) => Err("error")
+    }
+    Err(_) => Err("error")
+  };
+  const tax = match subtotal {
+    Ok(s) => match tax_rate {
+      Ok(t) => Decimal.multiply(s, t)
+      Err(_) => Err("error")
+    }
+    Err(_) => Err("error")
+  };
+  respond json({
+    "price": "19.99",
+    "quantity": "3",
+    "subtotal": match subtotal { Ok(v) => Decimal.toString(v) Err(_) => "error" },
+    "tax_rate": "0.0825",
+    "tax": match tax { Ok(v) => Decimal.toString(v) Err(_) => "error" }
+  })
+}
+
+api GET "/decimal-division" uses {} {
+  const numerator = Decimal.fromString("100.00");
+  const divisor = Decimal.fromString("3");
+  const result = match numerator {
+    Ok(n) => match divisor {
+      Ok(d) => Decimal.divide(n, d)
+      Err(_) => Err("error")
+    }
+    Err(_) => Err("error")
+  };
+  const zero_div = match numerator {
+    Ok(n) => Decimal.divide(n, Decimal.fromString("0") |> match { Ok(z) => z Err(_) => Decimal.zero() })
+    Err(_) => Err("error")
+  };
+  respond json({
+    "100_div_3": match result { Ok(v) => Decimal.toString(v) Err(e) => e },
+    "div_by_zero": match zero_div { Ok(v) => Decimal.toString(v) Err(e) => e }
+  })
+}
+
+api GET "/decimal-rounding" uses {} {
+  // Test round-half-even (banker's rounding) per IEEE-754-2008 §4.3.2
+  const d_half_even_up = Decimal.fromString("2.5");
+  const d_half_even_down = Decimal.fromString("3.5");
+  const d_normal = Decimal.fromString("2.4");
+  const rounded1 = match d_half_even_up {
+    Ok(v) => Decimal.round(v, 0)
+    Err(_) => Err("error")
+  };
+  const rounded2 = match d_half_even_down {
+    Ok(v) => Decimal.round(v, 0)
+    Err(_) => Err("error")
+  };
+  const rounded3 = match d_normal {
+    Ok(v) => Decimal.round(v, 0)
+    Err(_) => Err("error")
+  };
+  respond json({
+    "2.5_rounded": match rounded1 { Ok(v) => Decimal.toString(v) Err(_) => "error" },
+    "3.5_rounded": match rounded2 { Ok(v) => Decimal.toString(v) Err(_) => "error" },
+    "2.4_rounded": match rounded3 { Ok(v) => Decimal.toString(v) Err(_) => "error" }
+  })
+}
+
+api GET "/decimal-comparison" uses {} {
+  // Constant-time comparison per TECHSPEC §4-a
+  const d1 = Decimal.fromString("100.00");
+  const d2 = Decimal.fromString("100.0000");
+  const d3 = Decimal.fromString("99.99");
+  const eq_result = match d1 {
+    Ok(v1) => match d2 {
+      Ok(v2) => Decimal.equals(v1, v2)
+      Err(_) => false
+    }
+    Err(_) => false
+  };
+  const lt_result = match d3 {
+    Ok(v3) => match d1 {
+      Ok(v1) => Decimal.lessThan(v3, v1)
+      Err(_) => false
+    }
+    Err(_) => false
+  };
+  respond json({
+    "100.00_eq_100.0000": eq_result,
+    "99.99_lt_100.00": lt_result
+  })
+}
+
+api GET "/decimal-edge-cases" uses {} {
+  const max_digits = Decimal.fromString("1234567890123456789012345678901234");
+  const min_scale = Decimal.fromString("1");
+  const max_scale = Decimal.fromString("0.0000000000000000000000000001");
+  const negative = Decimal.fromString("-123.456");
+  respond json({
+    "max_34_digits": match max_digits { Ok(v) => Decimal.toString(v) Err(e) => e },
+    "min_scale_0": match min_scale { Ok(v) => Decimal.toString(v) Err(e) => e },
+    "max_scale_28": match max_scale { Ok(v) => Decimal.toString(v) Err(e) => e },
+    "negative": match negative { Ok(v) => Decimal.toString(v) Err(e) => e }
+  })
+}

@@ -1,0 +1,146 @@
+// Test: Pattern Matching (TECHSPEC §3.1, §4.2)
+// Tests exhaustive pattern matching on ADTs
+
+type Color = Red | Green | Blue | Custom(string)
+
+type Shape = Circle(number) | Rectangle(number, number) | Triangle(number, number, number)
+
+type Tree = Leaf(number) | Node(Tree, Tree)
+
+type HttpResponse = Success(number, string) | Error(number, string) | Redirect(string)
+
+api GET "/pattern-simple" uses {} {
+  const color1 = Red;
+  const color2 = Custom("purple");
+  const result1 = match color1 {
+    Red => "red"
+    Green => "green"
+    Blue => "blue"
+    Custom(name) => name
+  };
+  const result2 = match color2 {
+    Red => "red"
+    Green => "green"
+    Blue => "blue"
+    Custom(name) => name
+  };
+  respond json({
+    "color1": result1,
+    "color2": result2
+  })
+}
+
+api GET "/pattern-with-data" uses {} {
+  const circle = Circle(5);
+  const rect = Rectangle(4, 6);
+  const tri = Triangle(3, 4, 5);
+  function area(s: Shape) {
+    match s {
+      Circle(r) => 314 * r * r / 100
+      Rectangle(w, h) => w * h
+      Triangle(a, b, c) => {
+        const s = (a + b + c) / 2;
+        // Simplified: just return semi-perimeter for testing
+        s
+      }
+    }
+  }
+  respond json({
+    "circle_area": area(circle),
+    "rect_area": area(rect),
+    "triangle_semi": area(tri)
+  })
+}
+
+api GET "/pattern-nested" uses {} {
+  const tree = Node(Node(Leaf(1), Leaf(2)), Node(Leaf(3), Node(Leaf(4), Leaf(5))));
+  function sum_tree(t: Tree) {
+    match t {
+      Leaf(n) => n
+      Node(left, right) => sum_tree(left) + sum_tree(right)
+    }
+  }
+  function count_leaves(t: Tree) {
+    match t {
+      Leaf(_) => 1
+      Node(left, right) => count_leaves(left) + count_leaves(right)
+    }
+  }
+  function depth(t: Tree) {
+    match t {
+      Leaf(_) => 1
+      Node(left, right) => {
+        const dl = depth(left);
+        const dr = depth(right);
+        if (dl > dr) { dl + 1 } else { dr + 1 }
+      }
+    }
+  }
+  respond json({
+    "tree_sum": sum_tree(tree),
+    "leaf_count": count_leaves(tree),
+    "tree_depth": depth(tree)
+  })
+}
+
+api GET "/pattern-http-response" uses {} {
+  const success = Success(200, "OK");
+  const error = Error(404, "Not Found");
+  const redirect = Redirect("https://example.com/new");
+  function handle_response(r: HttpResponse) {
+    match r {
+      Success(code, msg) => { "status": "success", "code": code, "message": msg }
+      Error(code, msg) => { "status": "error", "code": code, "message": msg }
+      Redirect(url) => { "status": "redirect", "code": 302, "url": url }
+    }
+  }
+  respond json({
+    "success_handled": handle_response(success),
+    "error_handled": handle_response(error),
+    "redirect_handled": handle_response(redirect)
+  })
+}
+
+api GET "/pattern-wildcards" uses {} {
+  const values = [Some(10), None, Some(20), None, Some(30)];
+  function extract_or_default(opt: Option<number>, default_val: number) {
+    match opt {
+      Some(x) => x
+      None => default_val
+    }
+  }
+  function count_some(list: List<Option<number>>, idx: number, count: number) {
+    if (idx >= list.length) { count }
+    else {
+      const inc = match list[idx] {
+        Some(_) => 1
+        None => 0
+      };
+      count_some(list, idx + 1, count + inc)
+    }
+  }
+  respond json({
+    "first_or_0": extract_or_default(values[0], 0),
+    "second_or_99": extract_or_default(values[1], 99),
+    "some_count": count_some(values, 0, 0)
+  })
+}
+
+api GET "/pattern-record" uses {} {
+  type Point { x: number y: number }
+  type Person { name: string age: number }
+  const p1 = { "x": 10, "y": 20 };
+  const person = { "name": "Alice", "age": 30 };
+  const result = match p1 {
+    Point { x: x, y: y } => x + y
+    _ => 0
+  };
+  const greeting = match person {
+    Person { name: n, age: a } => if (a >= 18) { "Hello, adult " + n } else { "Hello, young " + n }
+    _ => "Hello"
+  };
+  respond json({
+    "point_sum": result,
+    "greeting": greeting
+  })
+}

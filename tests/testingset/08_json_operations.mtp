@@ -1,0 +1,129 @@
+// Test: JSON Operations (TECHSPEC §9, §23, §7-c)
+// Tests Json type, parsing, stringifying, and canonical output
+
+api GET "/json-parse-basic" uses {} {
+  const simple_obj = Json.parse("{\"key\":\"value\"}");
+  const simple_arr = Json.parse("[1,2,3]");
+  const simple_num = Json.parse("42");
+  const simple_str = Json.parse("\"hello\"");
+  const simple_bool = Json.parse("true");
+  const simple_null = Json.parse("null");
+  respond json({
+    "parsed_obj": match simple_obj { Ok(v) => v Err(_) => "error" },
+    "parsed_arr": match simple_arr { Ok(v) => v Err(_) => "error" },
+    "parsed_num": match simple_num { Ok(v) => v Err(_) => "error" },
+    "parsed_str": match simple_str { Ok(v) => v Err(_) => "error" },
+    "parsed_bool": match simple_bool { Ok(v) => v Err(_) => "error" },
+    "parsed_null": match simple_null { Ok(v) => v Err(_) => "error" }
+  })
+}
+
+api GET "/json-parse-nested" uses {} {
+  const nested = Json.parse("{\"outer\":{\"inner\":{\"deep\":\"value\"}},\"array\":[[1,2],[3,4]]}");
+  const complex = Json.parse("{\"users\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}],\"count\":2}");
+  respond json({
+    "nested": match nested { Ok(v) => v Err(_) => "error" },
+    "complex": match complex { Ok(v) => v Err(_) => "error" }
+  })
+}
+
+api GET "/json-parse-errors" uses {} {
+  // Invalid JSON
+  const invalid_syntax = Json.parse("{invalid}");
+  const unclosed_brace = Json.parse("{\"key\":\"value\"");
+  const trailing_comma = Json.parse("[1,2,3,]");
+  // Duplicate keys (must be rejected per TECHSPEC §9)
+  const duplicate_keys = Json.parse("{\"key\":1,\"key\":2}");
+  respond json({
+    "invalid_syntax": match invalid_syntax { Ok(_) => "unexpected success" Err(e) => e },
+    "unclosed_brace": match unclosed_brace { Ok(_) => "unexpected success" Err(e) => e },
+    "trailing_comma": match trailing_comma { Ok(_) => "unexpected success" Err(e) => e },
+    "duplicate_keys": match duplicate_keys { Ok(_) => "unexpected success" Err(e) => "duplicate key rejected" }
+  })
+}
+
+api GET "/json-stringify" uses {} {
+  const obj = { "z_key": 1, "a_key": 2, "m_key": 3 };
+  const arr = [true, false, null, 42, "string"];
+  const nested = {
+    "outer": { "inner": { "value": 123 } },
+    "list": [1, 2, 3]
+  };
+  // Canonical JSON: keys should be sorted per §23
+  respond json({
+    "obj_stringified": Json.stringify(obj),
+    "arr_stringified": Json.stringify(arr),
+    "nested_stringified": Json.stringify(nested)
+  })
+}
+
+api GET "/json-roundtrip" uses {} {
+  // Parse then stringify should produce canonical output
+  const original = "{\"b\":2,\"a\":1,\"c\":3}";
+  const parsed = Json.parse(original);
+  const stringified = match parsed {
+    Ok(v) => Json.stringify(v)
+    Err(_) => "error"
+  };
+  // Re-parse and re-stringify should be identical (idempotent)
+  const reparsed = Json.parse(stringified);
+  const restringified = match reparsed {
+    Ok(v) => Json.stringify(v)
+    Err(_) => "error"
+  };
+  respond json({
+    "original": original,
+    "canonical": stringified,
+    "idempotent": restringified,
+    "canonical_equals_idempotent": stringified == restringified
+  })
+}
+
+api GET "/json-types" uses {} {
+  // Test all JsonValue variants per TECHSPEC §9
+  const null_val = Json.parse("null");
+  const bool_true = Json.parse("true");
+  const bool_false = Json.parse("false");
+  const int_val = Json.parse("12345");
+  const decimal_val = Json.parse("123.456");
+  const string_val = Json.parse("\"hello world\"");
+  const array_val = Json.parse("[1,\"two\",true,null]");
+  const object_val = Json.parse("{\"nested\":{\"key\":\"value\"}}");
+  respond json({
+    "null": match null_val { Ok(v) => v Err(_) => "error" },
+    "bool_true": match bool_true { Ok(v) => v Err(_) => "error" },
+    "bool_false": match bool_false { Ok(v) => v Err(_) => "error" },
+    "int": match int_val { Ok(v) => v Err(_) => "error" },
+    "decimal": match decimal_val { Ok(v) => v Err(_) => "error" },
+    "string": match string_val { Ok(v) => v Err(_) => "error" },
+    "array": match array_val { Ok(v) => v Err(_) => "error" },
+    "object": match object_val { Ok(v) => v Err(_) => "error" }
+  })
+}
+
+api GET "/json-canonical-ordering" uses {} {
+  // Verify canonical key ordering per TECHSPEC §23
+  // Keys should be ordered by: type tag, hash, CBOR byte-wise
+  const unordered = "{\"zebra\":1,\"apple\":2,\"mango\":3,\"banana\":4}";
+  const parsed = Json.parse(unordered);
+  const canonical = match parsed {
+    Ok(v) => Json.stringify(v)
+    Err(_) => "error"
+  };
+  respond json({
+    "input": unordered,
+    "canonical_output": canonical
+  })
+}
+
+api GET "/json-special-chars" uses {} {
+  // Test JSON with special characters
+  const with_escapes = Json.parse("{\"text\":\"line1\\nline2\\ttab\"}");
+  const with_unicode = Json.parse("{\"emoji\":\"\\u2764\\u2665\"}");
+  const with_quotes = Json.parse("{\"quoted\":\"He said \\\"hello\\\"\"}");
+  respond json({
+    "escapes": match with_escapes { Ok(v) => v Err(_) => "error" },
+    "unicode": match with_unicode { Ok(v) => v Err(_) => "error" },
+    "quotes": match with_quotes { Ok(v) => v Err(_) => "error" }
+  })
+}

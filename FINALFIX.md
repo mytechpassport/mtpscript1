@@ -31,6 +31,14 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 - Added descriptive `expect()` message in `api/router.rs` for regex compilation
 - Added fallback in `errors/mod.rs` for JSON serialization edge cases
 
+**Placeholder Implementation Fixes:**
+- **Effect Array/Object compilation** (`compiler/effects.rs`) - Now properly serializes arrays and objects to JSON instead of returning `{}`
+- **Module import type checking** (`types/checker.rs`) - Added import validation and registers imports in type context
+- **Function return type inference** (`types/checker.rs`) - Now infers return type from function body instead of defaulting to `Number`
+- **Expression type checking** (`types/checker.rs`) - Added coverage for Index, Pipeline, Match, Const, Lambda, Await, RespondJson, and Group expressions
+- **Call expression return type** (`types/checker.rs`) - Now extracts return type from function signature
+- **JSON parser error recovery** (`json/parse.rs`) - Fixed panics on unterminated arrays/objects, now returns proper errors
+
 **Code Quality:**
 - #25: Canonical JSON determinism verification - 14 comprehensive tests added
 - #26: CBOR encoder validation - 23 comprehensive tests added
@@ -264,9 +272,11 @@ All 18 items marked with `[SECURITY AUDIT]` require:
 - Formal verification expertise
 
 ### Code Changes Made This Session
-1. `mtpscript-core/src/types/checker.rs` - Fixed string+number type checking
+1. `mtpscript-core/src/types/checker.rs` - Fixed string+number type checking, added import validation, function return type inference, complete expression type coverage
 2. `mtpscript-core/tests/typecheck_tests.rs` - Removed unused import
 3. `mtpscript-core/src/compiler/respond.rs` - Graceful handling of unsupported operators
-4. `mtpscript-core/src/runtime/effects.rs` - Mutex poison recovery (6 locations)
-5. `mtpscript-core/src/api/router.rs` - Descriptive expect for regex
-6. `mtpscript-core/src/errors/mod.rs` - JSON serialization fallback
+4. `mtpscript-core/src/compiler/effects.rs` - Proper Array/Object JSON serialization for effect arguments
+5. `mtpscript-core/src/runtime/effects.rs` - Mutex poison recovery (6 locations)
+6. `mtpscript-core/src/api/router.rs` - Descriptive expect for regex
+7. `mtpscript-core/src/errors/mod.rs` - JSON serialization fallback
+8. `mtpscript-core/src/json/parse.rs` - Fixed panics on unterminated arrays/objects, proper error returns
