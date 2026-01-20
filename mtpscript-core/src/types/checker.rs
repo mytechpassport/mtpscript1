@@ -200,18 +200,16 @@ impl TypeChecker {
                 let right_type = self.typecheck_expr(right, context)?;
                 match op {
                     ast::BinOp::Add => {
-                        // Allow both number and string addition
+                        // Allow both number and string addition (homogeneous types only)
                         if left_type == Type::Number && right_type == Type::Number {
                             Ok(Type::Number)
                         } else if left_type == Type::String && right_type == Type::String {
                             Ok(Type::String)
-                        } else if left_type == Type::String || right_type == Type::String {
-                            // String concatenation with any type
-                            Ok(Type::String)
                         } else {
-                            Err(CompileError::TypeError(
-                                "Addition requires numbers or strings".to_string(),
-                            ))
+                            Err(CompileError::TypeError(format!(
+                                "Cannot add {:?} and {:?} - addition requires matching types (number + number or string + string)",
+                                left_type, right_type
+                            )))
                         }
                     }
                     ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div => {

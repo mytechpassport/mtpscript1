@@ -1,4 +1,3 @@
-use mtpscript_core::errors::compile::CompileError;
 use mtpscript_core::parser::ast;
 use mtpscript_core::types::checker::TypeChecker;
 

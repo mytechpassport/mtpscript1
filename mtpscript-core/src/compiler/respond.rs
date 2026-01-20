@@ -73,7 +73,9 @@ fn compile_expr_to_js(expr: &Expr) -> String {
             let op_str = match op {
                 BinOp::Sub => "-",
                 BinOp::Not => "!",
-                _ => panic!("Unsupported unary operator"),
+                BinOp::Add => "+", // Unary plus (identity)
+                // Other operators shouldn't appear as unary - treat as identity
+                _ => "",
             };
             format!("{}{}", op_str, compile_expr_to_js(expr))
         }

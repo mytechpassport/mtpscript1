@@ -63,7 +63,10 @@ pub enum MtpError {
 
 impl MtpError {
     pub fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        serde_json::to_string(self).unwrap_or_else(|_| {
+            // Fallback if serialization fails (should never happen)
+            r#"{"error":"Internal","message":"Error serialization failed"}"#.to_string()
+        })
     }
 
     #[cfg(not(debug_assertions))]

@@ -114,7 +114,10 @@ impl Router {
 
         regex_pattern.push('$');
 
-        (Regex::new(&regex_pattern).unwrap(), param_names)
+        // Regex pattern is constructed from escaped segments, so should always be valid
+        let regex = Regex::new(&regex_pattern)
+            .expect("Internal error: route pattern should always be valid regex");
+        (regex, param_names)
     }
 }
 

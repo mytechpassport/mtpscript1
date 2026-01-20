@@ -216,6 +216,12 @@ impl Interpreter {
     fn execute_string(&mut self, js_code: &str) -> Result<Value, RuntimeError> {
         use std::collections::HashMap;
 
+        // Check for forbidden constructs
+        self.check_forbidden_constructs(js_code)?;
+
+        // Consume gas for parsing the code
+        self.gas_counter.consume(1)?;
+
         // First, extract and store function definitions
         self.parse_function_definitions(js_code)?;
 
@@ -225,17 +231,27 @@ impl Interpreter {
         let mut result = Value::Null;
         let mut in_function_def = false;
         let mut brace_depth = 0;
+        let mut i = 0;
 
-        for line in lines {
-            let line = line.trim();
+        while i < lines.len() {
+            let line = lines[i].trim();
+            i += 1;
+
             if line.is_empty() || line.starts_with("//") {
                 continue;
             }
+
+            // Consume gas for each line processed
+            self.gas_counter.consume(1)?;
 
             // Skip function definition lines (already parsed)
             if line.starts_with("function ") {
                 in_function_def = true;
                 brace_depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+                // For single-line functions where { and } are balanced, reset immediately
+                if brace_depth <= 0 {
+                    in_function_def = false;
+                }
                 continue;
             }
             if in_function_def {
@@ -243,6 +259,14 @@ impl Interpreter {
                 if brace_depth <= 0 {
                     in_function_def = false;
                 }
+                continue;
+            }
+
+            // Handle if statements
+            if line.starts_with("if ") || line.starts_with("if(") {
+                let (if_result, new_i) = self.execute_if_statement(&lines, i - 1, &variables)?;
+                result = if_result;
+                i = new_i;
                 continue;
             }
 
@@ -277,14 +301,7 @@ impl Interpreter {
                 continue;
             }
 
-            // Handle function calls without assignment
-            if line.contains("(") && line.contains(")") && !line.contains(" = ") {
-                let call = line.strip_suffix(";").unwrap_or(line);
-                result = self.evaluate_function_call(call, &variables)?;
-                continue;
-            }
-
-            // Handle simple expression statements (like "42;" or "true;")
+            // Handle all expressions (including function calls) via evaluate_expression
             let expr = line.strip_suffix(";").unwrap_or(line);
             if !expr.is_empty() {
                 result = self.evaluate_expression(expr, &variables)?;
@@ -310,11 +327,148 @@ impl Interpreter {
         Ok(result)
     }
 
+    /// Check for forbidden JavaScript constructs
+    fn check_forbidden_constructs(&self, code: &str) -> Result<(), RuntimeError> {
+        // List of forbidden constructs per spec
+        let forbidden_patterns = [
+            ("eval(", "eval() is forbidden"),
+            ("new ", "new keyword is forbidden"),
+            ("class ", "class keyword is forbidden"),
+            ("this.", "this keyword is forbidden"),
+            ("this)", "this keyword is forbidden"),
+            ("this;", "this keyword is forbidden"),
+            ("while (", "while loops are forbidden"),
+            ("while(", "while loops are forbidden"),
+            ("for (", "for loops are forbidden"),
+            ("for(", "for loops are forbidden"),
+        ];
+
+        for (pattern, message) in &forbidden_patterns {
+            if code.contains(pattern) {
+                return Err(RuntimeError::ValueError(message.to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute an if statement and return (result, next_line_index)
+    fn execute_if_statement(
+        &mut self,
+        lines: &[&str],
+        start_idx: usize,
+        variables: &HashMap<String, Value>,
+    ) -> Result<(Value, usize), RuntimeError> {
+        let first_line = lines[start_idx].trim();
+
+        // Extract condition from "if (condition) {" or "if (condition)"
+        let condition_start = first_line.find('(').unwrap_or(3) + 1;
+        let condition_end = first_line.rfind(')').unwrap_or(first_line.len());
+        let condition = &first_line[condition_start..condition_end];
+
+        // Evaluate condition
+        let cond_value = self.evaluate_expression(condition, variables)?;
+        let cond_bool = match cond_value {
+            Value::Boolean(b) => b,
+            Value::Number(n) => n != 0,
+            Value::Null => false,
+            _ => true,
+        };
+
+        // Find the if block, else keyword, and else block
+        let mut brace_depth = first_line.matches('{').count() as i32
+            - first_line.matches('}').count() as i32;
+        let mut if_block = Vec::new();
+        let mut else_block = Vec::new();
+        let mut in_else = false;
+        let mut idx = start_idx + 1;
+
+        // Collect blocks
+        while idx < lines.len() {
+            let line = lines[idx].trim();
+            idx += 1;
+
+            if line.is_empty() {
+                continue;
+            }
+
+            // Update brace depth FIRST
+            let open_braces = line.matches('{').count() as i32;
+            let close_braces = line.matches('}').count() as i32;
+            brace_depth += open_braces - close_braces;
+
+            // Check for "} else {" pattern (closing if block and opening else block)
+            if line.contains("} else") || line.starts_with("} else") {
+                in_else = true;
+                // brace_depth should now be correct (close } cancels, open { adds back)
+                continue;
+            }
+
+            // Check for standalone "else {" when brace_depth becomes 1 from 0
+            if !in_else && (line == "else {" || line.starts_with("else ")) {
+                in_else = true;
+                continue;
+            }
+
+            // Check for closing brace at level 0 (end of if or else block)
+            if brace_depth <= 0 {
+                // Check if this is just "}" ending the if block, and next line might be else
+                if !in_else && idx < lines.len() {
+                    let next = lines[idx].trim();
+                    if next.starts_with("else") {
+                        continue; // Will be handled in next iteration
+                    }
+                }
+                break;
+            }
+
+            // Handle content (excluding pure braces)
+            let content = line
+                .trim_start_matches('{')
+                .trim_end_matches('}')
+                .trim();
+            if !content.is_empty() && content != "{" && content != "}" {
+                if in_else {
+                    else_block.push(content.to_string());
+                } else {
+                    if_block.push(content.to_string());
+                }
+            }
+        }
+
+        // Execute the appropriate block
+        let block_to_execute = if cond_bool { &if_block } else { &else_block };
+        let mut result = Value::Null;
+
+        for line in block_to_execute {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            // Handle return statements
+            if let Some(return_expr) = line.strip_prefix("return ") {
+                let expr = return_expr.strip_suffix(";").unwrap_or(return_expr);
+                result = self.evaluate_expression(expr, variables)?;
+                break;
+            }
+
+            // Handle simple expression (like "1;" or "2;")
+            let expr = line.strip_suffix(";").unwrap_or(line);
+            result = self.evaluate_expression(expr, variables)?;
+        }
+
+        Ok((result, idx))
+    }
+
     fn evaluate_expression(
         &mut self,
         expr: &str,
         variables: &HashMap<String, Value>,
     ) -> Result<Value, RuntimeError> {
+        // Consume gas for each expression evaluation
+        self.gas_counter.consume(1)?;
+
         let expr = expr.trim();
 
         // Handle boolean literals
@@ -374,6 +528,32 @@ impl Interpreter {
             return Ok(value.clone());
         }
 
+        // Handle array indexing (arr[0])
+        if let Some(bracket_pos) = expr.find('[') {
+            if expr.ends_with(']') {
+                let arr_name = &expr[..bracket_pos];
+                let index_expr = &expr[bracket_pos + 1..expr.len() - 1];
+                let index_val = self.evaluate_expression(index_expr, variables)?;
+                let index = match index_val {
+                    Value::Number(n) => n as usize,
+                    _ => return Err(RuntimeError::TypeError("Array index must be a number".to_string())),
+                };
+
+                // Get the array
+                let arr_val = self.evaluate_expression(arr_name, variables)?;
+                return match arr_val {
+                    Value::Array(arr) => {
+                        if index >= arr.len() {
+                            Err(RuntimeError::ValueError("Array index out of bounds".to_string()))
+                        } else {
+                            Ok(arr[index].clone())
+                        }
+                    }
+                    _ => Err(RuntimeError::TypeError("Cannot index non-array".to_string())),
+                };
+            }
+        }
+
         // Handle function calls
         if expr.contains("(") && expr.ends_with(")") {
             return self.evaluate_function_call(expr, variables);
@@ -384,8 +564,8 @@ impl Interpreter {
             return self.evaluate_member_access(expr, variables);
         }
 
-        // Default to string for unknown expressions
-        Ok(Value::String(expr.to_string()))
+        // If identifier is not found, return error for undefined variable
+        Err(RuntimeError::ValueError(format!("Undefined variable: {}", expr)))
     }
 
     fn evaluate_member_access(
@@ -653,17 +833,32 @@ impl Interpreter {
                 let right_val = self.evaluate_expression(right, variables)?;
                 match op {
                     '+' => {
-                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
-                            return Ok(Some(Value::Number(l + r)));
-                        }
-                        // String concatenation
-                        if let (Value::String(l), Value::String(r)) = (&left_val, &right_val) {
-                            return Ok(Some(Value::String(format!("{}{}", l, r))));
+                        match (&left_val, &right_val) {
+                            (Value::Number(l), Value::Number(r)) => {
+                                return Ok(Some(Value::Number(l + r)));
+                            }
+                            (Value::String(l), Value::String(r)) => {
+                                return Ok(Some(Value::String(format!("{}{}", l, r))));
+                            }
+                            _ => {
+                                return Err(RuntimeError::TypeError(format!(
+                                    "Cannot add {:?} and {:?}",
+                                    left_val, right_val
+                                )));
+                            }
                         }
                     }
                     '-' => {
-                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
-                            return Ok(Some(Value::Number(l - r)));
+                        match (&left_val, &right_val) {
+                            (Value::Number(l), Value::Number(r)) => {
+                                return Ok(Some(Value::Number(l - r)));
+                            }
+                            _ => {
+                                return Err(RuntimeError::TypeError(format!(
+                                    "Cannot subtract {:?} from {:?}",
+                                    right_val, left_val
+                                )));
+                            }
                         }
                     }
                     _ => {}
@@ -693,16 +888,32 @@ impl Interpreter {
                 let right_val = self.evaluate_expression(right, variables)?;
                 match op {
                     '*' => {
-                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
-                            return Ok(Some(Value::Number(l * r)));
+                        match (&left_val, &right_val) {
+                            (Value::Number(l), Value::Number(r)) => {
+                                return Ok(Some(Value::Number(l * r)));
+                            }
+                            _ => {
+                                return Err(RuntimeError::TypeError(format!(
+                                    "Cannot multiply {:?} and {:?}",
+                                    left_val, right_val
+                                )));
+                            }
                         }
                     }
                     '/' => {
-                        if let (Value::Number(l), Value::Number(r)) = (&left_val, &right_val) {
-                            if *r == 0 {
-                                return Err(RuntimeError::ValueError("Division by zero".to_string()));
+                        match (&left_val, &right_val) {
+                            (Value::Number(l), Value::Number(r)) => {
+                                if *r == 0 {
+                                    return Err(RuntimeError::ValueError("Division by zero".to_string()));
+                                }
+                                return Ok(Some(Value::Number(l / r)));
                             }
-                            return Ok(Some(Value::Number(l / r)));
+                            _ => {
+                                return Err(RuntimeError::TypeError(format!(
+                                    "Cannot divide {:?} by {:?}",
+                                    left_val, right_val
+                                )));
+                            }
                         }
                     }
                     _ => {}
@@ -766,50 +977,91 @@ impl Interpreter {
         Ok(None)
     }
 
+    /// Parse function arguments, respecting nested parentheses
+    fn parse_function_args(&self, args_str: &str) -> Vec<String> {
+        let mut args = Vec::new();
+        let mut current_arg = String::new();
+        let mut paren_depth = 0;
+        let mut in_string = false;
+
+        for c in args_str.chars() {
+            match c {
+                '"' => {
+                    in_string = !in_string;
+                    current_arg.push(c);
+                }
+                '(' if !in_string => {
+                    paren_depth += 1;
+                    current_arg.push(c);
+                }
+                ')' if !in_string => {
+                    paren_depth -= 1;
+                    current_arg.push(c);
+                }
+                ',' if !in_string && paren_depth == 0 => {
+                    let trimmed = current_arg.trim().to_string();
+                    if !trimmed.is_empty() {
+                        args.push(trimmed);
+                    }
+                    current_arg = String::new();
+                }
+                _ => {
+                    current_arg.push(c);
+                }
+            }
+        }
+
+        let trimmed = current_arg.trim().to_string();
+        if !trimmed.is_empty() {
+            args.push(trimmed);
+        }
+
+        args
+    }
+
     fn evaluate_function_call(
         &mut self,
         call: &str,
         variables: &HashMap<String, Value>,
     ) -> Result<Value, RuntimeError> {
-        // Extract function name and arguments
+        // Consume gas for expression evaluation
+        self.gas_counter.consume(1)?;
+
+        // Extract function name and arguments (handle nested calls)
         if let Some(open_paren) = call.find("(") {
             let func_name = &call[..open_paren];
             let args_str = &call[open_paren + 1..call.len() - 1];
 
-            let args: Vec<&str> = if args_str.trim().is_empty() {
-                vec![]
-            } else {
-                args_str.split(",").map(|s| s.trim()).collect()
-            };
+            // Parse args respecting nested parentheses
+            let args = self.parse_function_args(args_str);
 
             match func_name {
                 "array_get" => {
                     if args.len() != 2 {
-                        return Ok(Value::Null);
+                        return Err(RuntimeError::ValueError("array_get expects 2 arguments".to_string()));
                     }
-                    let arr_name = args[0];
-                    let index_str = args[1];
+                    let arr_name = &args[0];
+                    let index_str = &args[1];
 
                     // Get array
-                    let arr = if let Some(Value::Array(a)) = variables.get(arr_name) {
+                    let arr = if let Some(Value::Array(a)) = variables.get(arr_name.as_str()) {
                         a.clone()
                     } else {
-                        return Ok(Value::Null);
+                        return Err(RuntimeError::TypeError("First argument must be an array".to_string()));
                     };
 
                     // Get index
                     let index = if let Ok(i) = index_str.parse::<usize>() {
                         i
-                    } else if let Some(Value::Number(i)) = variables.get(index_str) {
+                    } else if let Some(Value::Number(i)) = variables.get(index_str.as_str()) {
                         *i as usize
                     } else {
-                        return Ok(Value::Null);
+                        return Err(RuntimeError::TypeError("Index must be a number".to_string()));
                     };
 
                     // Check bounds
                     if index >= arr.len() {
-                        // Return special error value that will be caught
-                        return Ok(Value::String("ARRAY_BOUNDS_ERROR".to_string()));
+                        return Err(RuntimeError::ValueError("Array index out of bounds".to_string()));
                     }
 
                     Ok(arr[index].clone())
@@ -820,29 +1072,66 @@ impl Interpreter {
                         // Consume gas for function call (7000 to exhaust 10M with ~1400 calls)
                         self.gas_counter.consume(7000)?;
 
+                        // Check arity
+                        if args.len() != func_def.params.len() {
+                            return Err(RuntimeError::ValueError(format!(
+                                "Function {} expects {} arguments, got {}",
+                                func_name, func_def.params.len(), args.len()
+                            )));
+                        }
+
                         // Build local scope with arguments
                         let mut local_vars = variables.clone();
                         for (i, param) in func_def.params.iter().enumerate() {
-                            if i < args.len() {
-                                let arg_val = self.evaluate_expression(args[i], variables)?;
-                                local_vars.insert(param.clone(), arg_val);
-                            }
+                            let arg_val = self.evaluate_expression(&args[i], variables)?;
+                            local_vars.insert(param.clone(), arg_val);
                         }
 
                         // Execute the function body
                         return self.execute_function_body(&func_def.body, &local_vars);
                     }
 
+                    // Check for member function calls like JSON.parse
+                    if func_name.contains('.') {
+                        // This is a member call, evaluate as member access + call
+                        let parts: Vec<&str> = func_name.splitn(2, '.').collect();
+                        if parts.len() == 2 {
+                            let obj_name = parts[0];
+                            let method_name = parts[1];
+
+                            // Get the object from scope
+                            if let Some(obj_val) = self.global_scope.get(obj_name).cloned() {
+                                if let Value::Object(obj) = obj_val {
+                                    if let Some(method_ref) = obj.get(method_name) {
+                                        // Check if it's a builtin reference
+                                        if let Some(builtin_name) = self.get_builtin_name(method_ref) {
+                                            if let Some(builtin) = self.builtins.get(&builtin_name).cloned() {
+                                                let mut arg_values = Vec::new();
+                                                for arg in &args {
+                                                    let value = self.evaluate_expression(arg, variables)?;
+                                                    arg_values.push(value);
+                                                }
+                                                return builtin(arg_values).map_err(|e| RuntimeError::ValueError(e));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // For other functions, try builtin
                     if let Some(builtin) = self.builtins.get(func_name).cloned() {
                         let mut arg_values = Vec::new();
-                        for arg in args {
+                        for arg in &args {
                             let value = self.evaluate_expression(arg, variables)?;
                             arg_values.push(value);
                         }
                         return builtin(arg_values).map_err(|e| RuntimeError::ValueError(e));
                     }
-                    Ok(Value::Null)
+
+                    // Return error for undefined function
+                    Err(RuntimeError::ValueError(format!("Undefined function: {}", func_name)))
                 }
             }
         } else {

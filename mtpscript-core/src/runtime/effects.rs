@@ -38,7 +38,7 @@ pub fn init_sqlite(path: &str) -> Result<(), RuntimeError> {
     )
     .map_err(|e| RuntimeError::ValueError(format!("Failed to create table: {}", e)))?;
 
-    let mut db = SQLITE_CONNECTION.lock().unwrap();
+    let mut db = SQLITE_CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
     *db = Some(conn);
     Ok(())
 }
@@ -76,7 +76,7 @@ pub fn init_sqlite_memory() -> Result<(), RuntimeError> {
     )
     .map_err(|e| RuntimeError::ValueError(format!("Failed to insert test data: {}", e)))?;
 
-    let mut db = SQLITE_CONNECTION.lock().unwrap();
+    let mut db = SQLITE_CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
     *db = Some(conn);
     Ok(())
 }
@@ -105,7 +105,7 @@ impl EffectRegistry {
 
 /// Execute a SQL query using SQLite
 fn execute_sql_read(sql: &str, params_value: &Value) -> Result<Value, String> {
-    let db_guard = SQLITE_CONNECTION.lock().unwrap();
+    let db_guard = SQLITE_CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
     let conn = db_guard
         .as_ref()
         .ok_or_else(|| "Database not initialized. Call init_sqlite() first.".to_string())?;
@@ -153,7 +153,7 @@ fn execute_sql_read(sql: &str, params_value: &Value) -> Result<Value, String> {
 
 /// Execute a SQL write operation using SQLite
 fn execute_sql_write(sql: &str, params_value: &Value) -> Result<Value, String> {
-    let db_guard = SQLITE_CONNECTION.lock().unwrap();
+    let db_guard = SQLITE_CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
     let conn = db_guard
         .as_ref()
         .ok_or_else(|| "Database not initialized. Call init_sqlite() first.".to_string())?;
@@ -310,7 +310,7 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
 
     // Initialize in-memory SQLite if not already done
     {
-        let db = SQLITE_CONNECTION.lock().unwrap();
+        let db = SQLITE_CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
         if db.is_none() {
             drop(db);
             init_sqlite_memory()?;
@@ -542,7 +542,7 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
 
         // Check cache for deterministic replay
         {
-            let cache = ASYNC_CACHE.lock().unwrap();
+            let cache = ASYNC_CACHE.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(cached_result) = cache.get(&cache_key) {
                 return Ok(cached_result.clone());
             }
@@ -554,7 +554,7 @@ pub fn inject_effects(interp: &mut Interpreter, _seed: &[u8; 32]) -> Result<(), 
 
         // Cache the result for deterministic replay
         {
-            let mut cache = ASYNC_CACHE.lock().unwrap();
+            let mut cache = ASYNC_CACHE.lock().unwrap_or_else(|e| e.into_inner());
             cache.insert(cache_key, result.clone());
         }
 
@@ -618,7 +618,7 @@ fn execute_async_effect(effect_args: &Value) -> Result<Value, String> {
 
 /// Clear the async cache - useful for testing
 pub fn clear_async_cache() {
-    let mut cache = ASYNC_CACHE.lock().unwrap();
+    let mut cache = ASYNC_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     cache.clear();
 }
 

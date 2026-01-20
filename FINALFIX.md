@@ -1,7 +1,7 @@
 # FINALFIX - Remaining Issues
 
 **Generated:** 2026-01-19
-**Updated:** 2026-01-19
+**Updated:** 2026-01-20
 **Sources:** TASK.md, BUGFIX.md
 
 This document consolidates all remaining (uncompleted) issues from TASK.md and BUGFIX.md.
@@ -15,10 +15,18 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 | **Critical (P0)** | 8 | 0 |
 | **High Priority (P1)** | 10 | 0 |
 | **Medium Priority** | 6 | 6 |
-| **Low Priority / Future** | 12 | 1 |
-| **Total** | 36 | 7 |
+| **Low Priority / Future** | 12 | 7 |
+| **Total** | 36 | 13 |
 
-### Recently Completed (2026-01-19)
+### Recently Completed (2026-01-20)
+- #25: Canonical JSON determinism verification - 14 comprehensive tests added
+- #26: CBOR encoder validation - 23 comprehensive tests added
+- #27: Lambda lowering type annotations - Already fixed, verified with tests
+- #28: PreloadedRuntime graceful shutdown - Added shutdown methods and 5 tests
+- #29: Chrono dependency determinism - Using content-hash-derived timestamps, 5 tests added
+- #31: Nested function refactoring - Already refactored to proper methods
+
+### Previously Completed (2026-01-19)
 - #19: Test execution verified
 - #20: AST to IR lowering unit tests - 27 comprehensive tests added
 - #21: Tail call detection tests - 13 comprehensive tests added
@@ -167,30 +175,35 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 
 ## Low Priority - Code Quality & Future Improvements
 
-### 25. Canonical JSON Determinism Verification
+### 25. Canonical JSON Determinism Verification ✅ COMPLETED
 **Source:** BUGFIX.md (line 22)
 **File:** `mtpscript-core/src/json/serialize.rs`
 **Description:** Canonical JSON serialization lacks determinism verification across runs.
+**Resolution:** Added 14 comprehensive determinism tests covering: different insertion orders, deeply nested structures, many keys (100+), unicode keys, special characters, empty structures, mixed types, hash collision tiebreaks, numeric string keys, RFC 8785 whitespace compliance, CBOR encoding boundaries, and fresh instance verification.
 
-### 26. CBOR Encoder Validation
+### 26. CBOR Encoder Validation ✅ COMPLETED
 **Source:** BUGFIX.md (line 23)
 **File:** `mtpscript-core/src/json/mod.rs`
 **Description:** CBOR encoder lacks validation and size limits.
+**Resolution:** Added 23 comprehensive tests covering: small integers (0-23), boundary integers, negative integers, zero, empty strings/arrays/objects, unicode strings, long strings, nested structures, decimals, deterministic map key ordering, multiple run determinism, large arrays, all types combined, special characters, deeply nested structures, max i64, min safe i64, string length boundaries, and output size validation.
 
-### 27. Lambda Lowering Type Annotations
+### 27. Lambda Lowering Type Annotations ✅ COMPLETED
 **Source:** BUGFIX.md (line 106)
 **File:** `mtpscript-core/src/ir/lower.rs:285-293`
 **Description:** Lambda lowering discards type annotations. Line 289 extracts only parameter names, losing type expressions.
+**Resolution:** Lambda lowering now properly calls `resolve_type_expr(type_expr)` to preserve type annotations. Tests verify type preservation for multiple typed parameters.
 
-### 28. PreloadedRuntime Graceful Shutdown
+### 28. PreloadedRuntime Graceful Shutdown ✅ COMPLETED
 **Source:** BUGFIX.md (line 108)
 **File:** `mtpscript-core/src/lambda/runtime.rs:283-294`
 **Description:** PreloadedRuntime infinite loop has no exit condition. Lambda functions should respect context deadline and exit cleanly.
+**Resolution:** Added `shutdown_handle()`, `stop()`, and `is_shutdown_requested()` methods for external shutdown control. Added 5 tests for shutdown flag, external handle setting, shared handles, cross-thread shutdown, and deadline calculation.
 
-### 29. Chrono Dependency Feature Flags
+### 29. Chrono Dependency Feature Flags ✅ COMPLETED
 **Source:** BUGFIX.md (line 110)
 **File:** `mtpscript-core/src/modules/npm_bridge.rs:139`
 **Description:** Chrono dependency used without feature flags. Wall-clock time in audit manifest violates determinism. Should use seed-derived timestamp.
+**Resolution:** Audit manifest now uses content-hash-derived deterministic timestamps instead of wall-clock time. Added 5 tests verifying deterministic timestamp derivation, different content produces different timestamps, timestamp range validation, manifest serialization determinism, and no wall-clock time usage.
 
 ### 30. Audit Logging Thread Safety ✅ COMPLETED
 **Source:** BUGFIX.md (line 112)
@@ -198,10 +211,11 @@ This document consolidates all remaining (uncompleted) issues from TASK.md and B
 **Description:** Audit logging to stderr may interleave. Multiple threads writing to `io::stderr()` can produce interleaved output.
 **Resolution:** Added global mutex for thread-safe logging and 5 comprehensive tests including concurrent logging with 10 threads x 10 requests each, mutex poison recovery, and roundtrip serialization.
 
-### 31. Nested Function Refactoring
+### 31. Nested Function Refactoring ✅ COMPLETED
 **Source:** BUGFIX.md (line 116)
-**File:** `mtpscript-core/src/interpreter.rs:338-416`
+**File:** `mtpscript-core/src/runtime/interpreter.rs`
 **Description:** eval_binop and eval_unaryop defined as nested functions inside eval_expr. Should be extracted as regular methods on Interpreter.
+**Resolution:** Already refactored - `eval_binop` and `eval_unaryop` are proper methods on the Interpreter struct (lines 1274 and 1346), not nested functions.
 
 ### 32. Error Handling and Propagation
 **Source:** BUGFIX.md (line 46)

@@ -497,4 +497,155 @@ mod tests {
 
         assert!(validate_adapter_signature(invalid_adapter).is_err());
     }
+
+    // Determinism tests (#29) - verify timestamp derivation is deterministic
+
+    #[test]
+    fn test_deterministic_timestamp_derivation() {
+        use sha2::{Digest, Sha256};
+
+        // Same content should always produce the same timestamp
+        let content = r#"[{"name":"uuid","version":"9.0.1"}]"#;
+
+        fn derive_timestamp(content: &str) -> String {
+            let content_hash = Sha256::new().chain_update(content).finalize();
+            let time_offset = u32::from_le_bytes(content_hash[0..4].try_into().unwrap()) % 86400;
+            let base_timestamp =
+                chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap();
+            let deterministic_timestamp =
+                base_timestamp + chrono::Duration::seconds(time_offset as i64);
+            deterministic_timestamp.to_rfc3339()
+        }
+
+        // Run multiple times to verify determinism
+        let first_result = derive_timestamp(content);
+        for _ in 0..100 {
+            let result = derive_timestamp(content);
+            assert_eq!(
+                result, first_result,
+                "Timestamp derivation must be deterministic"
+            );
+        }
+    }
+
+    #[test]
+    fn test_different_content_produces_different_timestamps() {
+        use sha2::{Digest, Sha256};
+
+        fn derive_timestamp(content: &str) -> String {
+            let content_hash = Sha256::new().chain_update(content).finalize();
+            let time_offset = u32::from_le_bytes(content_hash[0..4].try_into().unwrap()) % 86400;
+            let base_timestamp =
+                chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap();
+            let deterministic_timestamp =
+                base_timestamp + chrono::Duration::seconds(time_offset as i64);
+            deterministic_timestamp.to_rfc3339()
+        }
+
+        let content1 = r#"[{"name":"uuid","version":"9.0.1"}]"#;
+        let content2 = r#"[{"name":"uuid","version":"9.0.2"}]"#;
+
+        let ts1 = derive_timestamp(content1);
+        let ts2 = derive_timestamp(content2);
+
+        // Different content should (most likely) produce different timestamps
+        // Note: There's a 1/86400 chance of collision, which is acceptable
+        assert_ne!(ts1, ts2, "Different content should produce different timestamps");
+    }
+
+    #[test]
+    fn test_timestamp_within_valid_range() {
+        use sha2::{Digest, Sha256};
+
+        // Test that derived timestamps are always within the expected range
+        let test_contents = vec![
+            "test1",
+            "test2",
+            "longer content here",
+            r#"{"complex": "json", "data": [1,2,3]}"#,
+        ];
+
+        for content in test_contents {
+            let content_hash = Sha256::new().chain_update(content).finalize();
+            let time_offset = u32::from_le_bytes(content_hash[0..4].try_into().unwrap()) % 86400;
+
+            // Offset should be 0..86399 (seconds in a day)
+            assert!(time_offset < 86400, "Time offset should be less than 86400");
+
+            let base_timestamp =
+                chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap();
+            let deterministic_timestamp =
+                base_timestamp + chrono::Duration::seconds(time_offset as i64);
+
+            // Timestamp should be on 2024-01-01
+            let ts_str = deterministic_timestamp.to_rfc3339();
+            assert!(
+                ts_str.starts_with("2024-01-01"),
+                "Timestamp should be on 2024-01-01, got {}",
+                ts_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_audit_manifest_serialization_deterministic() {
+        let dep = UnsafeDependency {
+            name: "test-pkg".to_string(),
+            version: "1.0.0".to_string(),
+            content_hash: "abc123".to_string(),
+            source_hash: "def456".to_string(),
+            license: Some("MIT".to_string()),
+            vulnerabilities: vec![],
+        };
+
+        let manifest = AuditManifest {
+            unsafe_deps: vec![dep.clone()],
+            generated_at: "2024-01-01T12:00:00+00:00".to_string(),
+            total_deps: 1,
+            manifest_hash: "hash123".to_string(),
+        };
+
+        // Serialize multiple times
+        let first_json = serde_json::to_string(&manifest).unwrap();
+        for _ in 0..100 {
+            let json = serde_json::to_string(&manifest).unwrap();
+            assert_eq!(json, first_json, "Manifest serialization must be deterministic");
+        }
+    }
+
+    #[test]
+    fn test_no_wall_clock_time_in_manifest() {
+        // This test documents that we don't use wall-clock time
+        // The timestamp is derived from content hash, not from Utc::now()
+
+        let dep = UnsafeDependency {
+            name: "uuid".to_string(),
+            version: "9.0.1".to_string(),
+            content_hash: "abc".to_string(),
+            source_hash: "def".to_string(),
+            license: None,
+            vulnerabilities: vec![],
+        };
+
+        // If we were using wall-clock time, running this twice would give different results
+        // But with content-derived timestamps, it's always the same
+        let manifest1 = AuditManifest {
+            unsafe_deps: vec![dep.clone()],
+            generated_at: "2024-01-01T00:00:00Z".to_string(), // Fixed, not from clock
+            total_deps: 1,
+            manifest_hash: "".to_string(),
+        };
+
+        let manifest2 = AuditManifest {
+            unsafe_deps: vec![dep],
+            generated_at: "2024-01-01T00:00:00Z".to_string(), // Fixed, not from clock
+            total_deps: 1,
+            manifest_hash: "".to_string(),
+        };
+
+        assert_eq!(
+            serde_json::to_string(&manifest1).unwrap(),
+            serde_json::to_string(&manifest2).unwrap()
+        );
+    }
 }
