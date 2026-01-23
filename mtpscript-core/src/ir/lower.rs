@@ -1,7 +1,7 @@
-use super::nodes::{IrApi, IrDecl, IrExpr, IrFunction, IrPattern, IrProgram};
+use super::nodes::{IrAdtType, IrAdtVariant, IrApi, IrDecl, IrExpr, IrFunction, IrPattern, IrProgram};
 use crate::errors::compile::CompileError;
 use crate::parser::ast::{
-    ApiDecl, BinOp, Expr as AstExpr, FuncDecl, ModuleDecl, Pattern as AstPattern, Program, TypeExpr,
+    ApiDecl, BinOp, Expr as AstExpr, FuncDecl, ModuleDecl, Pattern as AstPattern, Program, TypeDecl, TypeExpr,
 };
 use crate::types::Type;
 
@@ -34,6 +34,7 @@ fn resolve_type_expr(type_expr: &TypeExpr) -> Type {
 /// In a real implementation, this would take typed AST.
 pub fn lower_ast_to_ir(ast: &Program) -> Result<IrProgram, CompileError> {
     let mut decls = Vec::new();
+    let mut adt_types = Vec::new();
 
     for ast_decl in &ast.decls {
         match ast_decl {
@@ -45,13 +46,29 @@ pub fn lower_ast_to_ir(ast: &Program) -> Result<IrProgram, CompileError> {
                 let ir_api = lower_api(api)?;
                 decls.push(IrDecl::Api(ir_api));
             }
-            ModuleDecl::Type(_) | ModuleDecl::Import(_) => {
-                // Skip for now - types and imports don't generate IR
+            ModuleDecl::Type(type_decl) => {
+                // Extract ADT types for constructor generation
+                if let TypeDecl::Adt { name, variants, .. } = type_decl {
+                    let ir_variants: Vec<IrAdtVariant> = variants
+                        .iter()
+                        .map(|v| IrAdtVariant {
+                            name: v.name.clone(),
+                            arity: v.payload.len(),
+                        })
+                        .collect();
+                    adt_types.push(IrAdtType {
+                        name: name.clone(),
+                        variants: ir_variants,
+                    });
+                }
+            }
+            ModuleDecl::Import(_) => {
+                // Imports don't generate IR
             }
         }
     }
 
-    Ok(IrProgram { decls })
+    Ok(IrProgram { decls, adt_types })
 }
 
 fn lower_func(func: &FuncDecl) -> Result<IrFunction, CompileError> {
@@ -318,7 +335,17 @@ fn lower_expr_with_tail(
 fn lower_pattern(ast_pattern: &AstPattern) -> Result<IrPattern, CompileError> {
     match ast_pattern {
         AstPattern::Wildcard => Ok(IrPattern::Wildcard),
-        AstPattern::Ident(name) => Ok(IrPattern::Var(name.clone())),
+        AstPattern::Ident(name) => {
+            // Convention: uppercase identifiers in patterns are variant constructors
+            // This matches ML-family language conventions where constructors start with uppercase
+            if name.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false) {
+                // Treat as unit variant pattern (e.g., Red, Green, None)
+                Ok(IrPattern::Variant(name.clone(), vec![]))
+            } else {
+                // Lowercase identifiers are variable bindings
+                Ok(IrPattern::Var(name.clone()))
+            }
+        }
         AstPattern::Literal(expr) => {
             let ir_expr = lower_expr(expr, &Type::Var("literal".to_string()))?;
             Ok(IrPattern::Literal(ir_expr))

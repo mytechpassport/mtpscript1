@@ -95,8 +95,21 @@ pub enum IrDecl {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct IrAdtVariant {
+    pub name: String,
+    pub arity: usize, // number of payload arguments (0 for unit variants)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IrAdtType {
+    pub name: String,
+    pub variants: Vec<IrAdtVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct IrProgram {
     pub decls: Vec<IrDecl>,
+    pub adt_types: Vec<IrAdtType>, // ADT types for constructor generation
 }
 
 impl IrProgram {

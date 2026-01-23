@@ -90,9 +90,8 @@ impl<'a> Parser<'a> {
                 self.consume(Token::Colon, "Expected ':' after field name")?;
                 let field_type = self.parse_type_expr()?;
                 fields.push((field_name, field_type));
-                if !self.match_token(Token::Comma) {
-                    break;
-                }
+                // Commas are optional - allow newline-separated fields
+                self.match_token(Token::Comma);
             }
             self.consume(Token::RBrace, "Expected '}' after record fields")?;
             Ok(TypeDecl::Record { name, fields })
@@ -394,6 +393,20 @@ impl<'a> Parser<'a> {
                 Token::Minus => BinOp::Sub,
                 _ => unreachable!(),
             };
+
+            // Special case: -9223372036854775808 (i64::MIN)
+            // The lexer stores 9223372036854775808 as i64::MIN, so we need to
+            // recognize when the minus should be absorbed into the literal
+            if matches!(op, BinOp::Sub) {
+                if let Token::Number(n) = self.peek().token {
+                    if n == i64::MIN {
+                        self.advance(); // consume the number
+                        // The minus cancels out - return i64::MIN directly
+                        return Ok(Expr::Number(i64::MIN));
+                    }
+                }
+            }
+
             let right = self.parse_unary()?;
             Ok(Expr::Unary(op, Box::new(right)))
         } else {
@@ -547,22 +560,39 @@ impl<'a> Parser<'a> {
 
     fn parse_match(&mut self) -> Result<Expr, CompileError> {
         self.consume(Token::Match, "Expected 'match'")?;
-        let expr = self.parse_expr()?;
+        let scrutinee = self.parse_unary()?; // Parse just the scrutinee, not a full expr
         self.consume(Token::LBrace, "Expected '{' after match expression")?;
         let mut cases = Vec::new();
 
         while !self.check(Token::RBrace) && !self.is_at_end() {
             let pattern = self.parse_pattern()?;
             self.consume(Token::Arrow, "Expected '=>' after pattern")?;
-            let body = self.parse_expr()?;
+            let body = self.parse_match_arm_body()?;
             cases.push((pattern, body));
+            // Commas between match arms are optional
+            self.match_token(Token::Comma);
         }
 
         self.consume(Token::RBrace, "Expected '}' after match cases")?;
         Ok(Expr::Match {
-            expr: Box::new(expr),
+            expr: Box::new(scrutinee),
             cases,
         })
+    }
+
+    /// Parse a match arm body - stops at pattern-like tokens
+    fn parse_match_arm_body(&mut self) -> Result<Expr, CompileError> {
+        // Check if this looks like a block expression
+        if self.check(Token::LBrace) {
+            self.advance(); // consume {
+            let expr = self.parse_expr()?;
+            self.consume(Token::RBrace, "Expected '}' after block expression")?;
+            return Ok(expr);
+        }
+
+        // Parse a simple expression, but stop at pattern-like tokens
+        // A pattern-like token is: identifier/underscore followed by => or (
+        self.parse_comparison()
     }
 
     fn parse_const(&mut self) -> Result<Expr, CompileError> {
@@ -582,17 +612,38 @@ impl<'a> Parser<'a> {
 
     fn parse_lambda(&mut self) -> Result<Expr, CompileError> {
         self.consume(Token::Function, "Expected 'function'")?;
-        self.consume(Token::LParen, "Expected '(' after 'function'")?;
+
+        // Check for optional function name (named local function)
+        let name = if let Token::Ident(_) = self.peek().token {
+            Some(self.parse_identifier()?)
+        } else {
+            None
+        };
+
+        self.consume(Token::LParen, "Expected '(' after function")?;
         let params = self.parse_param_list()?;
         self.consume(Token::RParen, "Expected ')' after parameters")?;
         self.consume(Token::LBrace, "Expected '{' before lambda body")?;
-        let body = self.parse_expr()?;
+        let func_body = self.parse_expr()?;
         self.consume(Token::RBrace, "Expected '}' after lambda body")?;
 
-        Ok(Expr::Lambda {
+        let lambda = Expr::Lambda {
             params,
-            body: Box::new(body),
-        })
+            body: Box::new(func_body),
+        };
+
+        // If named, desugar to: const name = lambda; rest
+        if let Some(func_name) = name {
+            // Parse the rest of the containing expression as the body
+            let rest = self.parse_expr()?;
+            Ok(Expr::Const {
+                name: func_name,
+                value: Box::new(lambda),
+                body: Box::new(rest),
+            })
+        } else {
+            Ok(lambda)
+        }
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern, CompileError> {

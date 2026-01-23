@@ -118,6 +118,14 @@ mod tests {
             // Decimal methods
             "Decimal.fromString",
             "Decimal.toString",
+            "Decimal.add",
+            "Decimal.subtract",
+            "Decimal.multiply",
+            "Decimal.divide",
+            "Decimal.round",
+            "Decimal.equals",
+            "Decimal.lessThan",
+            "Decimal.zero",
             // Hash functions
             "fnv1a32",
             "fnv1a64",

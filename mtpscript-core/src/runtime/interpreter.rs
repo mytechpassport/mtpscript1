@@ -140,6 +140,38 @@ impl Interpreter {
             "toString".to_string(),
             Value::String("__builtin:Decimal.toString".to_string()),
         );
+        decimal_obj.insert(
+            "add".to_string(),
+            Value::String("__builtin:Decimal.add".to_string()),
+        );
+        decimal_obj.insert(
+            "subtract".to_string(),
+            Value::String("__builtin:Decimal.subtract".to_string()),
+        );
+        decimal_obj.insert(
+            "multiply".to_string(),
+            Value::String("__builtin:Decimal.multiply".to_string()),
+        );
+        decimal_obj.insert(
+            "divide".to_string(),
+            Value::String("__builtin:Decimal.divide".to_string()),
+        );
+        decimal_obj.insert(
+            "round".to_string(),
+            Value::String("__builtin:Decimal.round".to_string()),
+        );
+        decimal_obj.insert(
+            "equals".to_string(),
+            Value::String("__builtin:Decimal.equals".to_string()),
+        );
+        decimal_obj.insert(
+            "lessThan".to_string(),
+            Value::String("__builtin:Decimal.lessThan".to_string()),
+        );
+        decimal_obj.insert(
+            "zero".to_string(),
+            Value::String("__builtin:Decimal.zero".to_string()),
+        );
         self.global_scope
             .insert("Decimal".to_string(), Value::Object(decimal_obj));
 
@@ -155,6 +187,26 @@ impl Interpreter {
             .insert("Ok".to_string(), Value::String("Ok".to_string()));
         self.global_scope
             .insert("Err".to_string(), Value::String("Err".to_string()));
+
+        // Stdlib functions (top-level, not namespaced)
+        self.global_scope
+            .insert("fnv1a32".to_string(), Value::String("__builtin:fnv1a32".to_string()));
+        self.global_scope
+            .insert("fnv1a64".to_string(), Value::String("__builtin:fnv1a64".to_string()));
+        self.global_scope
+            .insert("cborEncode".to_string(), Value::String("__builtin:cborEncode".to_string()));
+
+        // Effect functions (stubs that will be handled specially)
+        self.global_scope
+            .insert("httpGet".to_string(), Value::String("__builtin:httpGet".to_string()));
+        self.global_scope
+            .insert("DbWrite".to_string(), Value::String("__builtin:DbWrite".to_string()));
+        self.global_scope
+            .insert("DbRead".to_string(), Value::String("__builtin:DbRead".to_string()));
+        self.global_scope
+            .insert("log".to_string(), Value::String("__builtin:log".to_string()));
+        self.global_scope
+            .insert("HttpOut".to_string(), Value::String("__builtin:HttpOut".to_string()));
     }
 
     /// Check if a value is a builtin reference and get the builtin name
@@ -207,9 +259,14 @@ impl Interpreter {
     /// Parses the JS subset code and evaluates it, returning the result
     /// as a JSON string (or the raw value for non-JSON results).
     pub fn execute(&mut self, code: &str) -> Result<Value, RuntimeError> {
-        // For now, use simple string-based execution instead of AST parsing
-        // to handle generated code that may not be valid JS AST
-        self.execute_string(code)
+        // Try AST-based execution first, fall back to string-based if parsing fails
+        match crate::runtime::js_parser::parse_js_program(code) {
+            Ok(ast) => self.eval(&ast),
+            Err(_) => {
+                // Fall back to string-based execution for edge cases
+                self.execute_string(code)
+            }
+        }
     }
 
     /// Simple string-based JS execution for generated code
@@ -1458,17 +1515,31 @@ impl Interpreter {
                 self.gas_counter.consume(1)?;
                 let arr_val = self.eval_expr(arr_expr, local_scope)?;
                 let idx_val = self.eval_expr(idx_expr, local_scope)?;
-                let idx = idx_val.as_number()? as usize;
-                match arr_val {
-                    Value::Array(ref arr) => Ok(arr.get(idx).cloned().unwrap_or(Value::Null)),
-                    Value::String(ref s) => Ok(s
-                        .chars()
-                        .nth(idx)
-                        .map(|c| Value::String(c.to_string()))
-                        .unwrap_or(Value::Null)),
-                    _ => Err(RuntimeError::TypeError(
-                        "Cannot index into non-array/string".to_string(),
-                    )),
+
+                // Handle both numeric indexing (arrays) and string key access (objects)
+                match (&arr_val, &idx_val) {
+                    // String key access on objects (e.g., obj["prop"])
+                    (Value::Object(ref obj), Value::String(key)) => {
+                        Ok(obj.get(key).cloned().unwrap_or(Value::Null))
+                    }
+                    // Numeric indexing on arrays
+                    (Value::Array(ref arr), Value::Number(idx)) => {
+                        let idx = *idx as usize;
+                        Ok(arr.get(idx).cloned().unwrap_or(Value::Null))
+                    }
+                    // Numeric indexing on strings
+                    (Value::String(ref s), Value::Number(idx)) => {
+                        let idx = *idx as usize;
+                        Ok(s.chars()
+                            .nth(idx)
+                            .map(|c| Value::String(c.to_string()))
+                            .unwrap_or(Value::Null))
+                    }
+                    _ => Err(RuntimeError::TypeError(format!(
+                        "Cannot index {:?} with {:?}",
+                        arr_val.type_name(),
+                        idx_val.type_name()
+                    ))),
                 }
             }
             JsExpr::If(cond, then_branch, else_branch) => {
@@ -1504,20 +1575,34 @@ impl Interpreter {
             }
             JsExpr::Function(name, params, body) => {
                 self.gas_counter.consume(5)?;
+
+                // For anonymous functions (empty name), generate a unique internal name
+                let internal_name = if name.is_empty() {
+                    format!("__anon_{}", self.function_bodies.len())
+                } else {
+                    name.clone()
+                };
+
                 // Store function body for later execution
                 self.function_bodies.insert(
-                    name.clone(),
+                    internal_name.clone(),
                     StoredFunction {
                         params: params.clone(),
                         body: body.clone(),
                     },
                 );
+
                 let func = Value::Function(FunctionValue {
-                    name: Some(name.clone()),
+                    name: Some(internal_name.clone()),
                     params: params.clone(),
                     closure: local_scope.clone(),
                 });
-                self.global_scope.insert(name.clone(), func.clone());
+
+                // Only store named functions in global scope
+                if !name.is_empty() {
+                    self.global_scope.insert(name.clone(), func.clone());
+                }
+
                 Ok(func)
             }
 

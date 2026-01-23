@@ -219,8 +219,72 @@ impl TypeContext {
             })),
         );
 
-        // Option and Result are generic, so we don't add them here
-        // They need to be instantiated with type parameters
+        // Add Option/Result constructors as callable values
+        // Some: (T) -> Option<T>
+        ctx.types.insert(
+            "Some".to_string(),
+            Type::Function(vec![Type::Var("T".to_string())], Box::new(Type::Var("Option".to_string()))),
+        );
+        // None: Option<T> (unit value)
+        ctx.types.insert(
+            "None".to_string(),
+            Type::Var("Option".to_string()),
+        );
+        // Ok: (T) -> Result<T, E>
+        ctx.types.insert(
+            "Ok".to_string(),
+            Type::Function(vec![Type::Var("T".to_string())], Box::new(Type::Var("Result".to_string()))),
+        );
+        // Err: (E) -> Result<T, E>
+        ctx.types.insert(
+            "Err".to_string(),
+            Type::Function(vec![Type::Var("E".to_string())], Box::new(Type::Var("Result".to_string()))),
+        );
+
+        // Built-in stdlib functions
+        // Hash functions
+        ctx.types.insert(
+            "fnv1a32".to_string(),
+            Type::Function(vec![Type::String], Box::new(Type::Number)),
+        );
+        ctx.types.insert(
+            "fnv1a64".to_string(),
+            Type::Function(vec![Type::String], Box::new(Type::Number)),
+        );
+        // CBOR encoding
+        ctx.types.insert(
+            "cborEncode".to_string(),
+            Type::Function(vec![Type::Var("T".to_string())], Box::new(Type::String)),
+        );
+        // Effect functions (return values wrapped in Result or similar)
+        ctx.types.insert(
+            "httpGet".to_string(),
+            Type::Function(vec![Type::String], Box::new(Type::Var("HttpResponse".to_string()))),
+        );
+        ctx.types.insert(
+            "DbWrite".to_string(),
+            Type::Function(vec![Type::String, Type::Var("T".to_string())], Box::new(Type::Var("Result".to_string()))),
+        );
+        ctx.types.insert(
+            "DbRead".to_string(),
+            Type::Function(vec![Type::String], Box::new(Type::Var("Result".to_string()))),
+        );
+        ctx.types.insert(
+            "log".to_string(),
+            Type::Function(vec![Type::String], Box::new(Type::Var("void".to_string()))),
+        );
+        ctx.types.insert(
+            "HttpOut".to_string(),
+            Type::Function(vec![Type::Var("T".to_string())], Box::new(Type::Var("HttpResponse".to_string()))),
+        );
+        ctx.types.insert(
+            "respond".to_string(),
+            Type::Function(vec![Type::Var("T".to_string())], Box::new(Type::Var("Response".to_string()))),
+        );
+        ctx.types.insert(
+            "json".to_string(),
+            Type::Function(vec![Type::Var("T".to_string())], Box::new(Type::Var("Json".to_string()))),
+        );
 
         ctx
     }

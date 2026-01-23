@@ -27,6 +27,7 @@ mod tests {
 
         let ir = IrProgram {
             decls: vec![IrDecl::Function(func)],
+            adt_types: vec![],
         };
 
         // Test that it validates

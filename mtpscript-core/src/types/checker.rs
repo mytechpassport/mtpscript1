@@ -77,6 +77,10 @@ impl TypeChecker {
                         .insert(param.clone(), Type::TypeVar(param.clone()));
                 }
 
+                // Register a placeholder type first to allow recursive type references
+                // This allows types like `type Tree = Leaf(number) | Node(Tree, Tree)`
+                self.context.insert(name.clone(), Type::Var(name.clone()));
+
                 let adt_variants = variants
                     .iter()
                     .map(|variant| match &variant.payload[..] {
@@ -90,6 +94,32 @@ impl TypeChecker {
                         }
                     })
                     .collect::<Result<Vec<_>, _>>()?;
+
+                // Create the result type for this ADT
+                let result_type = if type_params.is_empty() {
+                    Type::Var(name.clone())
+                } else {
+                    Type::TypeVar(format!("{}${}", name, type_params.join("$")))
+                };
+
+                // Register each variant as a constructor in the context
+                for variant in variants {
+                    match &variant.payload[..] {
+                        [] => {
+                            // Unit variant is a value of the ADT type
+                            self.context.insert(variant.name.clone(), result_type.clone());
+                        }
+                        payload => {
+                            // Variant with payload is a function: (payload types) -> ADT type
+                            let payload_types = payload
+                                .iter()
+                                .map(|te| self.resolve_type_expr(te))
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let constructor_type = Type::Function(payload_types, Box::new(result_type.clone()));
+                            self.context.insert(variant.name.clone(), constructor_type);
+                        }
+                    }
+                }
 
                 // Clear type vars
                 for param in type_params {
@@ -372,22 +402,32 @@ impl TypeChecker {
             }
             Expr::Match { expr, cases } => {
                 // Match expression - all case bodies must return same type
-                let _scrutinee_type = self.typecheck_expr(expr, context)?;
+                let scrutinee_type = self.typecheck_expr(expr, context)?;
                 if cases.is_empty() {
                     return Err(CompileError::TypeError(
                         "Match expression must have at least one case".to_string(),
                     ));
                 }
-                let first_type = self.typecheck_expr(&cases[0].1, context)?;
-                for (_, case_body) in &cases[1..] {
-                    let case_type = self.typecheck_expr(case_body, context)?;
-                    if case_type != first_type {
-                        return Err(CompileError::TypeError(
-                            "All match arms must return same type".to_string(),
-                        ));
+
+                // Type check each arm with pattern bindings
+                let mut result_type: Option<Type> = None;
+                for (pattern, case_body) in cases {
+                    // Create context with pattern bindings
+                    let mut local_context = context.clone();
+                    self.bind_pattern_vars(pattern, &scrutinee_type, &mut local_context)?;
+
+                    let case_type = self.typecheck_expr(case_body, &local_context)?;
+                    if let Some(ref expected) = result_type {
+                        if case_type != *expected {
+                            return Err(CompileError::TypeError(
+                                "All match arms must return same type".to_string(),
+                            ));
+                        }
+                    } else {
+                        result_type = Some(case_type);
                     }
                 }
-                Ok(first_type)
+                Ok(result_type.unwrap())
             }
             Expr::Const { name, value, body } => {
                 // Const binding: const x = value in body
@@ -476,5 +516,78 @@ impl TypeChecker {
         };
         self.exit_recursion();
         result
+    }
+
+    /// Bind pattern variables to the context for type checking match arm bodies
+    fn bind_pattern_vars(
+        &self,
+        pattern: &ast::Pattern,
+        scrutinee_type: &Type,
+        context: &mut TypeContext,
+    ) -> Result<(), CompileError> {
+        match pattern {
+            ast::Pattern::Wildcard => Ok(()),
+            ast::Pattern::Ident(name) => {
+                // Simple variable binding - takes on the scrutinee type
+                context.insert(name.clone(), scrutinee_type.clone());
+                Ok(())
+            }
+            ast::Pattern::Literal(_) => Ok(()), // No bindings in literals
+            ast::Pattern::Variant(variant_name, sub_patterns) => {
+                // Look up the variant in the ADT type to get payload types
+                let payload_types = self.get_variant_payload_types(scrutinee_type, variant_name)?;
+
+                // Bind sub-patterns
+                for (sub_pattern, payload_type) in sub_patterns.iter().zip(payload_types.iter()) {
+                    self.bind_pattern_vars(sub_pattern, payload_type, context)?;
+                }
+                Ok(())
+            }
+            ast::Pattern::Record(_, fields) => {
+                // For record patterns, bind each field variable
+                for (field_name, field_pattern) in fields {
+                    // Get field type from scrutinee if it's a record
+                    let field_type = match scrutinee_type {
+                        Type::Record(record) => record.field_type(field_name).cloned(),
+                        _ => None,
+                    };
+                    let field_type = field_type.unwrap_or_else(|| Type::TypeVar("unknown".to_string()));
+                    self.bind_pattern_vars(field_pattern, &field_type, context)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Get the payload types for a variant of an ADT
+    fn get_variant_payload_types(&self, scrutinee_type: &Type, variant_name: &str) -> Result<Vec<Type>, CompileError> {
+        // First check if this is a direct ADT type
+        if let Type::Adt(adt) = scrutinee_type {
+            for variant in &adt.variants {
+                match variant {
+                    AdtVariant::Unit(name) if name == variant_name => return Ok(vec![]),
+                    AdtVariant::Tuple(name, types) if name == variant_name => return Ok(types.clone()),
+                    _ => {}
+                }
+            }
+        }
+
+        // Check if it's a named ADT type (Type::Var)
+        if let Type::Var(type_name) = scrutinee_type {
+            if let Some(Type::Adt(adt)) = self.context.lookup(type_name) {
+                for variant in &adt.variants {
+                    match variant {
+                        AdtVariant::Unit(name) if name == variant_name => return Ok(vec![]),
+                        AdtVariant::Tuple(name, types) if name == variant_name => return Ok(types.clone()),
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        // For built-in types like Option/Result, check the context
+        // For generic type variables or unknown types, return a type variable for each sub-pattern
+        // This is a fallback that allows flexible pattern matching
+        Ok(vec![Type::TypeVar(format!("{}$payload", variant_name))])
     }
 }

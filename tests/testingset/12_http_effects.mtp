@@ -2,7 +2,7 @@
 // Tests HttpOut effect for outbound HTTP requests
 
 api POST "/http-get" uses { HttpOut } {
-  const response = HttpOut("GET", "https://api.example.com/users", null);
+  const response = HttpOut("GET", "https://jsonplaceholder.typicode.com/todos/1", null);
   respond json({
     "method": "GET",
     "response": response
@@ -11,7 +11,7 @@ api POST "/http-get" uses { HttpOut } {
 
 api POST "/http-post" uses { HttpOut } {
   const body = { "name": "Alice", "email": "alice@example.com" };
-  const response = HttpOut("POST", "https://api.example.com/users", body);
+  const response = HttpOut("POST", "https://jsonplaceholder.typicode.com/todos/1", body);
   respond json({
     "method": "POST",
     "body_sent": body,
@@ -21,7 +21,7 @@ api POST "/http-post" uses { HttpOut } {
 
 api PUT "/http-put" uses { HttpOut } {
   const update = { "id": 1, "name": "Alice Updated", "email": "alice.new@example.com" };
-  const response = HttpOut("PUT", "https://api.example.com/users/1", update);
+  const response = HttpOut("PUT", "https://jsonplaceholder.typicode.com/todos/1", update);
   respond json({
     "method": "PUT",
     "update": update,
@@ -30,7 +30,7 @@ api PUT "/http-put" uses { HttpOut } {
 }
 
 api DELETE "/http-delete" uses { HttpOut } {
-  const response = HttpOut("DELETE", "https://api.example.com/users/1", null);
+  const response = HttpOut("DELETE", "https://jsonplaceholder.typicode.com/todos/1", null);
   respond json({
     "method": "DELETE",
     "response": response
@@ -45,7 +45,7 @@ api POST "/http-with-headers" uses { HttpOut } {
       "X-Custom-Header": "custom-value"
     }
   };
-  const response = HttpOut("GET", "https://api.example.com/protected", options);
+  const response = HttpOut("GET", "https://jsonplaceholder.typicode.com/todos/1", options);
   respond json({
     "headers_sent": options["headers"],
     "response": response
@@ -54,9 +54,9 @@ api POST "/http-with-headers" uses { HttpOut } {
 
 api POST "/http-sequential" uses { HttpOut } {
   // Multiple sequential HTTP calls
-  const user_response = HttpOut("GET", "https://api.example.com/users/1", null);
-  const order_response = HttpOut("GET", "https://api.example.com/users/1/orders", null);
-  const profile_response = HttpOut("GET", "https://api.example.com/users/1/profile", null);
+  const user_response = HttpOut("GET", "https://jsonplaceholder.typicode.com/todos/1", null);
+  const order_response = HttpOut("GET", "https://jsonplaceholder.typicode.com/todos/1", null);
+  const profile_response = HttpOut("GET", "https://jsonplaceholder.typicode.com/todos/1", null);
   respond json({
     "user": user_response,
     "orders": order_response,
@@ -65,7 +65,7 @@ api POST "/http-sequential" uses { HttpOut } {
 }
 
 api POST "/http-error-handling" uses { HttpOut } {
-  const response = HttpOut("GET", "https://api.example.com/not-found", null);
+  const response = HttpOut("GET", "https://jsonplaceholder.typicode.com/todos/999999", null);
   const handled = match response {
     Ok(data) => { "status": "success", "data": data }
     Err(error) => { "status": "error", "error": error }

@@ -30,6 +30,7 @@ pub enum JsToken {
     True,
     False,
     Null,
+    Undefined,
 
     // Identifiers and literals
     Ident(String),
@@ -245,6 +246,7 @@ impl<'a> JsLexer<'a> {
             "true" => JsToken::True,
             "false" => JsToken::False,
             "null" => JsToken::Null,
+            "undefined" => JsToken::Undefined,
             // Forbidden constructs - will be caught at parse time
             _ => JsToken::Ident(ident),
         }
@@ -861,6 +863,12 @@ impl JsParser {
                 self.advance();
                 Ok(JsExpr::Literal(Value::Null))
             }
+            JsToken::Undefined => {
+                self.advance();
+                // In JavaScript, undefined is treated as a special "undefined" value
+                // We use Null to represent it in our runtime
+                Ok(JsExpr::Literal(Value::Null))
+            }
             JsToken::Ident(name) => {
                 self.advance();
                 Ok(JsExpr::Ident(name))
@@ -882,6 +890,30 @@ impl JsParser {
                 let fields = self.parse_object_fields()?;
                 self.expect(JsToken::RBrace)?;
                 Ok(JsExpr::Object(fields))
+            }
+            JsToken::Function => {
+                // Function expression: function(params) { body } or function name(params) { body }
+                self.advance();
+
+                // Optional function name
+                let name = if let JsToken::Ident(n) = self.current().clone() {
+                    self.advance();
+                    n
+                } else {
+                    String::new()
+                };
+
+                // Parse parameters
+                self.expect(JsToken::LParen)?;
+                let params = self.parse_param_list()?;
+                self.expect(JsToken::RParen)?;
+
+                // Parse body
+                self.expect(JsToken::LBrace)?;
+                let body = self.parse_block_contents()?;
+                self.expect(JsToken::RBrace)?;
+
+                Ok(JsExpr::Function(name, params, Box::new(body)))
             }
             _ => Err(RuntimeError::ValueError(format!(
                 "Unexpected token: {:?}",

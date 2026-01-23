@@ -102,6 +102,96 @@ pub fn decimal_to_string(args: Vec<Value>) -> Result<Value, String> {
     }
 }
 
+pub fn decimal_add(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.add expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(a), Value::Decimal(b)) => {
+            a.add(b).map(Value::Decimal).map_err(|e| format!("Decimal.add error: {:?}", e))
+        }
+        _ => Err("Decimal.add expects two Decimal values".to_string()),
+    }
+}
+
+pub fn decimal_subtract(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.subtract expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(a), Value::Decimal(b)) => {
+            a.sub(b).map(Value::Decimal).map_err(|e| format!("Decimal.subtract error: {:?}", e))
+        }
+        _ => Err("Decimal.subtract expects two Decimal values".to_string()),
+    }
+}
+
+pub fn decimal_multiply(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.multiply expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(a), Value::Decimal(b)) => {
+            a.mul(b).map(Value::Decimal).map_err(|e| format!("Decimal.multiply error: {:?}", e))
+        }
+        _ => Err("Decimal.multiply expects two Decimal values".to_string()),
+    }
+}
+
+pub fn decimal_divide(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.divide expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(a), Value::Decimal(b)) => {
+            // Use default scale of 28 for division (IEEE 754-2008 compliant)
+            a.div(b, 28).map(Value::Decimal).map_err(|e| format!("Decimal.divide error: {:?}", e))
+        }
+        _ => Err("Decimal.divide expects two Decimal values".to_string()),
+    }
+}
+
+pub fn decimal_round(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.round expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(d), Value::Number(places)) => {
+            let places_u8 = if *places < 0 { 0 } else if *places > 28 { 28 } else { *places as u8 };
+            d.round(places_u8).map(Value::Decimal).map_err(|e| format!("Decimal.round error: {:?}", e))
+        }
+        _ => Err("Decimal.round expects Decimal and number".to_string()),
+    }
+}
+
+pub fn decimal_equals(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.equals expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(a), Value::Decimal(b)) => {
+            Ok(Value::Boolean(a == b))
+        }
+        _ => Err("Decimal.equals expects two Decimal values".to_string()),
+    }
+}
+
+pub fn decimal_less_than(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("Decimal.lessThan expects 2 arguments".to_string());
+    }
+    match (&args[0], &args[1]) {
+        (Value::Decimal(a), Value::Decimal(b)) => {
+            Ok(Value::Boolean(a < b))
+        }
+        _ => Err("Decimal.lessThan expects two Decimal values".to_string()),
+    }
+}
+
+pub fn decimal_zero(_args: Vec<Value>) -> Result<Value, String> {
+    Ok(Value::Decimal(Decimal::zero()))
+}
+
 pub fn fnv1a32(args: Vec<Value>) -> Result<Value, String> {
     if args.len() != 1 {
         return Err("fnv1a32 expects 1 argument".to_string());
@@ -245,6 +335,23 @@ pub fn get_builtin_functions() -> HashMap<String, BuiltinFn> {
         "Decimal.toString".to_string(),
         decimal_to_string as BuiltinFn,
     );
+    map.insert("Decimal.add".to_string(), decimal_add as BuiltinFn);
+    map.insert(
+        "Decimal.subtract".to_string(),
+        decimal_subtract as BuiltinFn,
+    );
+    map.insert(
+        "Decimal.multiply".to_string(),
+        decimal_multiply as BuiltinFn,
+    );
+    map.insert("Decimal.divide".to_string(), decimal_divide as BuiltinFn);
+    map.insert("Decimal.round".to_string(), decimal_round as BuiltinFn);
+    map.insert("Decimal.equals".to_string(), decimal_equals as BuiltinFn);
+    map.insert(
+        "Decimal.lessThan".to_string(),
+        decimal_less_than as BuiltinFn,
+    );
+    map.insert("Decimal.zero".to_string(), decimal_zero as BuiltinFn);
 
     // Hash functions
     map.insert("fnv1a32".to_string(), fnv1a32 as BuiltinFn);

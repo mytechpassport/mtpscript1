@@ -16,29 +16,26 @@ impl PatternCompiler {
     }
 
     /// Compile a match expression with advanced pattern matching
+    /// Returns an expression wrapped in an IIFE for use in expression context
     pub fn compile_match(
         &mut self,
         expr: &IrExpr,
         cases: &[(IrPattern, IrExpr)],
-        indent: usize,
+        _indent: usize,
     ) -> Result<String, CompileError> {
-        let indent_str = "  ".repeat(indent);
         let expr_js = self.compile_expr(expr, 0)?;
-
-        let mut output = format!("{}// Match expression with advanced patterns\n", indent_str);
 
         // Bind the expression to a variable to avoid re-evaluation
         let match_var = self.next_temp_var();
-        output.push_str(&format!(
-            "{}const {} = {};\n",
-            indent_str, match_var, expr_js
-        ));
 
         // Generate simple pattern matching as ternary expressions
         let match_expr = self.compile_simple_ternary_match(&match_var, cases)?;
-        output.push_str(&format!("{}{}", indent_str, match_expr));
 
-        Ok(output)
+        // Wrap in IIFE to make it a valid expression
+        Ok(format!(
+            "(function() {{ const {} = {}; return {}; }})()",
+            match_var, expr_js, match_expr
+        ))
     }
 
     /// Compile simple pattern cases as ternary expressions with variable substitution
@@ -116,16 +113,14 @@ impl PatternCompiler {
 
         // For constructors with arguments, bind the value
         if !sub_patterns.is_empty() {
-            let value_expr = format!("{}.{}", expr_var, name);
-            let temp_var = self.next_temp_var();
-            bindings.push((temp_var.clone(), value_expr.clone()));
+            let value_expr = format!("{}[\"{}\"]", expr_var, name);
 
             for (i, sub_pattern) in sub_patterns.iter().enumerate() {
                 // For multi-argument constructors, access by index; for single arg, use directly
                 let sub_expr = if sub_patterns.len() == 1 {
-                    temp_var.clone()
+                    value_expr.clone()
                 } else {
-                    format!("{}[{}]", temp_var, i)
+                    format!("{}[{}]", value_expr, i)
                 };
 
                 match sub_pattern {
@@ -133,7 +128,7 @@ impl PatternCompiler {
                         // No additional condition or binding needed
                     }
                     IrPattern::Var(var_name) => {
-                        // Bind the variable to the appropriate expression
+                        // Bind the variable directly to the value expression
                         bindings.push((var_name.clone(), sub_expr));
                     }
                     IrPattern::Literal(lit_expr) => {
@@ -143,10 +138,8 @@ impl PatternCompiler {
                     }
                     IrPattern::Variant(nested_name, nested_subs) => {
                         // Recursively compile nested variant pattern
-                        let nested_temp = self.next_temp_var();
-                        bindings.push((nested_temp.clone(), sub_expr));
                         let (nested_cond, nested_bindings) =
-                            self.compile_variant_pattern(nested_name, nested_subs, &nested_temp)?;
+                            self.compile_variant_pattern(nested_name, nested_subs, &sub_expr)?;
                         if nested_cond != "true" {
                             conditions.push(nested_cond);
                         }
@@ -154,10 +147,8 @@ impl PatternCompiler {
                     }
                     IrPattern::Record(rec_name, rec_fields) => {
                         // Recursively compile nested record pattern
-                        let nested_temp = self.next_temp_var();
-                        bindings.push((nested_temp.clone(), sub_expr));
                         let (rec_cond, rec_bindings) =
-                            self.compile_record_pattern(rec_name, rec_fields, &nested_temp)?;
+                            self.compile_record_pattern(rec_name, rec_fields, &sub_expr)?;
                         if rec_cond != "true" {
                             conditions.push(rec_cond);
                         }

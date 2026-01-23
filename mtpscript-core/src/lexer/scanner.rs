@@ -4,8 +4,9 @@ use crate::errors::compile::CompileError;
 pub struct Scanner<'a> {
     source: &'a str,
     chars: Vec<char>,
-    start: usize,
-    current: usize,
+    char_byte_offsets: Vec<usize>, // byte offset for each char index
+    start: usize,                   // char index
+    current: usize,                 // char index
     line: usize,
     column: usize,
 }
@@ -31,9 +32,20 @@ impl<'a> Scanner<'a> {
             ));
         }
 
+        // Build char vector and byte offset mapping
+        let chars: Vec<char> = source.chars().collect();
+        let mut char_byte_offsets = Vec::with_capacity(chars.len() + 1);
+        let mut byte_offset = 0;
+        for c in &chars {
+            char_byte_offsets.push(byte_offset);
+            byte_offset += c.len_utf8();
+        }
+        char_byte_offsets.push(byte_offset); // end offset for slicing
+
         Ok(Self {
             source,
-            chars: source.chars().collect(),
+            chars,
+            char_byte_offsets,
             start: 0,
             current: 0,
             line: 1,
@@ -77,7 +89,35 @@ impl<'a> Scanner<'a> {
             '+' => Ok(Some(self.make_token(Token::Plus))),
             '-' => Ok(Some(self.make_token(Token::Minus))),
             '*' => Ok(Some(self.make_token(Token::Star))),
-            '/' => Ok(Some(self.make_token(Token::Slash))),
+            '/' => {
+                if self.match_char('/') {
+                    // Single-line comment: skip until end of line
+                    while !self.is_at_end() && self.peek() != '\n' {
+                        self.advance();
+                    }
+                    Ok(None) // skip comment
+                } else if self.match_char('*') {
+                    // Multi-line comment: skip until */
+                    while !self.is_at_end() {
+                        if self.peek() == '*' {
+                            self.advance();
+                            if !self.is_at_end() && self.peek() == '/' {
+                                self.advance();
+                                break;
+                            }
+                        } else {
+                            if self.peek() == '\n' {
+                                self.line += 1;
+                                self.column = 0;
+                            }
+                            self.advance();
+                        }
+                    }
+                    Ok(None) // skip comment
+                } else {
+                    Ok(Some(self.make_token(Token::Slash)))
+                }
+            }
             '.' => {
                 if self.peek().is_ascii_digit() {
                     Err(CompileError::LexerError(
@@ -177,8 +217,11 @@ impl<'a> Scanner<'a> {
 
         self.advance(); // closing "
 
-        let value = self.source[self.start + 1..self.current - 1].to_string();
-        let processed = self.process_escapes(&value);
+        // Get the string content between the quotes using byte offsets
+        let start_byte = self.char_byte_offsets[self.start + 1]; // skip opening quote
+        let end_byte = self.char_byte_offsets[self.current - 1]; // skip closing quote
+        let value = &self.source[start_byte..end_byte];
+        let processed = self.process_escapes(value);
 
         Ok(Some(self.make_token(Token::String(processed))))
     }
@@ -221,14 +264,28 @@ impl<'a> Scanner<'a> {
             while !self.is_at_end() && self.peek().is_ascii_digit() {
                 self.advance();
             }
-            let value = &self.source[self.start..self.current];
+            let value = self.current_lexeme();
             return Ok(Some(self.make_token(Token::Decimal(value.to_string()))));
         }
 
-        let value = &self.source[self.start..self.current];
-        let num = value
-            .parse::<i64>()
-            .map_err(|_| CompileError::LexerError("Invalid number".to_string()))?;
+        let value = self.current_lexeme();
+        // Try parsing as i64, handle potential overflow for i64::MIN edge case
+        let num = match value.parse::<i64>() {
+            Ok(n) => n,
+            Err(_) => {
+                // Special case: 9223372036854775808 is only valid as part of -9223372036854775808 (i64::MIN)
+                // Store as i64::MAX and let the parser handle negation
+                if value == "9223372036854775808" {
+                    // Use i64::MIN directly - the unary minus in parser will need to handle this
+                    i64::MIN
+                } else {
+                    return Err(CompileError::LexerError(format!(
+                        "Number {} is out of i64 range",
+                        value
+                    )));
+                }
+            }
+        };
         Ok(Some(self.make_token(Token::Number(num))))
     }
 
@@ -237,7 +294,7 @@ impl<'a> Scanner<'a> {
             self.advance();
         }
 
-        let text = &self.source[self.start..self.current];
+        let text = self.current_lexeme();
 
         let token = match text {
             "function" => Token::Function,
@@ -299,6 +356,13 @@ impl<'a> Scanner<'a> {
 
     fn is_at_end(&self) -> bool {
         self.current >= self.chars.len()
+    }
+
+    /// Get the source text between start and current char indices using proper byte offsets
+    fn current_lexeme(&self) -> &str {
+        let start_byte = self.char_byte_offsets[self.start];
+        let end_byte = self.char_byte_offsets[self.current];
+        &self.source[start_byte..end_byte]
     }
 }
 
