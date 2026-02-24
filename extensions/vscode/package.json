@@ -17,8 +17,13 @@
     "languages": [
       {
         "id": "mtpscript",
-        "aliases": ["MTPScript", "mtp"],
-        "extensions": [".mtp"],
+        "aliases": [
+          "MTPScript",
+          "mtp"
+        ],
+        "extensions": [
+          ".mtp"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
