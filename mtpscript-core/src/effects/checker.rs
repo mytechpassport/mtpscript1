@@ -110,6 +110,11 @@ fn check_expr_effects(
                 check_expr_effects(value, declared_effects, allow_respond)?;
             }
         }
+        Expr::Block(exprs) => {
+            for expr in exprs {
+                check_expr_effects(expr, declared_effects, allow_respond)?;
+            }
+        }
         // Literals and identifiers don't use effects
         Expr::String(_)
         | Expr::Number(_)

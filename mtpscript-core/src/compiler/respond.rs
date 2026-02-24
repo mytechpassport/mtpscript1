@@ -134,6 +134,26 @@ fn compile_expr_to_js(expr: &Expr) -> String {
 
         // Grouping
         Expr::Group(inner) => format!("({})", compile_expr_to_js(inner)),
+
+        // Block expression - compile as IIFE with statements
+        Expr::Block(exprs) => {
+            if exprs.is_empty() {
+                "true".to_string()
+            } else if exprs.len() == 1 {
+                compile_expr_to_js(&exprs[0])
+            } else {
+                let stmts: Vec<String> = exprs[..exprs.len()-1]
+                    .iter()
+                    .map(|e| format!("{};", compile_expr_to_js(e)))
+                    .collect();
+                let last = compile_expr_to_js(exprs.last().unwrap());
+                format!(
+                    "(function() {{ {} return {}; }})()",
+                    stmts.join(" "),
+                    last
+                )
+            }
+        }
     }
 }
 

@@ -23,6 +23,7 @@ impl<'a> Scanner<'a> {
         keywords.insert("const", TokenKind::Const);
         keywords.insert("if", TokenKind::If);
         keywords.insert("else", TokenKind::Else);
+        keywords.insert("then", TokenKind::Then);
         keywords.insert("match", TokenKind::Match);
         keywords.insert("await", TokenKind::Await);
         keywords.insert("uses", TokenKind::Uses);
@@ -30,6 +31,10 @@ impl<'a> Scanner<'a> {
         keywords.insert("respond", TokenKind::Respond);
         keywords.insert("true", TokenKind::True);
         keywords.insert("false", TokenKind::False);
+        keywords.insert("Ok", TokenKind::Ok);
+        keywords.insert("Err", TokenKind::Err);
+        keywords.insert("Some", TokenKind::Some);
+        keywords.insert("None", TokenKind::None);
         keywords.insert("GET", TokenKind::Get);
         keywords.insert("POST", TokenKind::Post);
         keywords.insert("PUT", TokenKind::Put);
@@ -85,10 +90,7 @@ impl<'a> Scanner<'a> {
                 } else if self.matches('>') {
                     Ok(self.make_token(TokenKind::EqualGreater))
                 } else {
-                    return Err(MtpError::LexerError {
-                        error: "LexerError".to_string(),
-                        message: "Unexpected '='".to_string(),
-                    });
+                    Ok(self.make_token(TokenKind::Equal))
                 }
             }
             '<' => {
@@ -129,7 +131,15 @@ impl<'a> Scanner<'a> {
             }
             '"' => self.string(),
             '0'..='9' => self.number(),
-            'a'..='z' | 'A'..='Z' | '_' => self.identifier(),
+            '_' => {
+                // Check if it's just a standalone underscore (wildcard) or part of an identifier
+                if self.is_at_end() || !(self.peek().is_alphanumeric() || self.peek() == '_') {
+                    Ok(self.make_token(TokenKind::Underscore))
+                } else {
+                    self.identifier()
+                }
+            }
+            'a'..='z' | 'A'..='Z' => self.identifier(),
             _ => Err(MtpError::LexerError {
                 error: "LexerError".to_string(),
                 message: format!("Unexpected character: {}", c),

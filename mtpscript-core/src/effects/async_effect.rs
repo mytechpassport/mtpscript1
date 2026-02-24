@@ -96,6 +96,11 @@ fn desugar_expr_async(expr: &mut Expr, cont_id_counter: &mut u32) -> Result<(), 
         Expr::RespondJson(inner) => {
             desugar_expr_async(inner, cont_id_counter)?;
         }
+        Expr::Block(exprs) => {
+            for expr in exprs {
+                desugar_expr_async(expr, cont_id_counter)?;
+            }
+        }
         // Literals don't need desugaring
         Expr::String(_)
         | Expr::Number(_)
@@ -211,6 +216,17 @@ fn deterministic_expr_serialize(expr: &Expr) -> String {
         Expr::RespondJson(expr) => format!("RespondJson({})", deterministic_expr_serialize(expr)),
         Expr::Await(expr) => format!("Await({})", deterministic_expr_serialize(expr)),
         Expr::Group(expr) => format!("Group({})", deterministic_expr_serialize(expr)),
+        Expr::Block(exprs) => {
+            let mut s = "Block(".to_string();
+            for (i, e) in exprs.iter().enumerate() {
+                if i > 0 {
+                    s.push(',');
+                }
+                s.push_str(&deterministic_expr_serialize(e));
+            }
+            s.push(')');
+            s
+        }
     }
 }
 

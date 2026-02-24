@@ -14,6 +14,7 @@ pub enum TokenKind {
     Const,
     If,
     Else,
+    Then,
     Match,
     Await,
     Uses,
@@ -21,13 +22,18 @@ pub enum TokenKind {
     Respond,
     True,
     False,
+    Ok,
+    Err,
+    Some,
+    None,
 
     // Operators
     Plus,
     Minus,
     Star,
     Slash,
-    EqualEqual,
+    Equal,       // =
+    EqualEqual,  // ==
     BangEqual,
     Less,
     LessEqual,
@@ -50,6 +56,7 @@ pub enum TokenKind {
     Colon,
     Semicolon,
     EqualGreater, // =>
+    Underscore,   // _
 
     // HTTP Methods
     Get,

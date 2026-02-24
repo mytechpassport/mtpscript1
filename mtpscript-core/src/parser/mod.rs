@@ -149,6 +149,51 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_expr(&mut self) -> Result<TypeExpr, CompileError> {
+        // Handle function types: function(T1, T2): R
+        if self.match_token(Token::Function) {
+            self.consume(Token::LParen, "Expected '(' after 'function' in type")?;
+            let mut param_types = Vec::new();
+            while !self.check(Token::RParen) && !self.is_at_end() {
+                param_types.push(self.parse_type_expr()?);
+                if !self.match_token(Token::Comma) {
+                    break;
+                }
+            }
+            self.consume(Token::RParen, "Expected ')' after function parameter types")?;
+            // Optional return type
+            let return_type = if self.match_token(Token::Colon) {
+                self.parse_type_expr()?
+            } else {
+                TypeExpr::Ident("void".to_string())
+            };
+            // Encode as a generic type: Function<param1, param2, ..., return>
+            let mut args = param_types;
+            args.push(return_type);
+            return Ok(TypeExpr::Generic("Function".to_string(), args));
+        }
+
+        // Handle inline record types: { field: Type, ... }
+        if self.match_token(Token::LBrace) {
+            // Parse fields
+            let mut fields = Vec::new();
+            while !self.check(Token::RBrace) && !self.is_at_end() {
+                let field_name = self.parse_identifier()?;
+                self.consume(Token::Colon, "Expected ':' after field name in record type")?;
+                let field_type = self.parse_type_expr()?;
+                fields.push((field_name, field_type));
+                // Commas are optional
+                self.match_token(Token::Comma);
+            }
+            self.consume(Token::RBrace, "Expected '}' after record type fields")?;
+            // Encode as anonymous record: Record<field1_name, field1_type, ...>
+            let mut args = Vec::new();
+            for (name, typ) in fields {
+                args.push(TypeExpr::Ident(name));
+                args.push(typ);
+            }
+            return Ok(TypeExpr::Generic("Record".to_string(), args));
+        }
+
         let ident = self.parse_identifier()?;
 
         if self.match_token(Token::Less) {
@@ -196,8 +241,13 @@ impl<'a> Parser<'a> {
         let mut params = Vec::new();
         while !self.check(Token::RParen) && !self.is_at_end() {
             let name = self.parse_identifier()?;
-            self.consume(Token::Colon, "Expected ':' after parameter name")?;
-            let typ = self.parse_type_expr()?;
+            // Type annotation is optional for lambdas
+            let typ = if self.match_token(Token::Colon) {
+                self.parse_type_expr()?
+            } else {
+                // Default to "any" type when not specified
+                TypeExpr::Ident("any".to_string())
+            };
             params.push((name, typ));
             if !self.match_token(Token::Comma) {
                 break;
@@ -216,7 +266,7 @@ impl<'a> Parser<'a> {
             Vec::new()
         };
         self.consume(Token::LBrace, "Expected '{' before API body")?;
-        let body = self.parse_expr()?;
+        let body = self.parse_block_body()?;
         self.consume(Token::RBrace, "Expected '}' after API body")?;
 
         Ok(ApiDecl {
@@ -225,6 +275,57 @@ impl<'a> Parser<'a> {
             effects,
             body,
         })
+    }
+
+    /// Parse a block body - a sequence of expressions/statements
+    fn parse_block_body(&mut self) -> Result<Expr, CompileError> {
+        let mut exprs = Vec::new();
+
+        while !self.check(Token::RBrace) && !self.is_at_end() {
+            // Handle local type declarations
+            if self.check(Token::Type) {
+                // Skip local type declarations - they don't produce a value
+                self.advance(); // consume 'type'
+                let _name = self.parse_identifier()?;
+                if self.match_token(Token::LBrace) {
+                    // Record type: type Foo { field: Type }
+                    while !self.check(Token::RBrace) && !self.is_at_end() {
+                        self.parse_identifier()?; // field name
+                        self.consume(Token::Colon, "Expected ':' after field name")?;
+                        self.parse_type_expr()?;
+                        self.match_token(Token::Comma);
+                    }
+                    self.consume(Token::RBrace, "Expected '}' after record fields")?;
+                } else if self.match_token(Token::Equal) {
+                    // ADT type: type Foo = Bar | Baz
+                    loop {
+                        self.parse_variant_decl()?;
+                        if !self.match_token(Token::Pipe) {
+                            break;
+                        }
+                    }
+                }
+                // Consume optional semicolon
+                self.match_token(Token::Semicolon);
+                continue;
+            }
+
+            let expr = self.parse_expr()?;
+            exprs.push(expr);
+            // Consume optional semicolon
+            self.match_token(Token::Semicolon);
+        }
+
+        // If only one expression, return it directly
+        // Otherwise wrap in Block
+        if exprs.len() == 1 {
+            Ok(exprs.pop().unwrap())
+        } else if exprs.is_empty() {
+            // Empty block returns unit/null
+            Ok(Expr::Boolean(true))
+        } else {
+            Ok(Expr::Block(exprs))
+        }
     }
 
     fn parse_http_method(&mut self) -> Result<HttpMethod, CompileError> {
@@ -582,17 +683,66 @@ impl<'a> Parser<'a> {
 
     /// Parse a match arm body - stops at pattern-like tokens
     fn parse_match_arm_body(&mut self) -> Result<Expr, CompileError> {
-        // Check if this looks like a block expression
+        // Check if this looks like a block expression or object literal
         if self.check(Token::LBrace) {
             self.advance(); // consume {
-            let expr = self.parse_expr()?;
-            self.consume(Token::RBrace, "Expected '}' after block expression")?;
-            return Ok(expr);
-        }
+            // Check if it's empty
+            if self.check(Token::RBrace) {
+                // Empty {} - could be empty block or empty object
+                // In match arm context, treat as empty object (more common)
+                self.advance();
+                return Ok(Expr::Object(Vec::new()));
+            }
 
-        // Parse a simple expression, but stop at pattern-like tokens
-        // A pattern-like token is: identifier/underscore followed by => or (
-        self.parse_comparison()
+            // Look ahead to determine if it's an object or block
+            // Object: { "key": value } or { key: value }
+            // Block: { const x = ...; expr } or { expr; expr }
+            let is_object = self.is_object_literal_lookahead();
+
+            if is_object {
+                // Parse object fields
+                let mut fields = Vec::new();
+                loop {
+                    if self.check(Token::RBrace) {
+                        break;
+                    }
+                    let key = self.parse_string_literal()?;
+                    self.consume(Token::Colon, "Expected ':' after object key")?;
+                    let value = self.parse_expr()?;
+                    fields.push((key, value));
+                    if !self.match_token(Token::Comma) {
+                        break;
+                    }
+                }
+                self.consume(Token::RBrace, "Expected '}' after object fields")?;
+                Ok(Expr::Object(fields))
+            } else {
+                // Parse as block body (multiple statements)
+                let body = self.parse_block_body()?;
+                self.consume(Token::RBrace, "Expected '}' after block expression")?;
+                Ok(body)
+            }
+        } else if self.check(Token::LBracket) {
+            // Array literal - parse normally
+            self.parse_primary()
+        } else {
+            // Parse a simple expression, but stop at pattern-like tokens
+            // A pattern-like token is: identifier/underscore followed by => or (
+            self.parse_comparison()
+        }
+    }
+
+    /// Check if the current position looks like an object literal start
+    fn is_object_literal_lookahead(&self) -> bool {
+        // Object literal: { "key": ... }
+        // First token is a string literal followed by colon
+        if let Token::String(_) = self.peek().token {
+            // Check if next is colon
+            if self.current + 1 < self.tokens.len() {
+                return self.tokens[self.current + 1].token == Token::Colon;
+            }
+        }
+        false
     }
 
     fn parse_const(&mut self) -> Result<Expr, CompileError> {

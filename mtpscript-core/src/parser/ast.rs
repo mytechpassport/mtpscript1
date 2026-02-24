@@ -84,6 +84,9 @@ pub enum Expr {
         body: Box<Expr>,
     },
 
+    // Block expression (sequence of expressions, returns last)
+    Block(Vec<Expr>),
+
     // Special constructs
     Await(Box<Expr>),
     RespondJson(Box<Expr>),

@@ -321,6 +321,30 @@ fn lower_expr_with_tail(
             ))
         }
 
+        AstExpr::Block(exprs) => {
+            // Lower block as a sequence of lets with dummy names, final expr is the result
+            if exprs.is_empty() {
+                return Ok(IrExpr::Boolean(true, Type::Boolean));
+            }
+            if exprs.len() == 1 {
+                return lower_expr_with_tail(&exprs[0], expected_type, is_tail);
+            }
+
+            // Convert block to nested lets
+            // For each non-final expression, wrap in a let with a dummy name
+            let mut result = lower_expr_with_tail(exprs.last().unwrap(), expected_type, is_tail)?;
+            for (i, expr) in exprs.iter().rev().skip(1).enumerate() {
+                let ir_expr = lower_expr_with_tail(expr, &Type::Var("stmt".to_string()), false)?;
+                result = IrExpr::Let {
+                    name: format!("__block_stmt_{}", i),
+                    value: Box::new(ir_expr),
+                    body: Box::new(result),
+                    result_type: expected_type.clone(),
+                };
+            }
+            Ok(result)
+        }
+
         AstExpr::Group(expr) => lower_expr_with_tail(expr, expected_type, is_tail),
 
         AstExpr::Await(_) => {

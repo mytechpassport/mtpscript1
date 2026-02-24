@@ -223,22 +223,26 @@ impl TypeChecker {
             Expr::Boolean(_) => Ok(Type::Boolean),
             Expr::Array(elements) => {
                 if elements.is_empty() {
-                    // Empty array, can't infer type
-                    Err(CompileError::TypeError(
-                        "Cannot infer type of empty array".to_string(),
-                    ))
+                    // Empty array - use a type variable placeholder
+                    // In a full type system, this would be unified with context
+                    Ok(Type::TypeVar("Array$elem".to_string()))
                 } else {
                     let elem_type = self.typecheck_expr(&elements[0], context)?;
-                    // Check all elements have same type
+                    // Check all elements have compatible types
+                    // Allow mixed types by widening to a common type var
+                    let mut has_mixed = false;
                     for elem in &elements[1..] {
                         let t = self.typecheck_expr(elem, context)?;
                         if t != elem_type {
-                            return Err(CompileError::TypeError(
-                                "Array elements must have same type".to_string(),
-                            ));
+                            has_mixed = true;
                         }
                     }
-                    Ok(elem_type) // Arrays not fully typed yet
+                    if has_mixed {
+                        // Mixed types - return type var to allow heterogeneous arrays
+                        Ok(Type::TypeVar("Array$mixed".to_string()))
+                    } else {
+                        Ok(elem_type)
+                    }
                 }
             }
             Expr::Object(_fields) => {
@@ -461,6 +465,19 @@ impl TypeChecker {
             Expr::Group(inner) => {
                 // Grouping doesn't change type
                 self.typecheck_expr(inner, context)
+            }
+            Expr::Block(exprs) => {
+                // Block expression - type is the type of the last expression
+                if exprs.is_empty() {
+                    Ok(Type::Boolean) // Empty block returns unit/true
+                } else {
+                    // Type check all expressions, return the type of the last one
+                    let mut last_type = Type::Boolean;
+                    for expr in exprs {
+                        last_type = self.typecheck_expr(expr, context)?;
+                    }
+                    Ok(last_type)
+                }
             }
         }
     }
