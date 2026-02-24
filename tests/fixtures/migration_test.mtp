@@ -1,0 +1,21 @@
+record User {
+    id: Int;
+    name: String;
+    email: String;
+}
+
+function getUser(id: Int): User {
+    return {
+        id: id,
+        name: "John Doe",
+        email: "john@example.com"
+    };
+}
+
+function createUser(name: String, email: String): User {
+    return {
+        id: 1,
+        name: name,
+        email: email
+    };
+}

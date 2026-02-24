@@ -1,0 +1,12 @@
+{
+  "_integrity": "502d831db9fd43f9183e0a7f8fddee97c8fac1138f0d47bd59f98510808a38df",
+  "dependencies": {
+    "--help": {
+      "version": "latest",
+      "git_url": "(null)",
+      "git_hash": "placeholder-hash",
+      "signature": "placeholder-signature",
+      "integrity": "placeholder-hash"
+    }
+  }
+}

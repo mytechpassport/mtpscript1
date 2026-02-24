@@ -1,44 +1,20 @@
-# Opencode workspace files
-.opencode
-.claude/
-
-# Build artifacts and intermediate files
-build/
-target/
-*.o
-*.so
-*.dylib
-*.a
-
-# Generated snapshots (keep examples, ignore temp builds)
-*.msqs
-!examples/*.msqs
-
-# Compiler and runtime binaries (keep final executables, ignore intermediate)
-mtpjs_*
-!mtpjs_repl
-!mtpsc
-
-# Temporary test files
-tmp/
-temp/
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Rust-specific
-*.rs.bk
-.coverage/
-*.profraw
-
-# OS files
-.DS_Store
-Thumbs.db
-Cargo.lock
-ecdsa_key.pem
-ec_key.pem
-test_key.pem
+<<<<<<< HEAD
+**/*.o
+**/*.d
+**/*.exe
+**/*.bin
+**/*.sig
+**/*.msqs
+**/*.msqs.sig
+**/*.msqs.sig.pub
+**/*.msqs.sig.priv
+**/*.msqs.sig.pub.pem
+**/*.msqs.sig.priv.pem
+**/*.msqs.sig.pub.pem.sig
+**/*.msqs.sig.priv.pem.sig
+tests/executables/*
+example
+example_stdlib
+mtpjs
+mtpjs_stdlib
+mtpsc

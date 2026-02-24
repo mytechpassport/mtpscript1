@@ -1,0 +1,67 @@
+{
+  "name": "mtpscript",
+  "displayName": "MTPScript",
+  "description": "MTPScript language support for VS Code",
+  "version": "5.1.0",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:mtpscript"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "mtpscript",
+        "aliases": ["MTPScript", "mtp"],
+        "extensions": [".mtp"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mtpscript",
+        "scopeName": "source.mtp",
+        "path": "./syntaxes/mtpscript.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "MTPScript",
+      "properties": {
+        "mtpscript.server.path": {
+          "type": "string",
+          "default": "mtpsc",
+          "description": "Path to the MTPScript language server executable"
+        },
+        "mtpscript.server.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging for the language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.70.0",
+    "@types/node": "16.x",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "@vscode/test-electron": "^2.2.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  }
+}

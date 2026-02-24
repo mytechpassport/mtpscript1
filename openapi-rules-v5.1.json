@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "OpenAPI Generation Rules v5.1",
+  "description": "Deterministic rules for generating OpenAPI specifications from MTPScript",
+  "type": "object",
+  "properties": {
+    "fieldOrdering": {
+      "type": "object",
+      "description": "Deterministic field ordering rules",
+      "properties": {
+        "pathItem": {
+          "type": "array",
+          "description": "Order of HTTP methods in path items",
+          "items": {
+            "type": "string",
+            "enum": ["get", "post", "put", "delete", "patch", "head", "options", "trace"]
+          },
+          "default": ["get", "post", "put", "delete", "patch", "head", "options", "trace"]
+        },
+        "operation": {
+          "type": "array",
+          "description": "Order of fields within operation objects",
+          "items": {
+            "type": "string",
+            "enum": ["summary", "description", "operationId", "tags", "parameters", "requestBody", "responses", "callbacks", "deprecated", "security", "servers"]
+          },
+          "default": ["summary", "description", "operationId", "tags", "parameters", "requestBody", "responses", "callbacks", "deprecated", "security", "servers"]
+        },
+        "schema": {
+          "type": "array",
+          "description": "Order of fields within schema objects",
+          "items": {
+            "type": "string",
+            "enum": ["type", "format", "title", "description", "enum", "const", "multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum", "maxLength", "minLength", "pattern", "maxItems", "minItems", "uniqueItems", "maxProperties", "minProperties", "required", "properties", "patternProperties", "additionalProperties", "items", "allOf", "oneOf", "anyOf", "not", "nullable", "discriminator", "readOnly", "writeOnly", "xml", "externalDocs", "example", "examples", "deprecated"]
+          }
+        },
+        "parameter": {
+          "type": "array",
+          "description": "Order of fields within parameter objects",
+          "items": {
+            "type": "string",
+            "enum": ["name", "in", "description", "required", "deprecated", "allowEmptyValue", "style", "explode", "allowReserved", "schema", "example", "examples", "content"]
+          }
+        }
+      }
+    },
+    "refFolding": {
+      "type": "object",
+      "description": "Rules for folding $ref references",
+      "properties": {
+        "maxRefDepth": {
+          "type": "integer",
+          "description": "Maximum depth for reference folding",
+          "default": 3,
+          "minimum": 1
+        },
+        "foldPrimitives": {
+          "type": "boolean",
+          "description": "Whether to fold primitive type references",
+          "default": true
+        },
+        "foldSimpleObjects": {
+          "type": "boolean",
+          "description": "Whether to fold simple object references",
+          "default": true
+        },
+        "minComplexityForRef": {
+          "type": "integer",
+          "description": "Minimum complexity score required to create a $ref",
+          "default": 5
+        }
+      }
+    },
+    "schemaDeduplication": {
+      "type": "object",
+      "description": "Rules for schema deduplication",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "Algorithm for computing schema similarity",
+          "enum": ["structural", "semantic", "hybrid"],
+          "default": "structural"
+        },
+        "similarityThreshold": {
+          "type": "number",
+          "description": "Minimum similarity score for deduplication",
+          "default": 0.95,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "maxDeduplicationCandidates": {
+          "type": "integer",
+          "description": "Maximum number of candidates to consider for deduplication",
+          "default": 1000,
+          "minimum": 1
+        }
+      }
+    },
+    "pathParameterOrdering": {
+      "type": "object",
+      "description": "Rules for ordering path parameters",
+      "properties": {
+        "sortBy": {
+          "type": "string",
+          "description": "How to sort path parameters",
+          "enum": ["alphabetical", "appearance", "complexity"],
+          "default": "appearance"
+        },
+        "groupByType": {
+          "type": "boolean",
+          "description": "Whether to group parameters by type",
+          "default": false
+        }
+      }
+    },
+    "responseCanonicalization": {
+      "type": "object",
+      "description": "Rules for canonicalizing response schemas",
+      "properties": {
+        "canonicalStatusCodes": {
+          "type": "object",
+          "description": "Canonical status code mappings",
+          "properties": {
+            "200": { "type": "string", "default": "OK" },
+            "201": { "type": "string", "default": "Created" },
+            "204": { "type": "string", "default": "No Content" },
+            "400": { "type": "string", "default": "Bad Request" },
+            "401": { "type": "string", "default": "Unauthorized" },
+            "403": { "type": "string", "default": "Forbidden" },
+            "404": { "type": "string", "default": "Not Found" },
+            "409": { "type": "string", "default": "Conflict" },
+            "422": { "type": "string", "default": "Unprocessable Entity" },
+            "500": { "type": "string", "default": "Internal Server Error" }
+          }
+        },
+        "defaultResponseContentType": {
+          "type": "string",
+          "description": "Default content type for responses",
+          "default": "application/json"
+        },
+        "errorResponseSchema": {
+          "type": "object",
+          "description": "Schema for error responses",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["object"],
+              "default": "object"
+            },
+            "properties": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "string" },
+                    "message": { "type": "string" },
+                    "details": { "type": "object" }
+                  },
+                  "required": ["code", "message"]
+                }
+              },
+              "required": ["error"]
+            }
+          }
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "description": "Determinism guarantees for OpenAPI generation",
+      "properties": {
+        "stableIds": {
+          "type": "boolean",
+          "description": "Whether operation IDs are stable across generations",
+          "default": true
+        },
+        "canonicalJson": {
+          "type": "boolean",
+          "description": "Whether output follows RFC 8785 canonical JSON",
+          "default": true
+        },
+        "timestampFree": {
+          "type": "boolean",
+          "description": "Whether output is free of timestamps",
+          "default": true
+        },
+        "versionAgnostic": {
+          "type": "boolean",
+          "description": "Whether output is agnostic to MTPScript version",
+          "default": false
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "MTPScript-specific OpenAPI extensions",
+      "properties": {
+        "x-mtpscript-gas-limit": {
+          "type": "object",
+          "description": "Gas limit extension for operations",
+          "properties": {
+            "required": { "type": "boolean", "default": true },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum gas units allowed for this operation"
+              }
+            }
+          }
+        },
+        "x-mtpscript-effects": {
+          "type": "object",
+          "description": "Declared effects for operations",
+          "properties": {
+            "required": { "type": "boolean", "default": false },
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of effects declared by this operation"
+            }
+          }
+        },
+        "x-mtpscript-determinism": {
+          "type": "object",
+          "description": "Determinism level for operations",
+          "properties": {
+            "required": { "type": "boolean", "default": true },
+            "schema": {
+              "type": "string",
+              "enum": ["request", "seed", "global"],
+              "description": "Determinism level: request (per-request), seed (deterministic), global (nondeterministic)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["fieldOrdering", "refFolding", "schemaDeduplication", "pathParameterOrdering", "responseCanonicalization", "determinism"]
+}

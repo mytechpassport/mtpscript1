@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTPScript - Deterministic. Serverless. Auditable. AI-Native.</title>
+
+    <!-- Fonts: Inter and IBM Plex Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+    <!-- Icons: Fork Awesome (compatible with Font Awesome) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fork-awesome@1.2.0/css/fork-awesome.min.css" integrity="sha256-XoaMnoYC5TH6AA0baF8FY1vr5tehR8rfxO+teanpfQI=" crossorigin="anonymous">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    colors: {
+                        paper: '#F7F5F2',
+                        ink: '#0F172A',
+                        'sage-60': '#64748B',
+                        'verify-green': '#059669',
+                        'boundary-500': '#D97706',
+                        'fail-red': '#DC2626',
+                        highlight: '#34D399',
+                        'sage-300': '#CBD5E1',
+                        // Dark mode overrides
+                        'dark-paper': '#0F172A',
+                        'dark-ink': '#F7F5F2',
+                        'dark-sage-60': '#CBD5E1',
+                    },
+                    fontFamily: {
+                        display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        body: ['IBM Plex Mono', 'monospace'],
+                        table: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .list-arrow li::before {
+                content: "→";
+                @apply text-verify-green inline-block w-[1.5em] -ml-[1.5em];
+            }
+        }
+    </style>
+</head>
+<body class="bg-paper text-ink font-body antialiased leading-relaxed transition-colors duration-200 dark:bg-dark-paper dark:text-dark-ink relative">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 w-full backdrop-blur-md bg-paper/90 dark:bg-dark-paper/90 border-b border-sage-60/10">
+        <div class="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="#" class="font-display font-bold text-2xl tracking-tight text-ink dark:text-dark-ink hover:text-verify-green transition-colors">MTPScript</a>
+
+            <!-- Desktop Navigation -->
+            <div class="hidden md:flex gap-10 text-sm font-medium font-display text-sage-60 dark:text-dark-sage-60">
+                <a href="#who-is-for" class="hover:text-verify-green transition-colors">Use Cases</a>
+                <a href="#ai-safe" class="hover:text-verify-green transition-colors">AI Safety</a>
+                <a href="#comparison" class="hover:text-verify-green transition-colors">Comparison</a>
+                <a href="#isolation" class="hover:text-verify-green transition-colors">How it Works</a>
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button id="mobile-menu-button" class="md:hidden flex flex-col justify-center items-center w-8 h-8 space-y-1.5 focus:outline-none group relative">
+                <span class="block w-6 h-0.5 bg-ink dark:bg-dark-ink transition-all duration-300 origin-center"></span>
+                <span class="block w-6 h-0.5 bg-ink dark:bg-dark-ink transition-all duration-300 origin-center"></span>
+                <span class="block w-6 h-0.5 bg-ink dark:bg-dark-ink transition-all duration-300 origin-center"></span>
+            </button>
+
+            <!-- Desktop CTA -->
+            <a href="#spec" class="hidden md:inline-block px-5 py-2.5 rounded bg-verify-green text-white text-sm font-bold font-display hover:opacity-90 transition-opacity shadow-lg shadow-verify-green/20">
+                Get Started
+            </a>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Overlay (outside nav for proper z-index stacking) -->
+    <div id="mobile-menu" class="md:hidden fixed inset-0 bg-paper/98 dark:bg-dark-paper/98 backdrop-blur-lg z-[60] transform translate-x-full transition-all duration-300 ease-in-out">
+        <!-- Close button positioned absolutely in top right -->
+        <button id="mobile-menu-close" onclick="closeMobileMenu()" class="absolute top-6 right-6 w-10 h-10 flex items-center justify-center focus:outline-none z-[70]">
+            <span class="sr-only">Close menu</span>
+            <svg class="w-6 h-6 text-ink dark:text-dark-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+
+        <div class="flex flex-col h-full pt-20">
+            <div class="flex flex-col space-y-2 px-6 py-8">
+                <a href="#who-is-for" class="text-xl font-medium font-display text-ink dark:text-dark-ink hover:text-verify-green hover:bg-verify-green/5 transition-all duration-200 py-3 px-4 rounded-lg" onclick="closeMobileMenu()">Use Cases</a>
+                <a href="#ai-safe" class="text-xl font-medium font-display text-ink dark:text-dark-ink hover:text-verify-green hover:bg-verify-green/5 transition-all duration-200 py-3 px-4 rounded-lg" onclick="closeMobileMenu()">AI Safety</a>
+                <a href="#comparison" class="text-xl font-medium font-display text-ink dark:text-dark-ink hover:text-verify-green hover:bg-verify-green/5 transition-all duration-200 py-3 px-4 rounded-lg" onclick="closeMobileMenu()">Comparison</a>
+                <a href="#isolation" class="text-xl font-medium font-display text-ink dark:text-dark-ink hover:text-verify-green hover:bg-verify-green/5 transition-all duration-200 py-3 px-4 rounded-lg" onclick="closeMobileMenu()">How it Works</a>
+
+                <div class="pt-8 mt-8 border-t border-sage-60/20">
+                    <a href="#spec" class="inline-block w-full text-center px-8 py-4 rounded-lg bg-verify-green text-white text-lg font-bold font-display hover:opacity-90 transition-all duration-200 shadow-lg shadow-verify-green/20 hover:shadow-xl hover:shadow-verify-green/30 hover:-translate-y-0.5">
+                        Get Started
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header / Hero -->
+    <header class="max-w-6xl mx-auto px-6 py-32 relative overflow-visible">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="relative z-10">
+                <h1 class="font-display font-bold leading-tight mb-6 tracking-tight text-5xl md:text-6xl lg:text-7xl">
+                    If You Know JavaScript,
+                    <span class="text-verify-green">You Already Know MTPScript</span>
+                </h1>
+                <div class="text-2xl text-sage-60 font-display mb-10 font-medium dark:text-dark-sage-60 leading-relaxed">
+                    Deterministic. Serverless. Auditable. AI-Native.
+                </div>
+
+                <div class="max-w-2xl mx-auto">
+                    <p class="mb-8 text-lg leading-relaxed">MTPScript is a <strong>serverless-first API language</strong> for regulated environments. It looks like JS but runs in a <strong>sealed, deterministic runtime</strong>.</p>
+
+                    <div class="bg-ink/5 dark:bg-ink/20 p-6 rounded-lg border-l-4 border-verify-green mb-10 backdrop-blur-sm text-left inline-block">
+                        <p class="font-display font-bold text-lg leading-loose text-ink dark:text-dark-ink">
+                            Write like JavaScript.<br>
+                            Run like a regulated system.<br>
+                            Generate safely with AI.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <a href="#spec" class="inline-flex justify-center items-center px-8 py-4 rounded text-lg font-display font-bold transition-transform hover:-translate-y-0.5 bg-verify-green text-white shadow-xl shadow-verify-green/20">
+                            Read the Specification
+                        </a>
+                        <a href="#migrate" class="inline-flex justify-center items-center px-8 py-4 rounded text-lg font-display font-bold transition-transform hover:-translate-y-0.5 bg-transparent border-2 border-sage-60 text-ink dark:text-dark-ink dark:border-dark-sage-60 hover:bg-sage-60/10">
+                            Migrate from JS/TS
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6">
+
+        <!-- Who MTPScript Is For -->
+        <section id="who-is-for" class="py-32 border-b border-sage-60/10">
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="font-display font-bold leading-tight mb-6 tracking-tight text-4xl">Who MTPScript Is For</h2>
+                    <p class="mb-8 text-lg text-sage-60 dark:text-dark-sage-60">Built for teams that already ship APIs in <strong>JavaScript or TypeScript</strong>, and now want to:</p>
+
+                    <div class="space-y-6">
+                        <ul class="list-none pl-6 mb-8 list-arrow space-y-3 text-lg">
+                            <li>Use AI to generate production code</li>
+                            <li>Eliminate whole classes of runtime bugs</li>
+                            <li>Guarantee deterministic behavior</li>
+                            <li>Satisfy audit and compliance requirements</li>
+                            <li>Deploy safely on serverless infrastructure</li>
+                        </ul>
+
+                        <div>
+                            <h3 class="font-display font-bold leading-tight mb-4 tracking-tight text-xl text-sage-60 dark:text-dark-sage-60 uppercase tracking-widest text-sm">Ideal for</h3>
+                            <div class="flex flex-wrap gap-3">
+                                <span class="px-3 py-1 rounded-full bg-sage-60/10 text-sage-60 text-sm font-medium border border-sage-60/20">FinTech & Payments</span>
+                                <span class="px-3 py-1 rounded-full bg-sage-60/10 text-sage-60 text-sm font-medium border border-sage-60/20">Healthcare SaaS</span>
+                                <span class="px-3 py-1 rounded-full bg-sage-60/10 text-sage-60 text-sm font-medium border border-sage-60/20">Platform Teams</span>
+                                <span class="px-3 py-1 rounded-full bg-sage-60/10 text-sage-60 text-sm font-medium border border-sage-60/20">Government</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Visual: Target Audience Radar -->
+                <div class="flex justify-center items-center h-full">
+                    <svg width="400" height="400" viewBox="0 0 400 400" fill="none" class="text-sage-60 w-full h-auto max-w-[400px]">
+                        <!-- Radar Background -->
+                        <circle cx="200" cy="200" r="150" stroke="currentColor" stroke-width="1" stroke-opacity="0.1" />
+                        <circle cx="200" cy="200" r="100" stroke="currentColor" stroke-width="1" stroke-opacity="0.1" />
+                        <circle cx="200" cy="200" r="50" stroke="currentColor" stroke-width="1" stroke-opacity="0.1" />
+                        <line x1="200" y1="50" x2="200" y2="350" stroke="currentColor" stroke-width="1" stroke-opacity="0.1" />
+                        <line x1="50" y1="200" x2="350" y2="200" stroke="currentColor" stroke-width="1" stroke-opacity="0.1" />
+
+                        <!-- Data Shape -->
+                        <path d="M200 80 L320 200 L200 320 L80 200 Z" fill="var(--color-verify-green)" fill-opacity="0.05" stroke="var(--color-verify-green)" stroke-width="2" />
+
+                        <!-- Points -->
+                        <circle cx="200" cy="80" r="4" fill="var(--color-verify-green)" />
+                        <circle cx="320" cy="200" r="4" fill="var(--color-verify-green)" />
+                        <circle cx="200" cy="320" r="4" fill="var(--color-verify-green)" />
+                        <circle cx="80" cy="200" r="4" fill="var(--color-verify-green)" />
+
+                        <!-- Labels -->
+                        <text x="200" y="40" text-anchor="middle" font-size="12" fill="currentColor" class="font-display font-bold">Safety</text>
+                        <text x="360" y="205" text-anchor="middle" font-size="12" fill="currentColor" class="font-display font-bold">Audit</text>
+                        <text x="200" y="370" text-anchor="middle" font-size="12" fill="currentColor" class="font-display font-bold">Speed</text>
+                        <text x="40" y="205" text-anchor="middle" font-size="12" fill="currentColor" class="font-display font-bold">Simplicity</text>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Problem -->
+        <section id="problem" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-4 tracking-tight text-4xl text-center">The Problem With AI + Existing Languages</h2>
+            <p class="mb-16 text-center max-w-2xl mx-auto text-xl text-sage-60 dark:text-dark-sage-60">AI can write code — but existing backend languages <strong class="text-ink dark:text-dark-ink border-b-2 border-fail-red">trust the code too much</strong>.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                 <div class="order-2 md:order-1 pl-4 md:pl-12">
+                    <p class="mb-6 font-display font-bold text-lg">In JavaScript, TypeScript, Go, Rust, and Python:</p>
+                    <ul class="list-none space-y-4 text-lg text-sage-60 dark:text-dark-sage-60">
+                        <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fail-red"></span> Authority is ambient</li>
+                        <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fail-red"></span> State is shared</li>
+                        <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fail-red"></span> Effects are implicit</li>
+                        <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fail-red"></span> Runtime behavior is nondeterministic</li>
+                        <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fail-red"></span> Safety depends on developer discipline</li>
+                    </ul>
+                </div>
+
+                <div class="order-1 md:order-2 bg-fail-red/5 dark:bg-fail-red/10 p-10 rounded-2xl border border-fail-red/20 shadow-lg relative overflow-hidden group hover:border-fail-red/40 transition-colors">
+                    <div class="absolute -right-10 -top-10 text-fail-red/10 group-hover:text-fail-red/20 transition-colors">
+                        <i class="fa fa-exclamation-triangle text-9xl"></i>
+                    </div>
+
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-3 mb-6 text-fail-red">
+                            <i class="fa fa-bug text-2xl"></i>
+                            <strong class="font-display text-xl">The Risk to Your System</strong>
+                        </div>
+                        <p class="mb-6 font-medium text-lg">AI-generated code can accidentally:</p>
+                        <ul class="space-y-3 font-medium">
+                            <li class="flex items-center gap-3 text-fail-red"><i class="fa fa-times-circle"></i> Access I/O it shouldn’t</li>
+                            <li class="flex items-center gap-3 text-fail-red"><i class="fa fa-times-circle"></i> Leak state across requests</li>
+                            <li class="flex items-center gap-3 text-fail-red"><i class="fa fa-times-circle"></i> Behave differently under load</li>
+                            <li class="flex items-center gap-3 text-fail-red"><i class="fa fa-times-circle"></i> Pass tests but fail audits</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-20">
+                <div class="inline-block p-8 bg-paper dark:bg-dark-paper border border-sage-60/20 rounded-xl shadow-sm max-w-2xl w-full">
+                    <p class="text-2xl font-display font-bold">
+                        The problem is not AI.<br>
+                        <span class="text-fail-red">The problem is the language.</span>
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI-Safe Design -->
+        <section id="ai-safe" class="py-32 border-b border-sage-60/10">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+                <div>
+                    <h2 class="font-display font-bold leading-tight mb-6 tracking-tight text-4xl">MTPScript Is Designed for AI-Assisted Coding</h2>
+
+                    <h3 class="font-display font-bold leading-tight mb-4 tracking-tight text-2xl mt-8 text-sage-60 dark:text-dark-sage-60">AI-Safe by Construction</h3>
+                    <p class="mb-6 text-lg">MTPScript is intentionally strict so that <strong>AI cannot generate unsafe code</strong>. The language removes entire categories of mistakes — not through linting, but through <strong>hard semantic rules</strong>.</p>
+
+                    <h3 class="font-display font-bold leading-tight mb-4 tracking-tight text-xl mt-8 text-sage-60 dark:text-dark-sage-60">What AI <em>Cannot</em> Do in MTPScript</h3>
+                    <ul class="list-none pl-0 mb-6 space-y-3">
+                        <li class="flex items-center gap-3"><i class="fa fa-lock text-verify-green"></i> Access filesystem, network, time implicitly</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-lock text-verify-green"></i> Share state across requests</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-lock text-verify-green"></i> Introduce nondeterminism</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-lock text-verify-green"></i> Load dynamic code</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-lock text-verify-green"></i> Smuggle unsafe dependencies</li>
+                    </ul>
+                </div>
+
+                <!-- Visual: Shield/Protection -->
+                <div class="flex justify-center items-center">
+                     <svg width="400" height="400" viewBox="0 0 400 400" fill="none" class="text-verify-green drop-shadow-xl w-full h-auto max-w-[400px]">
+                        <!-- Shield Outer -->
+                        <path d="M200 40 L340 90 V180 C340 280 200 360 200 360 C200 360 60 280 60 180 V90 L200 40 Z"
+                              stroke="currentColor" stroke-width="2" fill="var(--color-paper)" fill-opacity="0.1" class="dark:fill-dark-paper" />
+
+                        <!-- Inner Grid -->
+                        <path d="M200 40 V360" stroke="currentColor" stroke-width="1" stroke-opacity="0.2" />
+                        <path d="M60 180 H340" stroke="currentColor" stroke-width="1" stroke-opacity="0.2" />
+
+                        <!-- Core Symbol -->
+                        <circle cx="200" cy="180" r="60" stroke="currentColor" stroke-width="2" class="animate-pulse-slow" />
+                        <path d="M170 180 L190 200 L230 160" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+
+                        <!-- Particles -->
+                        <circle cx="100" cy="120" r="4" fill="var(--color-boundary-500)" opacity="0.6">
+                            <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite" />
+                        </circle>
+                         <circle cx="300" cy="240" r="4" fill="var(--color-boundary-500)" opacity="0.6">
+                            <animate attributeName="opacity" values="0;1;0" dur="3s" repeatCount="indefinite" />
+                        </circle>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                <div class="p-6 bg-paper dark:bg-dark-paper border border-sage-60/20 rounded-xl hover:border-fail-red/50 transition-colors">
+                    <p class="font-bold mb-3 font-display text-lg">Rule Violation?</p>
+                    <p class="text-fail-red font-mono bg-fail-red/10 inline-block px-3 py-1 rounded">Does not compile</p>
+                </div>
+                <div class="p-6 bg-paper dark:bg-dark-paper border border-sage-60/20 rounded-xl hover:border-fail-red/50 transition-colors">
+                    <p class="font-bold mb-3 font-display text-lg">Undeclared Authority?</p>
+                    <p class="text-fail-red font-mono bg-fail-red/10 inline-block px-3 py-1 rounded">Does not compile</p>
+                </div>
+                <div class="p-6 bg-paper dark:bg-dark-paper border border-sage-60/20 rounded-xl hover:border-fail-red/50 transition-colors">
+                    <p class="font-bold mb-3 font-display text-lg">Nondeterminism?</p>
+                    <p class="text-fail-red font-mono bg-fail-red/10 inline-block px-3 py-1 rounded">Cannot be expressed</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Why AI Works Better -->
+        <section id="why-ai" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-16 tracking-tight text-4xl text-center">Why AI Works Better With MTPScript</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-16 bg-sage-60/5 p-12 rounded-3xl relative overflow-hidden">
+                <!-- Background decoration -->
+                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-sage-60 to-verify-green opacity-50"></div>
+
+                <div class="relative z-10">
+                    <h3 class="font-display font-bold text-2xl mb-8">Because MTPScript is:</h3>
+                    <ul class="space-y-4 text-lg">
+                        <li class="flex items-center gap-3"><i class="fa fa-check-circle text-sage-60"></i> Deterministic</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-check-circle text-sage-60"></i> Side-effect explicit</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-check-circle text-sage-60"></i> Free of ambient authority</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-check-circle text-sage-60"></i> Free of hidden state</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-check-circle text-sage-60"></i> Fully typed</li>
+                    </ul>
+                </div>
+                <div class="relative z-10">
+                    <h3 class="font-display font-bold text-2xl mb-8 text-verify-green">AI-generated code becomes:</h3>
+                    <ul class="space-y-4 text-lg font-medium text-verify-green">
+                        <li class="flex items-center gap-3"><i class="fa fa-star"></i> Predictable</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-star"></i> Auditable</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-star"></i> Reproducible</li>
+                        <li class="flex items-center gap-3"><i class="fa fa-star"></i> Safe to execute in production</li>
+                    </ul>
+                </div>
+            </div>
+
+            <p class="text-center mt-12 text-2xl font-display font-bold">
+                The language constrains the AI — <span class="text-sage-60">not the other way around.</span>
+            </p>
+        </section>
+
+        <!-- What MTPScript Is -->
+        <section id="what-is" class="py-32 border-b border-sage-60/10">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="font-display font-bold leading-tight mb-6 tracking-tight text-4xl">What MTPScript Is</h2>
+                    <h3 class="font-display font-bold leading-tight mb-8 tracking-tight text-2xl text-sage-60 dark:text-dark-sage-60">JavaScript Syntax. Regulated & AI-Safe Semantics.</h3>
+
+                     <p class="mb-6 text-lg">MTPScript is a <strong>JavaScript-shaped language</strong> that compiles to a <strong>strictly constrained JavaScript subset</strong>, executed by a <strong>sealed MicroQuickJS runtime</strong>.</p>
+
+                    <p class="mb-6 text-lg">If you know JavaScript or TypeScript, you already know the syntax. What changes is <strong>what the language allows — and forbids</strong>.</p>
+                </div>
+
+                <!-- Visual: JS Subset / Runtime -->
+                <div class="flex justify-center p-8">
+                     <svg width="350" height="350" viewBox="0 0 350 350" fill="none" class="w-full h-auto max-w-[350px]">
+                        <!-- Outer Circle: JS -->
+                        <circle cx="175" cy="175" r="170" stroke="currentColor" stroke-width="1" class="text-sage-60" stroke-dasharray="8 8" opacity="0.3"/>
+                        <text x="175" y="40" text-anchor="middle" class="text-sm fill-current text-sage-60 font-body tracking-widest">STANDARD JAVASCRIPT</text>
+
+                        <!-- Inner Circle: MTPScript -->
+                        <circle cx="175" cy="175" r="110" stroke="var(--color-verify-green)" stroke-width="2" fill="var(--color-paper)" fill-opacity="0.8" class="dark:fill-dark-paper"/>
+                         <text x="175" y="140" text-anchor="middle" class="text-lg font-bold fill-current text-verify-green font-display">MTPScript</text>
+                         <text x="175" y="160" text-anchor="middle" class="text-xs fill-current text-verify-green font-body">Deterministic Subset</text>
+
+                         <!-- Inner Inner: Runtime -->
+                         <circle cx="175" cy="220" r="40" stroke="currentColor" stroke-width="1" class="text-ink dark:text-dark-ink" opacity="0.3"/>
+                         <path d="M165 210 L175 220 L195 200" stroke="currentColor" stroke-width="2" class="text-ink dark:text-dark-ink"/>
+                         <text x="175" y="245" text-anchor="middle" class="text-[10px] fill-current text-ink dark:text-dark-ink font-body">Sealed VM</text>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Side by Side -->
+        <section id="comparison" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-4 tracking-tight text-4xl">JavaScript vs MTPScript</h2>
+            <h3 class="font-display font-bold leading-tight mb-16 tracking-tight text-2xl text-sage-60 dark:text-dark-sage-60">Same Intent. Different Guarantees.</h3>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-20">
+                <!-- JS Code -->
+                <div class="group">
+                    <div class="flex items-center justify-between mb-4">
+                        <h5 class="font-display font-bold leading-tight tracking-tight text-xl text-sage-60 dark:text-dark-sage-60">JavaScript / TypeScript</h5>
+                        <span class="text-xs px-2 py-1 rounded border border-sage-60/30 text-sage-60">Implicit I/O</span>
+                    </div>
+                    <div class="bg-slate-800 dark:bg-slate-950 text-slate-200 p-8 rounded-xl overflow-x-auto mb-6 font-body text-sm border border-transparent group-hover:border-sage-60/50 transition-colors shadow-2xl">
+<pre><code class="language-ts">app.post("/users", async (req, res) => {
+  // Implicit: DB access, network,
+  // async scheduling, shared state
+  const user = await db.insert(req.body);
+  console.log("created user", user);
+  res.json(user);
+});</code></pre>
+                    </div>
+                </div>
+
+                <!-- MTPScript Code -->
+                <div class="group">
+                    <div class="flex items-center justify-between mb-4">
+                         <h5 class="font-display font-bold leading-tight tracking-tight text-xl text-verify-green">MTPScript</h5>
+                         <span class="text-xs px-2 py-1 rounded bg-verify-green/10 text-verify-green border border-verify-green/20">Explicit Effects</span>
+                    </div>
+                    <div class="bg-slate-800 dark:bg-slate-950 text-slate-200 p-8 rounded-xl overflow-x-auto mb-6 font-body text-sm border-2 border-verify-green/30 group-hover:border-verify-green transition-colors shadow-2xl shadow-verify-green/5">
+<pre><code class="language-mtp">api POST /users
+uses { db, log } {
+  // Explicit capabilities only
+  let user = db.insert(req.body)
+  log.info("created user", user)
+  respond json(user)
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table remains effectively the same but cleaner -->
+            <div class="overflow-x-auto rounded-xl border border-sage-60/10">
+                <table class="w-full border-collapse font-table min-w-[600px]">
+                    <thead>
+                        <tr class="bg-sage-60/5">
+                            <th class="text-left p-5 border-b border-sage-60/20 font-bold text-ink dark:text-dark-ink">Concern</th>
+                            <th class="text-left p-5 border-b border-sage-60/20 font-semibold text-sage-60 dark:text-dark-sage-60">JavaScript / TypeScript</th>
+                            <th class="text-left p-5 border-b border-sage-60/20 font-bold text-verify-green">MTPScript</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="hover:bg-sage-60/5 transition-colors">
+                            <td class="text-left p-5 border-b border-sage-60/10 font-medium">Syntax familiarity</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-check text-verify-green mr-2"></i> High</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-check text-verify-green mr-2"></i> High</td>
+                        </tr>
+                        <!-- ... (Rest of table rows with slightly more padding) ... -->
+                         <tr class="hover:bg-sage-60/5 transition-colors">
+                            <td class="text-left p-5 border-b border-sage-60/10 font-medium">AI-safe by default</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-times text-fail-red mr-2"></i> No</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-check text-verify-green mr-2"></i> Yes</td>
+                        </tr>
+                        <tr class="hover:bg-sage-60/5 transition-colors">
+                            <td class="text-left p-5 border-b border-sage-60/10 font-medium">Ambient I/O</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-check text-sage-60 mr-2"></i> Yes (Risky)</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-ban text-verify-green mr-2"></i> No</td>
+                        </tr>
+                        <tr class="hover:bg-sage-60/5 transition-colors">
+                            <td class="text-left p-5 border-b border-sage-60/10 font-medium">Deterministic</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-question text-boundary-500 mr-2"></i> Best-effort</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-check text-verify-green mr-2"></i> Guaranteed</td>
+                        </tr>
+                         <tr class="hover:bg-sage-60/5 transition-colors">
+                            <td class="text-left p-5 border-b border-sage-60/10 font-medium">Auditability</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-eye text-sage-60 mr-2"></i> Observational</td>
+                            <td class="text-left p-5 border-b border-sage-60/10"><i class="fa fa-lock text-verify-green mr-2"></i> Provable</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Isolation -->
+        <section id="isolation" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-12 tracking-tight text-4xl text-center">Per-Request Isolation Without Cold Starts</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+                <div>
+                     <p class="mb-6 text-lg">Each request runs in its <strong>own isolated VM</strong>, created via a snapshot-clone model:</p>
+                    <ol class="list-none pl-0 mb-8 space-y-4 text-lg">
+                        <li class="flex items-center gap-4">
+                            <span class="w-8 h-8 rounded-full bg-sage-60 text-white flex items-center justify-center font-bold text-sm">1</span>
+                            Immutable build-time snapshot
+                        </li>
+                        <li class="flex items-center gap-4">
+                            <span class="w-8 h-8 rounded-full bg-sage-60 text-white flex items-center justify-center font-bold text-sm">2</span>
+                            Copy-on-write VM clone
+                        </li>
+                        <li class="flex items-center gap-4">
+                            <span class="w-8 h-8 rounded-full bg-verify-green text-white flex items-center justify-center font-bold text-sm">3</span>
+                            Execute exactly one request
+                        </li>
+                         <li class="flex items-center gap-4">
+                            <span class="w-8 h-8 rounded-full bg-sage-60 text-white flex items-center justify-center font-bold text-sm">4</span>
+                            Discard VM immediately
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- Visual: VM Isolation Bubbles -->
+                <div class="flex justify-center">
+                    <svg width="400" height="300" viewBox="0 0 400 300" fill="none" class="text-sage-60 w-full h-auto max-w-[400px]">
+                        <!-- Shared Immutable Snapshot at Top -->
+                        <rect x="140" y="20" width="120" height="40" rx="6" stroke="currentColor" stroke-width="2" fill="var(--color-paper)" class="dark:fill-dark-paper" />
+                        <text x="200" y="45" text-anchor="middle" font-size="12" fill="currentColor" font-weight="bold" class="font-display">Immutable Snapshot</text>
+
+                        <!-- Distribution Lines -->
+                        <path d="M200 60 V100" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" />
+                        <path d="M200 100 H80 V130" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" />
+                        <path d="M200 100 H320 V130" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" />
+                        <path d="M200 100 V130" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" />
+
+                        <!-- Isolated Containers (Lanes) -->
+
+                        <!-- Container 1 -->
+                        <g class="animate-float" style="animation-delay: 0s;">
+                            <rect x="40" y="130" width="80" height="120" rx="8" stroke="var(--color-verify-green)" stroke-width="2" fill="var(--color-paper)" class="dark:fill-dark-paper" stroke-opacity="0.8"/>
+                            <text x="80" y="155" text-anchor="middle" font-size="11" fill="var(--color-verify-green)" font-weight="bold" class="font-display">Req A</text>
+                            <!-- Inner contents -->
+                            <rect x="55" y="170" width="50" height="4" rx="2" fill="currentColor" opacity="0.2" />
+                            <rect x="55" y="180" width="30" height="4" rx="2" fill="currentColor" opacity="0.2" />
+                            <!-- Lock icon approximation -->
+                            <circle cx="80" cy="210" r="8" stroke="var(--color-verify-green)" stroke-width="1.5" />
+                            <rect x="76" y="208" width="8" height="6" rx="1" fill="var(--color-verify-green)" />
+                        </g>
+
+                        <!-- Container 2 -->
+                        <g class="animate-float" style="animation-delay: 1.5s;">
+                            <rect x="160" y="130" width="80" height="120" rx="8" stroke="var(--color-verify-green)" stroke-width="2" fill="var(--color-paper)" class="dark:fill-dark-paper" stroke-opacity="0.8"/>
+                            <text x="200" y="155" text-anchor="middle" font-size="11" fill="var(--color-verify-green)" font-weight="bold" class="font-display">Req B</text>
+                            <rect x="175" y="170" width="50" height="4" rx="2" fill="currentColor" opacity="0.2" />
+                            <rect x="175" y="180" width="40" height="4" rx="2" fill="currentColor" opacity="0.2" />
+                            <circle cx="200" cy="210" r="8" stroke="var(--color-verify-green)" stroke-width="1.5" />
+                            <rect x="196" y="208" width="8" height="6" rx="1" fill="var(--color-verify-green)" />
+                        </g>
+
+                        <!-- Container 3 -->
+                        <g class="animate-float" style="animation-delay: 0.7s;">
+                            <rect x="280" y="130" width="80" height="120" rx="8" stroke="var(--color-verify-green)" stroke-width="2" fill="var(--color-paper)" class="dark:fill-dark-paper" stroke-opacity="0.8"/>
+                            <text x="320" y="155" text-anchor="middle" font-size="11" fill="var(--color-verify-green)" font-weight="bold" class="font-display">Req C</text>
+                            <rect x="295" y="170" width="50" height="4" rx="2" fill="currentColor" opacity="0.2" />
+                            <rect x="295" y="180" width="20" height="4" rx="2" fill="currentColor" opacity="0.2" />
+                            <circle cx="320" cy="210" r="8" stroke="var(--color-verify-green)" stroke-width="1.5" />
+                            <rect x="316" y="208" width="8" height="6" rx="1" fill="var(--color-verify-green)" />
+                        </g>
+
+                        <!-- Isolation Walls (dashed lines between) -->
+                        <line x1="140" y1="120" x2="140" y2="280" stroke="var(--color-fail-red)" stroke-width="1" stroke-dasharray="2 2" opacity="0.3" />
+                        <line x1="260" y1="120" x2="260" y2="280" stroke="var(--color-fail-red)" stroke-width="1" stroke-dasharray="2 2" opacity="0.3" />
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Determinism -->
+        <section id="determinism" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-4 tracking-tight text-4xl text-center">Determinism You Can Prove</h2>
+            <div class="max-w-4xl mx-auto text-center">
+                <p class="mb-16 text-xl text-sage-60 dark:text-dark-sage-60">Same input bytes produce:</p>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+                    <div class="p-8 border border-sage-60/20 rounded-2xl bg-paper dark:bg-dark-paper hover:-translate-y-1 transition-transform">
+                        <i class="fa fa-cogs text-4xl text-verify-green mb-4"></i>
+                        <div class="font-bold font-display">Same Execution</div>
+                    </div>
+                    <div class="p-8 border border-sage-60/20 rounded-2xl bg-paper dark:bg-dark-paper hover:-translate-y-1 transition-transform">
+                         <i class="fa fa-bolt text-4xl text-verify-green mb-4"></i>
+                        <div class="font-bold font-display">Same Effects</div>
+                    </div>
+                    <div class="p-8 border border-sage-60/20 rounded-2xl bg-paper dark:bg-dark-paper hover:-translate-y-1 transition-transform">
+                         <i class="fa fa-file-code-o text-4xl text-verify-green mb-4"></i>
+                        <div class="font-bold font-display">Same Output</div>
+                    </div>
+                    <div class="p-8 border border-sage-60/20 rounded-2xl bg-paper dark:bg-dark-paper hover:-translate-y-1 transition-transform">
+                         <i class="fa fa-hashtag text-4xl text-verify-green mb-4"></i>
+                        <div class="font-bold font-display">Same Hash</div>
+                    </div>
+                </div>
+
+                <p class="mb-6 font-semibold text-verify-green text-xl">This is what makes AI-generated code auditable.</p>
+            </div>
+        </section>
+
+        <!-- Migration -->
+        <section id="migration" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-6 tracking-tight text-4xl">From JavaScript & TypeScript to MTPScript</h2>
+            <h3 class="font-display font-bold leading-tight mb-12 tracking-tight text-2xl text-sage-60 dark:text-dark-sage-60">Mechanical Migration — Human or AI Driven</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div>
+                     <p class="mb-6 text-lg">MTPScript is designed for <strong>mechanical migration</strong> from JS/TS. AI tools can safely:</p>
+                    <ul class="list-none pl-6 mb-6 list-arrow space-y-3 text-lg">
+                        <li>Translate handlers</li>
+                        <li>Replace implicit I/O with effects</li>
+                        <li>Introduce <code class="font-body bg-slate-500/10 px-1.5 py-0.5 rounded text-sm text-boundary-500">Option</code> and <code class="font-body bg-slate-500/10 px-1.5 py-0.5 rounded text-sm text-boundary-500">Result</code></li>
+                        <li>Eliminate runtime exceptions</li>
+                        <li>Produce audit-ready APIs</li>
+                    </ul>
+                </div>
+                <div class="flex items-center justify-center p-12 bg-sage-60/5 rounded-2xl border border-sage-60/10">
+                    <div class="text-center">
+                        <div class="text-5xl mb-4 font-display font-bold flex items-center justify-center gap-8">
+                            <span>JS</span>
+                            <i class="fa fa-long-arrow-right text-verify-green"></i>
+                            <span>MTP</span>
+                        </div>
+                        <div class="text-lg text-sage-60">Safe Mechanical Translation</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Why Exists -->
+        <section id="why-exists" class="py-32 border-b border-sage-60/10">
+            <h2 class="font-display font-bold leading-tight mb-16 tracking-tight text-4xl text-center">Why MTPScript Exists</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div class="p-10 border border-sage-60/20 rounded-2xl">
+                    <p class="mb-8 font-bold text-2xl text-sage-60">Most languages assume:</p>
+                    <ul class="list-none pl-6 mb-6 list-arrow space-y-4 text-xl text-sage-60">
+                        <li>Humans write code carefully</li>
+                        <li>Runtime issues are caught later</li>
+                        <li>Safety is enforced by convention</li>
+                    </ul>
+                </div>
+                <div class="p-10 border-2 border-verify-green rounded-2xl bg-verify-green/5 shadow-xl shadow-verify-green/10">
+                    <p class="mb-8 font-bold text-2xl text-ink dark:text-dark-ink">MTPScript assumes:</p>
+                    <ul class="list-none pl-6 mb-6 list-arrow space-y-4 text-xl font-medium">
+                        <li class="before:text-verify-green">Code will be generated by AI</li>
+                        <li class="before:text-verify-green">Execution must be provably safe</li>
+                        <li class="before:text-verify-green">Mistakes must be impossible, not discouraged</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="text-center mt-20 text-3xl font-display font-bold text-verify-green mb-6 max-w-3xl mx-auto leading-tight">
+                MTPScript is a language you can trust — even when the code wasn’t written by you.
+            </p>
+        </section>
+
+        <!-- Final CTA -->
+        <section id="cta" class="text-center py-40 pb-20 border-b-0 bg-gradient-to-b from-transparent to-sage-60/5">
+            <h2 class="font-display font-bold leading-tight mb-12 tracking-tight text-5xl md:text-6xl">Write JavaScript.<br>Generate with AI.<br>Run Deterministically.</h2>
+            <div class="flex flex-wrap gap-6 justify-center mt-16">
+                <a href="#" class="inline-flex justify-center items-center px-10 py-5 rounded text-xl font-display font-bold transition-transform hover:-translate-y-1 hover:shadow-2xl bg-verify-green text-white border-b-0 shadow-xl shadow-verify-green/20">Read the Full Specification</a>
+                <a href="#" class="inline-flex justify-center items-center px-10 py-5 rounded text-xl font-display font-bold transition-transform hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-dark-paper border border-sage-60 text-ink dark:text-dark-ink dark:border-dark-sage-60 border-b-0">See Examples</a>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="py-20 text-center border-t border-sage-60/20 mt-0 bg-sage-60/5">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="font-display font-extrabold text-3xl mb-4">MTPScript</div>
+            <div class="text-sage-60 dark:text-dark-sage-60 text-lg">JavaScript familiarity. Deterministic execution. AI-safe by design.</div>
+            <div class="mt-12 text-sm text-sage-60/60 font-body">
+                &copy; 2026 My Tech Passport Inc. Open Source.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        let isMenuOpen = false;
+
+        function toggleMobileMenu() {
+            isMenuOpen = !isMenuOpen;
+
+            if (isMenuOpen) {
+                mobileMenu.classList.remove('translate-x-full');
+                mobileMenu.classList.add('translate-x-0');
+                document.body.style.overflow = 'hidden'; // Prevent scrolling when menu is open
+            } else {
+                mobileMenu.classList.remove('translate-x-0');
+                mobileMenu.classList.add('translate-x-full');
+                document.body.style.overflow = ''; // Restore scrolling
+            }
+
+            // Animate hamburger button
+            const bars = mobileMenuButton.querySelectorAll('span');
+            if (isMenuOpen) {
+                bars[0].style.transform = 'rotate(45deg) translate(6px, 6px)';
+                bars[1].style.opacity = '0';
+                bars[1].style.transform = 'translateX(20px)';
+                bars[2].style.transform = 'rotate(-45deg) translate(6px, -6px)';
+            } else {
+                bars[0].style.transform = '';
+                bars[1].style.opacity = '';
+                bars[1].style.transform = '';
+                bars[2].style.transform = '';
+            }
+        }
+
+        function closeMobileMenu() {
+            if (isMenuOpen) {
+                toggleMobileMenu();
+            }
+        }
+
+        // Event listeners
+        mobileMenuButton.addEventListener('click', toggleMobileMenu);
+
+        // Close menu when clicking outside or on a link
+        mobileMenu.addEventListener('click', function(e) {
+            if (e.target === mobileMenu) {
+                closeMobileMenu();
+            }
+        });
+
+        // Close menu on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isMenuOpen) {
+                closeMobileMenu();
+            }
+        });
+
+        // Close menu on window resize to desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 768 && isMenuOpen) { // md breakpoint
+                closeMobileMenu();
+            }
+        });
+    </script>
+
+</body>
+</html>
+</html>

@@ -1,0 +1,46 @@
+// Complex model fixture showcasing all primitive types and nested structures
+// This demonstrates MTPScript type system capabilities
+
+// Simple function demonstrating all primitive types
+function createPrimitiveShowcase(): {
+    integer_num: number,
+    decimal_num: Decimal,
+    text: string,
+    flag: boolean,
+    nested: {
+        inner_text: string,
+        inner_number: number
+    },
+    array_of_numbers: [number]
+} {
+    return {
+        integer_num: 42,
+        decimal_num: 3.14159265359,
+        text: "Hello complex world",
+        flag: true,
+        nested: {
+            inner_text: "nested content",
+            inner_number: 99
+        },
+        array_of_numbers: [1, 2, 3, 4, 5]
+    }
+}
+
+// API endpoint with complex return type
+api GET "/test" function getComplexData(): {
+    id: number,
+    data: {
+        name: string,
+        values: [number]
+    },
+    success: boolean
+} {
+    return {
+        id: 123,
+        data: {
+            name: "test",
+            values: [1, 2, 3]
+        },
+        success: true
+    }
+}
